@@ -1,9 +1,59 @@
-.env
-.venv/
+# Python
 __pycache__/
+*.py[codz]
+*$py.class
 *.pyc
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Environments
+.env
+.envrc
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs
+*.log
 streamlit.out.log
 streamlit.err.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE / editor
+.vscode/
+.idea/
+.cursorignore
+.cursorindexingignore
+.ropeproject
+.spyderproject
+.spyproject
+
+# Project-local runtime artifacts
 data/app.db
 uploads/*
 !uploads/.gitkeep

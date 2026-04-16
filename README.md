@@ -1,10 +1,15 @@
-# PCR 电泳异常诊断 Demo
+# pcr_diagnosis
 
-这是一个基于 Streamlit 的 PCR 电泳异常诊断最小可行性产品（MVP）。
+PCR 电泳异常智能诊断助手，一个基于 Streamlit + SQLite 的课堂演示原型系统。
 
-## 功能简介
+## 功能概览
 
-根据用户输入的 PCR 实验异常现象和参数，系统返回一个简单诊断结果，包括可能原因、分数和建议。
+- 学生端分步提交 PCR 实验异常信息
+- 系统返回 Top1 / Top2 / Top3 诊断结果
+- 展示诊断依据、置信度、证据摘要和缺失信息提示
+- 支持文本线索参与规则诊断
+- 支持凝胶图片上传
+- 教师端支持历史记录查看、筛选、统计看板和教师确认
 
 ## 安装依赖
 
@@ -18,56 +23,25 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-运行后，浏览器会自动打开 `http://localhost:8501` 查看应用。
+默认访问地址：
 
-## 数据库文件位置
-
-- 路径: `data/app.db`
-- 类型: SQLite 数据库
-- 表名: `diagnosis_records`
-
-每次诊断会自动保存一条记录到数据库中。
-
-## rules.csv 作用
-
-`rules.csv` 是诊断规则文件，包含以下字段：
-
-- `abnormality`: 实验异常现象
-- `cause`: 异常原因
-- `positive_control_normal`: 阳性对照是否正常
-- `negative_control_band`: 阴性对照是否有带
-- `min_template` / `max_template`: 模板量范围
-- `min_temp` / `max_temp`: 退火温度范围
-- `min_cycles` / `max_cycles`: 循环数范围
-- `score`: 匹配分数
-- `suggestion`: 建议操作
-
-用户可以根据实际需求修改规则文件来调整诊断逻辑。
-
-## 环境变量配置
-
-项目使用以下环境变量来配置 BigModel（智谱）API：
-
-- `BIGMODEL_API_KEY`：BigModel API 密钥（必须配置才能使用 AI 文本抽取）
-- `BIGMODEL_BASE_URL`：BigModel API 基础 URL（默认：`https://open.bigmodel.cn/api/paas/v4`）
-- `BIGMODEL_MODEL`：使用的模型名称（默认：`glm-5`）
-
-### 配置说明
-
-**Windows PowerShell 配置示例：**
-
-```powershell
-# 设置环境变量
-$env:BIGMODEL_API_KEY = "your-api-key-here"
-$env:BIGMODEL_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
-$env:BIGMODEL_MODEL = "glm-5"
-
-# 验证设置
-Get-ChildItem Env:BIGMODEL_*
+```text
+http://localhost:8501
 ```
 
-**重要说明：**
-- Codex 使用默认 OpenAI 配置
-- 项目业务中的 BigModel 使用 BIGMODEL_* 私有变量
-- 两者互不影响
-- 如果未配置 `BIGMODEL_API_KEY`，系统会自动回退到本地规则抽取
+## 主要文件
+
+- `app.py`：应用入口
+- `core.py`：数据库、诊断逻辑和通用渲染函数
+- `pages/1_学生端.py`：学生端
+- `pages/2_教师端.py`：教师端
+- `pages/3_开发调试端.py`：开发调试端
+- `rules.csv`：规则库
+
+## 环境变量
+
+- `BIGMODEL_API_KEY`
+- `BIGMODEL_BASE_URL`，默认 `https://open.bigmodel.cn/api/paas/v4`
+- `BIGMODEL_MODEL`，默认 `glm-5`
+
+如果未配置 `BIGMODEL_API_KEY`，系统会自动回退到本地关键词规则抽取。
