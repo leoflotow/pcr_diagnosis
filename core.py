@@ -16,6 +16,7 @@ import re
 import json
 import uuid
 from datetime import datetime
+from navigation_state import get_home_page
 
 try:
     # 使用兼容 OpenAI SDK 的方式调用 MiniMax
@@ -117,6 +118,21 @@ def go_home(clear_entries=False):
     request_navigation("home")
 
 
+def return_to_home(clear_entries=False):
+    """Return to the registered home page."""
+    go_home(clear_entries=clear_entries)
+    switch_to_home_page()
+
+
+def switch_to_home_page():
+    """Switch to home page, falling back to rerun when unavailable."""
+    home_page = get_home_page()
+    if home_page is not None:
+        st.switch_page(home_page)
+        return
+    st.rerun()
+
+
 def get_current_role_label():
     role_map = {
         "home": "首页",
@@ -185,12 +201,10 @@ def render_entry_guard(page_name):
         col_home, col_reset = st.columns(2)
         with col_home:
             if st.button("返回首页", key=f"guard_home_{page_name}", use_container_width=True):
-                go_home(clear_entries=False)
-                st.switch_page("app.py")
+                return_to_home(clear_entries=False)
         with col_reset:
             if st.button("返回首页并重置入口状态", key=f"guard_reset_{page_name}", use_container_width=True):
-                go_home(clear_entries=True)
-                st.switch_page("app.py")
+                return_to_home(clear_entries=True)
 
 
 def apply_common_styles(theme="student"):

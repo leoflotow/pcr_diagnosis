@@ -14,16 +14,18 @@ from core import (
     get_current_role_label,
     get_dev_access_code,
     get_teacher_access_code,
-    go_home,
     init_access_state,
     init_database,
     logout_dev_access,
     logout_teacher_access,
+    return_to_home,
     render_card_title,
     render_page_hero,
     render_soft_notice,
+    switch_to_home_page,
     verify_access_code,
 )
+from navigation_state import get_home_page, register_home_page
 
 
 PAGE_TARGETS = {
@@ -160,12 +162,10 @@ def render_home_portal():
         col_home, col_reset = st.columns(2)
         with col_home:
             if st.button("返回首页", key="home_keep_home", use_container_width=True):
-                go_home(clear_entries=False)
-                st.rerun()
+                return_to_home(clear_entries=False)
         with col_reset:
             if st.button("清空全部入口状态", key="home_reset_access", use_container_width=True):
-                go_home(clear_entries=True)
-                st.rerun()
+                return_to_home(clear_entries=True)
 
     with st.container(border=True):
         render_card_title("使用说明", "本次只做轻量访问码验证，不做账号体系。")
@@ -177,8 +177,11 @@ def render_home_portal():
 
 def build_navigation_pages():
     """根据当前会话状态动态组装页面导航。"""
+    home_page = register_home_page(
+        st.Page(render_home_portal, title="首页", icon="🏠", default=True)
+    )
     pages = [
-        st.Page(render_home_portal, title="首页", icon="🏠", default=True),
+        home_page,
         st.Page("pages/1_学生端.py", title="学生端", icon="🎓"),
     ]
 
@@ -198,25 +201,31 @@ def render_sidebar_status():
         st.caption(f"开发调试端：{'已验证' if st.session_state.get('dev_verified') else '未验证'}")
 
         if st.button("返回首页", key="sidebar_go_home", use_container_width=True):
-            go_home(clear_entries=False)
-            st.switch_page("app.py")
+            return_to_home(clear_entries=False)
 
         if st.session_state.get("teacher_verified"):
             if st.button("退出教师访问", key="sidebar_logout_teacher", use_container_width=True):
                 logout_teacher_access()
-                st.switch_page("app.py")
+                switch_to_home_page()
 
         if st.session_state.get("dev_verified"):
             if st.button("退出开发访问", key="sidebar_logout_dev", use_container_width=True):
                 logout_dev_access()
-                st.switch_page("app.py")
+                switch_to_home_page()
 
 
 def handle_pending_navigation():
     """处理首页验证成功后的自动跳转。"""
     target = st.session_state.get("navigation_target")
-    if not target or target == "home":
+    if not target:
         st.session_state["navigation_target"] = None
+        return
+
+    if target == "home":
+        st.session_state["navigation_target"] = None
+        home_page = get_home_page()
+        if home_page is not None:
+            st.switch_page(home_page)
         return
 
     target_path = PAGE_TARGETS.get(target)
@@ -230,8 +239,8 @@ def main():
     init_database()
     init_access_state()
 
-    render_sidebar_status()
     pages = build_navigation_pages()
+    render_sidebar_status()
     navigator = st.navigation(pages, position="sidebar")
     handle_pending_navigation()
     navigator.run()
