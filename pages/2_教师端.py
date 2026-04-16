@@ -50,6 +50,17 @@ HISTORY_DISPLAY_OPTIONS = {
     "50 条": 50,
     "全部": None,
 }
+STAT_VIEW_OPTIONS = [
+    "请选择统计视角",
+    "Top1 不一致案例",
+    "Top1 一致案例",
+    "Top3 命中但 Top1 不一致案例",
+    "高频失败原因对应案例",
+]
+STAT_LINK_DISPLAY_OPTIONS = {
+    "最近 10 条": 10,
+    "最近 20 条": 20,
+}
 
 NEGATIVE_CONTROL_PATTERN = re.compile(r"阴性对照.*?(有带|有条带|出带|出现条带|有扩增)")
 POSITIVE_CONTROL_PATTERN = re.compile(r"阳性对照.*?(无带|无条带|没有带|未出带|不出带|未见条带)")
@@ -85,6 +96,16 @@ def is_blank(value):
 
 def normalize_text(value):
     return str(value or "").strip()
+
+
+def normalize_record_id(value):
+    if pd.isna(value):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        text = normalize_text(value)
+        return text or None
 
 
 def normalize_display_text(value, default="未填写"):
@@ -496,6 +517,26 @@ def build_reason_summary(filtered_df):
     return summary_df.head(10)
 
 
+def build_case_consistency_status(is_confirmed, comparable, top1_match, top3_hit):
+    """统一一致性状态判断，供统计看板与历史详情复用"""
+    if not is_confirmed or not comparable:
+        return "无法比较"
+    if top1_match:
+        return "一致"
+    if top3_hit:
+        return "Top3命中但Top1不一致"
+    return "未命中"
+
+
+def build_consistency_category_label(status_text):
+    mapping = {
+        "一致": "Top1 一致",
+        "Top3命中但Top1不一致": "Top1 不一致但 Top3 命中",
+        "未命中": "Top3 也未命中",
+    }
+    return mapping.get(status_text, "无法比较")
+
+
 def compute_control_abnormal_stats(filtered_df, column_mapping):
     """统计两类对照异常，优先结构化字段，缺失时回退到文本关键词匹配"""
     result = {
@@ -546,8 +587,8 @@ def build_consistency_dataframe(filtered_df, column_mapping):
     """基于当前筛选结果构建系统判断与教师确认一致性明细"""
     if filtered_df.empty:
         return pd.DataFrame(columns=[
-            "提交时间", "异常现象 / 案例摘要", "系统 Top1", "系统 Top2", "系统 Top3",
-            "教师最终原因", "是否已确认", "是否可比较", "Top1 是否一致", "Top3 是否命中", "一致性分类",
+            "id", "提交时间", "异常现象 / 案例摘要", "系统 Top1", "系统 Top2", "系统 Top3",
+            "教师最终原因", "是否已确认", "是否可比较", "Top1 是否一致", "Top3 是否命中", "一致性状态", "一致性分类",
         ])
 
     teacher_col = column_mapping.get("teacher_final")
@@ -571,17 +612,11 @@ def build_consistency_dataframe(filtered_df, column_mapping):
 
         top1_match = comparable and teacher_reason_normalized == normalized_candidates[0]
         top3_hit = comparable and teacher_reason_normalized in normalized_candidates[:3]
-
-        if not comparable:
-            consistency_category = "无法比较"
-        elif top1_match:
-            consistency_category = "Top1 一致"
-        elif top3_hit:
-            consistency_category = "Top1 不一致但 Top3 命中"
-        else:
-            consistency_category = "Top3 也未命中"
+        consistency_status = build_case_consistency_status(is_confirmed, comparable, top1_match, top3_hit)
+        consistency_category = build_consistency_category_label(consistency_status)
 
         records.append({
+            "id": normalize_record_id(row.get("id")),
             "提交时间": normalize_display_text(row.get(time_col), default="-") if time_col else "-",
             "异常现象 / 案例摘要": build_case_brief(row, column_mapping),
             "系统 Top1": normalize_display_text(system_top1, default="-"),
@@ -592,6 +627,7 @@ def build_consistency_dataframe(filtered_df, column_mapping):
             "是否可比较": comparable,
             "Top1 是否一致": top1_match,
             "Top3 是否命中": top3_hit,
+            "一致性状态": consistency_status,
             "一致性分类": consistency_category,
             "_dashboard_time": row.get("_dashboard_time"),
             "_teacher_reason_normalized": teacher_reason_normalized,
@@ -649,17 +685,7 @@ def build_feedback_loop_status(record):
     comparable = bool(is_confirmed and normalized_teacher and normalized_candidates)
     top1_match = comparable and normalized_teacher == normalized_top1
     top3_hit = comparable and normalized_teacher in normalized_candidates
-
-    if not is_confirmed:
-        consistency_status = "无法比较"
-    elif not comparable:
-        consistency_status = "无法比较"
-    elif top1_match:
-        consistency_status = "一致"
-    elif top3_hit:
-        consistency_status = "Top3命中但Top1不一致"
-    else:
-        consistency_status = "未命中"
+    consistency_status = build_case_consistency_status(is_confirmed, comparable, top1_match, top3_hit)
 
     return {
         "当前状态": "已确认" if is_confirmed else "未确认",
@@ -933,6 +959,243 @@ def render_similar_case_block(current_record, all_records):
                     st.markdown(f"- 相似依据：{similar_reason_text}")
 
 
+def build_records_by_id(records):
+    records_by_id = {}
+    for record in records:
+        record_id = normalize_record_id(record.get("id"))
+        if record_id is not None:
+            records_by_id[record_id] = record
+    return records_by_id
+
+
+def build_stat_view_options():
+    return STAT_VIEW_OPTIONS
+
+
+def filter_records_by_stat_view(view_name, consistency_df, filtered_df, selected_reason=""):
+    if view_name == "Top1 不一致案例":
+        linked_df = consistency_df[
+            consistency_df["是否已确认"]
+            & consistency_df["是否可比较"]
+            & (~consistency_df["Top1 是否一致"])
+        ].copy()
+        linked_df = sort_recent_cases(linked_df)
+        return linked_df, f"当前共找到 {len(linked_df)} 条 Top1 不一致案例。"
+
+    if view_name == "Top1 一致案例":
+        linked_df = consistency_df[
+            consistency_df["是否已确认"]
+            & consistency_df["是否可比较"]
+            & consistency_df["Top1 是否一致"]
+        ].copy()
+        linked_df = sort_recent_cases(linked_df)
+        return linked_df, f"当前共找到 {len(linked_df)} 条 Top1 一致案例。"
+
+    if view_name == "Top3 命中但 Top1 不一致案例":
+        linked_df = consistency_df[
+            consistency_df["是否已确认"]
+            & consistency_df["是否可比较"]
+            & (~consistency_df["Top1 是否一致"])
+            & consistency_df["Top3 是否命中"]
+        ].copy()
+        linked_df = sort_recent_cases(linked_df)
+        return linked_df, f"当前共找到 {len(linked_df)} 条 Top3 命中但 Top1 不一致案例。"
+
+    if view_name == "高频失败原因对应案例":
+        reason_value = normalize_text(selected_reason)
+        if not reason_value:
+            return pd.DataFrame(), "请选择一个失败原因后查看对应案例。"
+        reason_df = filtered_df.copy()
+        if reason_df.empty or "_reason" not in reason_df.columns:
+            return pd.DataFrame(), f"当前筛选范围内暂无“{reason_value}”相关案例。"
+        reason_df["_reason"] = reason_df["_reason"].apply(normalize_text)
+        linked_df = reason_df[reason_df["_reason"] == reason_value].copy()
+        linked_df = sort_recent_cases(linked_df)
+        return linked_df, f"当前共找到 {len(linked_df)} 条“{reason_value}”相关案例。"
+
+    return pd.DataFrame(), "请选择一个统计视角查看对应案例明细。"
+
+
+def build_stat_linked_records(linked_df, records_by_id):
+    linked_records = []
+    seen_ids = set()
+    if linked_df.empty or "id" not in linked_df.columns:
+        return linked_records
+
+    for record_id in linked_df["id"].tolist():
+        normalized_id = normalize_record_id(record_id)
+        if normalized_id is None or normalized_id in seen_ids:
+            continue
+        record = records_by_id.get(normalized_id)
+        if record:
+            linked_records.append(record)
+            seen_ids.add(normalized_id)
+    return linked_records
+
+
+def render_case_detail(record, all_records, detail_key_prefix):
+    record_id = record.get("id")
+    with st.expander(f"展开查看详情（记录ID: {record_id}）"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"- 记录 id：{record_id}")
+            st.markdown(f"- 提交时间：{record.get('提交时间', '-')}")
+            st.markdown(f"- 实验现象：{record.get('实验现象', '-')}")
+            st.markdown(f"- 模板量：{record.get('模板量', '-')}")
+            st.markdown(f"- 退火温度：{record.get('退火温度', '-')}")
+            st.markdown(f"- 循环数：{record.get('循环数', '-')}")
+        with col2:
+            st.markdown(f"- 阳性对照是否正常：{record.get('阳性对照是否正常', '-')}")
+            st.markdown(f"- 阴性对照是否有带：{record.get('阴性对照是否有带', '-')}")
+            st.markdown(f"- Top1 原因：{record.get('Top1 原因', '-')}")
+            st.markdown(f"- Top1 分数：{record.get('Top1 分数', '-')}")
+
+        st.markdown(f"- 学生补充描述：{record.get('学生补充描述', '-')}")
+        clues = record.get("抽取到的文本线索", [])
+        st.markdown(f"- 抽取到的文本线索：{('、'.join(clues)) if clues else '无'}")
+
+        candidates = record.get("候选原因列表", [])
+        if len(candidates) > 1:
+            for item in candidates[1:]:
+                st.markdown(f"- 其他候选原因：{item}")
+        else:
+            st.markdown("- 其他候选原因：无")
+
+        render_diagnosis_quality_block(
+            candidate_texts=candidates,
+            top1_reason=record.get("Top1 原因", ""),
+            top1_score=record.get("Top1 分数", ""),
+            abnormality=record.get("实验现象", ""),
+            positive_control_normal=record.get("阳性对照是否正常", ""),
+            negative_control_band=record.get("阴性对照是否有带", ""),
+            template_amount=record.get("模板量"),
+            annealing_temp=record.get("退火温度"),
+            cycles=record.get("循环数"),
+            description=record.get("学生补充描述", ""),
+            text_clues=clues,
+            gel_image_path=record.get("凝胶图路径", ""),
+            has_image=bool(record.get("凝胶图路径")),
+            title="系统 Top1 诊断可信度解读",
+        )
+
+        render_feedback_loop_block(record)
+        render_similar_case_block(record, all_records)
+
+        st.markdown(f"- 教师最终原因：{record.get('教师最终原因', '未确认')}")
+        st.markdown(f"- 教师备注：{record.get('教师备注', '-')}")
+        st.markdown(f"- 教师确认时间：{record.get('教师确认时间', '-')}")
+
+        img_path = record.get("凝胶图路径", "")
+        if img_path and os.path.exists(img_path):
+            st.markdown(f"- 图片路径：{img_path}")
+            st.image(img_path, caption="历史凝胶图片", use_container_width=True)
+        elif img_path:
+            st.markdown(f"- 图片路径：{img_path}")
+            st.info("图片文件不存在")
+        else:
+            st.info("无图片")
+
+        with st.container(border=True):
+            render_card_title("教师确认", "请选择最终原因并补充备注。")
+            candidate_causes = [extract_cause_text(x) for x in candidates if extract_cause_text(x)]
+            if not candidate_causes and record.get("Top1 原因"):
+                candidate_causes = [record.get("Top1 原因")]
+            confirm_options = list(dict.fromkeys(candidate_causes + ["其他/待补充"]))
+
+            with st.form(f"{detail_key_prefix}_teacher_confirm_form_{record_id}"):
+                teacher_choice = st.selectbox("教师最终原因", confirm_options, key=f"{detail_key_prefix}_teacher_choice_{record_id}")
+                custom_cause = ""
+                if teacher_choice == "其他/待补充":
+                    custom_cause = st.text_input("请填写教师最终原因", key=f"{detail_key_prefix}_teacher_custom_{record_id}")
+                teacher_note = st.text_area("教师备注", height=3, key=f"{detail_key_prefix}_teacher_note_{record_id}")
+                save_confirm = st.form_submit_button("保存教师确认结果")
+
+            if save_confirm:
+                final_cause = custom_cause.strip() if teacher_choice == "其他/待补充" else teacher_choice
+                if not final_cause:
+                    st.warning("请选择或填写教师最终原因。")
+                else:
+                    save_teacher_confirmation(record_id, final_cause, teacher_note.strip())
+                    st.success("教师确认已保存")
+                    st.rerun()
+
+
+def render_case_record_list(records_to_render, all_records, list_key_prefix):
+    for idx, record in enumerate(records_to_render, 1):
+        loop_status = build_feedback_loop_status(record)
+        status_class = "pcr-status-ok" if loop_status["当前状态"] == "已确认" else "pcr-status-pending"
+        status_label = loop_status["当前状态"]
+
+        st.markdown(
+            f"""
+            <div class="pcr-sub-card">
+                <b>{idx}. {record.get('提交时间', '-')} | {record.get('实验现象', '-')} | Top1: {record.get('Top1 原因', '-')} | 教师确认: {loop_status['教师最终确认原因']} | 一致性: {loop_status['一致性状态']} | {record.get('凝胶图', '无图')}</b>
+                <span class="pcr-status-pill {status_class}">{status_label}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        render_case_detail(record, all_records, detail_key_prefix=f"{list_key_prefix}_{record.get('id', idx)}")
+
+
+def render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records):
+    with st.container(border=True):
+        render_card_title("统计结果对应案例明细", "基于当前统计筛选范围做二次过滤，快速查看统计结论对应的具体案例。")
+
+        view_col, limit_col = st.columns([1.4, 0.8])
+        with view_col:
+            selected_view = st.selectbox(
+                "查看哪类案例",
+                build_stat_view_options(),
+                key="teacher_dashboard_stat_view",
+            )
+        with limit_col:
+            display_label = st.selectbox(
+                "明细显示条数",
+                list(STAT_LINK_DISPLAY_OPTIONS.keys()),
+                key="teacher_dashboard_stat_link_display_limit",
+            )
+
+        selected_reason = ""
+        if selected_view == "高频失败原因对应案例":
+            reason_options = reason_summary_df["失败原因"].tolist() if not reason_summary_df.empty else []
+            if reason_options:
+                selected_reason = st.selectbox(
+                    "失败原因",
+                    ["请选择失败原因"] + reason_options,
+                    key="teacher_dashboard_reason_view_filter",
+                )
+                if selected_reason == "请选择失败原因":
+                    selected_reason = ""
+            else:
+                st.info("当前统计范围内暂无可用的失败原因。")
+
+        linked_df, summary_text = filter_records_by_stat_view(
+            selected_view,
+            consistency_df,
+            filtered_df,
+            selected_reason=selected_reason,
+        )
+        st.caption(summary_text)
+
+        if selected_view == "请选择统计视角":
+            st.info("请选择一个统计视角查看对应案例明细。")
+            return
+
+        if linked_df.empty:
+            st.info("当前统计视角下暂无可展示的案例。")
+            return
+
+        display_limit = STAT_LINK_DISPLAY_OPTIONS[display_label]
+        display_records = build_stat_linked_records(linked_df.head(display_limit), records_by_id)
+
+        if not display_records:
+            st.info("当前案例明细暂无法关联到完整历史记录。")
+            return
+
+        render_case_record_list(display_records, all_records, list_key_prefix="dashboard_linked")
+
+
 def get_recent_mismatch_cases(consistency_df, limit=10):
     if consistency_df.empty:
         return consistency_df
@@ -972,8 +1235,11 @@ def get_recent_match_cases(consistency_df, limit=10):
     ]].head(limit)
 
 
-def render_teacher_dashboard():
+def render_teacher_dashboard(records_by_id, all_records):
     dashboard_df, column_mapping, load_error = load_teacher_dashboard_data()
+    filtered_df = pd.DataFrame()
+    consistency_df = pd.DataFrame()
+    reason_summary_df = pd.DataFrame(columns=["失败原因", "次数", "已确认数", "未确认数"])
 
     with st.container(border=True):
         render_card_title("学情统计看板", "基于历史诊断记录自动汇总，支持按时间范围筛选；存在缺失字段时自动降级显示。")
@@ -1022,87 +1288,88 @@ def render_teacher_dashboard():
 
         if dashboard_df.empty:
             st.info("暂无历史诊断数据，学情统计看板已就绪，待学生提交记录后自动更新。")
-            return
-
-        if filtered_df.empty:
-            st.info("当前筛选条件下暂无可统计数据。")
-
-        render_card_title("系统判断 vs 教师确认一致率", "复用当前筛选结果统计 Top1 一致率、Top3 命中率及最近一致/不一致案例。")
-        consistency_df = build_consistency_dataframe(filtered_df, column_mapping)
-        consistency_stats = compute_consistency_stats(consistency_df)
-
-        consistency_metric_cols = st.columns(4)
-        consistency_metric_cols[0].metric("已确认案例数", consistency_stats["已确认案例数"])
-        consistency_metric_cols[1].metric("Top1 一致率", consistency_stats["Top1 一致率"])
-        consistency_metric_cols[2].metric("Top3 命中率", consistency_stats["Top3 命中率"])
-        consistency_metric_cols[3].metric("无法比较案例数", consistency_stats["无法比较案例数"])
-
-        if consistency_stats["可比较已确认案例数"] == 0:
-            st.info("当前筛选范围内暂无可比较的已确认案例。")
         else:
-            st.caption(f"一致率分母为当前筛选范围内可比较的已确认案例数：{consistency_stats['可比较已确认案例数']} 条。")
+            if filtered_df.empty:
+                st.info("当前筛选条件下暂无可统计数据。")
 
-        dashboard_col_left, dashboard_col_right = st.columns([1.2, 1])
+            render_card_title("系统判断 vs 教师确认一致率", "复用当前筛选结果统计 Top1 一致率、Top3 命中率及最近一致/不一致案例。")
+            consistency_df = build_consistency_dataframe(filtered_df, column_mapping)
+            consistency_stats = compute_consistency_stats(consistency_df)
 
-        with dashboard_col_left:
-            render_card_title("系统判断与教师确认一致性分布", "仅统计当前筛选范围内可比较的已确认案例。")
-            distribution_df = consistency_stats["一致性分布"]
-            if distribution_df["案例数"].sum() == 0:
-                st.info("暂无可用的一致性分布数据。")
+            consistency_metric_cols = st.columns(4)
+            consistency_metric_cols[0].metric("已确认案例数", consistency_stats["已确认案例数"])
+            consistency_metric_cols[1].metric("Top1 一致率", consistency_stats["Top1 一致率"])
+            consistency_metric_cols[2].metric("Top3 命中率", consistency_stats["Top3 命中率"])
+            consistency_metric_cols[3].metric("无法比较案例数", consistency_stats["无法比较案例数"])
+
+            if consistency_stats["可比较已确认案例数"] == 0:
+                st.info("当前筛选范围内暂无可比较的已确认案例。")
             else:
-                st.bar_chart(distribution_df.set_index("类别"))
-                st.dataframe(distribution_df, use_container_width=True, hide_index=True)
+                st.caption(f"一致率分母为当前筛选范围内可比较的已确认案例数：{consistency_stats['可比较已确认案例数']} 条。")
 
-        with dashboard_col_right:
-            render_card_title("高频失败原因 Top 5", "优先统计教师最终确认原因；未确认时回退到系统 Top1 诊断结果。")
-            reason_summary_df = build_reason_summary(filtered_df)
-            if reason_summary_df.empty:
-                st.info("当前筛选范围内暂无可汇总的失败原因数据。")
-            else:
-                top5_df = reason_summary_df[["失败原因", "次数"]].head(5).set_index("失败原因")
-                st.bar_chart(top5_df)
-                st.dataframe(
-                    reason_summary_df[["失败原因", "次数"]].head(5),
-                    use_container_width=True,
-                    hide_index=True,
-                )
+            dashboard_col_left, dashboard_col_right = st.columns([1.2, 1])
 
-        case_col_left, case_col_right = st.columns(2)
-        with case_col_left:
-            render_card_title("最近不一致案例", "展示教师已确认但系统 Top1 不一致的最近案例，便于快速复盘。")
-            mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
-            if mismatch_df.empty:
-                st.info("当前筛选范围内暂无最近不一致案例。")
-            else:
-                st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
+            with dashboard_col_left:
+                render_card_title("系统判断与教师确认一致性分布", "仅统计当前筛选范围内可比较的已确认案例。")
+                distribution_df = consistency_stats["一致性分布"]
+                if distribution_df["案例数"].sum() == 0:
+                    st.info("暂无可用的一致性分布数据。")
+                else:
+                    st.bar_chart(distribution_df.set_index("类别"))
+                    st.dataframe(distribution_df, use_container_width=True, hide_index=True)
 
-        with case_col_right:
-            render_card_title("最近一致案例", "用于展示系统 Top1 与教师最终确认一致的近期案例。")
-            match_df = get_recent_match_cases(consistency_df, limit=10)
-            if match_df.empty:
-                st.info("当前筛选范围内暂无最近一致案例。")
-            else:
-                st.dataframe(match_df, use_container_width=True, hide_index=True)
+            with dashboard_col_right:
+                render_card_title("高频失败原因 Top 5", "优先统计教师最终确认原因；未确认时回退到系统 Top1 诊断结果。")
+                reason_summary_df = build_reason_summary(filtered_df)
+                if reason_summary_df.empty:
+                    st.info("当前筛选范围内暂无可汇总的失败原因数据。")
+                else:
+                    top5_df = reason_summary_df[["失败原因", "次数"]].head(5).set_index("失败原因")
+                    st.bar_chart(top5_df)
+                    st.dataframe(
+                        reason_summary_df[["失败原因", "次数"]].head(5),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
 
-        detail_col_left, detail_col_right = st.columns([0.8, 1.2])
-        with detail_col_left:
-            render_card_title("对照异常统计", "优先读取结构化字段，缺失时自动回退到原始文本关键词匹配。")
-            control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
-            negative_count = control_stats.get("negative_control_band_count")
-            positive_count = control_stats.get("positive_control_failure_count")
-            if negative_count is None and positive_count is None:
-                st.info("暂无可用数据")
-            else:
-                control_cols = st.columns(2)
-                control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
-                control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
+            case_col_left, case_col_right = st.columns(2)
+            with case_col_left:
+                render_card_title("最近不一致案例", "展示教师已确认但系统 Top1 不一致的最近案例，便于快速复盘。")
+                mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
+                if mismatch_df.empty:
+                    st.info("当前筛选范围内暂无最近不一致案例。")
+                else:
+                    st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
 
-        with detail_col_right:
-            render_card_title("最近诊断记录统计明细表", "按当前筛选条件聚合，按次数降序展示前 10 条。")
-            if reason_summary_df.empty:
-                st.info("当前筛选范围内暂无可展示的聚合明细。")
-            else:
-                st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
+            with case_col_right:
+                render_card_title("最近一致案例", "用于展示系统 Top1 与教师最终确认一致的近期案例。")
+                match_df = get_recent_match_cases(consistency_df, limit=10)
+                if match_df.empty:
+                    st.info("当前筛选范围内暂无最近一致案例。")
+                else:
+                    st.dataframe(match_df, use_container_width=True, hide_index=True)
+
+            detail_col_left, detail_col_right = st.columns([0.8, 1.2])
+            with detail_col_left:
+                render_card_title("对照异常统计", "优先读取结构化字段，缺失时自动回退到原始文本关键词匹配。")
+                control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
+                negative_count = control_stats.get("negative_control_band_count")
+                positive_count = control_stats.get("positive_control_failure_count")
+                if negative_count is None and positive_count is None:
+                    st.info("暂无可用数据")
+                else:
+                    control_cols = st.columns(2)
+                    control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
+                    control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
+
+            with detail_col_right:
+                render_card_title("最近诊断记录统计明细表", "按当前筛选条件聚合，按次数降序展示前 10 条。")
+                if reason_summary_df.empty:
+                    st.info("当前筛选范围内暂无可展示的聚合明细。")
+                else:
+                    st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
+
+    render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records)
 
 
 def extract_cause_text(candidate_text):
@@ -1137,11 +1404,13 @@ def main():
         "教师端",
     )
 
-    render_teacher_dashboard()
+    records = load_recent_records(limit=5000)
+    records_by_id = build_records_by_id(records)
+
+    render_teacher_dashboard(records_by_id, records)
 
     with st.container(border=True):
         render_card_title("最近诊断记录", "可展开每条记录查看完整信息并进行教师确认。")
-        records = load_recent_records(limit=5000)
 
         if not records:
             st.info("暂无历史诊断记录")
@@ -1233,106 +1502,7 @@ def main():
 
         st.markdown("**案例列表**")
         display_records = [records[int(idx)] for idx in filtered_records_df["record_index"].tolist()]
-
-        for idx, rec in enumerate(display_records, 1):
-            teacher_result = rec.get("教师最终原因", "未确认")
-            status_class = "pcr-status-ok" if teacher_result != "未确认" else "pcr-status-pending"
-            status_label = "已确认" if teacher_result != "未确认" else "未确认"
-
-            st.markdown(
-                f"""
-                <div class="pcr-sub-card">
-                    <b>{idx}. {rec.get('提交时间', '-')} | {rec.get('实验现象', '-')} | Top1: {rec.get('Top1 原因', '-')} | {rec.get('凝胶图', '无图')}</b>
-                    <span class="pcr-status-pill {status_class}">{status_label}</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-            record_id = rec.get("id")
-            with st.expander(f"展开查看详情（记录ID: {record_id}）"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown(f"- 记录 id：{record_id}")
-                    st.markdown(f"- 提交时间：{rec.get('提交时间', '-')}")
-                    st.markdown(f"- 实验现象：{rec.get('实验现象', '-')}")
-                    st.markdown(f"- 模板量：{rec.get('模板量', '-')}")
-                    st.markdown(f"- 退火温度：{rec.get('退火温度', '-')}")
-                    st.markdown(f"- 循环数：{rec.get('循环数', '-')}")
-                with col2:
-                    st.markdown(f"- 阳性对照是否正常：{rec.get('阳性对照是否正常', '-')}")
-                    st.markdown(f"- 阴性对照是否有带：{rec.get('阴性对照是否有带', '-')}")
-                    st.markdown(f"- Top1 原因：{rec.get('Top1 原因', '-')}")
-                    st.markdown(f"- Top1 分数：{rec.get('Top1 分数', '-')}")
-
-                st.markdown(f"- 学生补充描述：{rec.get('学生补充描述', '-')}")
-                clues = rec.get("抽取到的文本线索", [])
-                st.markdown(f"- 抽取到的文本线索：{('、'.join(clues)) if clues else '无'}")
-
-                candidates = rec.get("候选原因列表", [])
-                if len(candidates) > 1:
-                    for item in candidates[1:]:
-                        st.markdown(f"- 其他候选原因：{item}")
-                else:
-                    st.markdown("- 其他候选原因：无")
-
-                render_diagnosis_quality_block(
-                    candidate_texts=candidates,
-                    top1_reason=rec.get("Top1 原因", ""),
-                    top1_score=rec.get("Top1 分数", ""),
-                    abnormality=rec.get("实验现象", ""),
-                    positive_control_normal=rec.get("阳性对照是否正常", ""),
-                    negative_control_band=rec.get("阴性对照是否有带", ""),
-                    template_amount=rec.get("模板量"),
-                    annealing_temp=rec.get("退火温度"),
-                    cycles=rec.get("循环数"),
-                    description=rec.get("学生补充描述", ""),
-                    text_clues=clues,
-                    gel_image_path=rec.get("凝胶图路径", ""),
-                    has_image=bool(rec.get("凝胶图路径")),
-                    title="系统 Top1 诊断可信度解读",
-                )
-
-                render_feedback_loop_block(rec)
-                render_similar_case_block(rec, records)
-
-                st.markdown(f"- 教师最终原因：{teacher_result}")
-                st.markdown(f"- 教师备注：{rec.get('教师备注', '-')}")
-                st.markdown(f"- 教师确认时间：{rec.get('教师确认时间', '-')}")
-
-                img_path = rec.get("凝胶图路径", "")
-                if img_path and os.path.exists(img_path):
-                    st.markdown(f"- 图片路径：{img_path}")
-                    st.image(img_path, caption="历史凝胶图片", use_container_width=True)
-                elif img_path:
-                    st.markdown(f"- 图片路径：{img_path}")
-                    st.info("图片文件不存在")
-                else:
-                    st.info("无图片")
-
-                with st.container(border=True):
-                    render_card_title("教师确认", "请选择最终原因并补充备注。")
-                    candidate_causes = [extract_cause_text(x) for x in candidates if extract_cause_text(x)]
-                    if not candidate_causes and rec.get("Top1 原因"):
-                        candidate_causes = [rec.get("Top1 原因")]
-                    confirm_options = list(dict.fromkeys(candidate_causes + ["其他/待补充"]))
-
-                    with st.form(f"teacher_confirm_form_{record_id}"):
-                        teacher_choice = st.selectbox("教师最终原因", confirm_options, key=f"teacher_choice_{record_id}")
-                        custom_cause = ""
-                        if teacher_choice == "其他/待补充":
-                            custom_cause = st.text_input("请填写教师最终原因", key=f"teacher_custom_{record_id}")
-                        teacher_note = st.text_area("教师备注", height=3, key=f"teacher_note_{record_id}")
-                        save_confirm = st.form_submit_button("保存教师确认结果")
-
-                    if save_confirm:
-                        final_cause = custom_cause.strip() if teacher_choice == "其他/待补充" else teacher_choice
-                        if not final_cause:
-                            st.warning("请选择或填写教师最终原因。")
-                        else:
-                            save_teacher_confirmation(record_id, final_cause, teacher_note.strip())
-                            st.success("教师确认已保存")
-                            st.rerun()
+        render_case_record_list(display_records, records, list_key_prefix="history")
 
 
 if __name__ == "__main__":
