@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+streamlit.out.log
+streamlit.err.log
+data/app.db
+uploads/*
+!uploads/.gitkeep
+config/
+.claude/
+.python-3.10.11-installer.exe
