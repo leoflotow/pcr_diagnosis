@@ -80,6 +80,21 @@ def main():
                 error_detail = (last_api_debug.get("error_detail", "") or "").strip()
                 if error_detail:
                     st.markdown(f"- 异常摘要：{error_detail}")
+                normalized_case = last_api_debug.get("normalized_case")
+                if normalized_case:
+                    st.markdown("#### 标准化病例")
+                    st.json(normalized_case)
+                rules_v2_eval = last_api_debug.get("rules_v2_eval") or {}
+                if rules_v2_eval:
+                    st.markdown("#### 新版规则并行结果")
+                    st.markdown(f"- Top1：{rules_v2_eval.get('top1') or '-'}")
+                    st.markdown(f"- Top2：{rules_v2_eval.get('top2') or '-'}")
+                    st.markdown(f"- Top3：{rules_v2_eval.get('top3') or '-'}")
+                    st.markdown(f"- 基础规则命中数：{len(rules_v2_eval.get('base_rule_hits') or [])}")
+                    st.markdown(f"- 组合规则命中数：{len(rules_v2_eval.get('combo_hits') or [])}")
+                rules_v2_error = (last_api_debug.get("rules_v2_error", "") or "").strip()
+                if rules_v2_error:
+                    st.warning(f"新版规则并行评估失败：{rules_v2_error}")
             else:
                 st.info("当前还没有最近一次抽取调试信息，请先到“学生端”执行一次诊断。")
 

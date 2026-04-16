@@ -16,6 +16,8 @@ import re
 import json
 import uuid
 from datetime import datetime
+from diagnosis_normalization import build_normalized_case, explain_normalized_case
+from diagnosis_rule_engine_v2 import evaluate_rules_v2
 from navigation_state import get_home_page
 
 try:
@@ -29,6 +31,7 @@ DB_PATH = "data/app.db"
 
 # 规则文件路径
 RULES_PATH = "rules.csv"
+LEGACY_RULES_PATH = "rules_v2.csv"
 # 上传图片保存目录
 UPLOAD_DIR = "uploads"
 # 页面里使用的实验现象选项（也用于规则校验）
@@ -119,13 +122,13 @@ def go_home(clear_entries=False):
 
 
 def return_to_home(clear_entries=False):
-    """Return to the registered home page."""
+    """返回首页视图：更新状态后真正切换到首页页对象。"""
     go_home(clear_entries=clear_entries)
     switch_to_home_page()
 
 
 def switch_to_home_page():
-    """Switch to home page, falling back to rerun when unavailable."""
+    """真正切换到首页；若首页页对象尚未注册则安全回退为 rerun。"""
     home_page = get_home_page()
     if home_page is not None:
         st.switch_page(home_page)
@@ -1053,17 +1056,17 @@ def save_uploaded_image(uploaded_file):
         return None, str(e)[:200]
 
 
-def load_rules():
+def load_rules(path=RULES_PATH):
     """加载规则文件，支持多种编码兼容"""
     encodings = ["utf-8", "utf-8-sig", "gbk"]
     for enc in encodings:
         try:
-            return pd.read_csv(RULES_PATH, encoding=enc)
+            return pd.read_csv(path, encoding=enc)
         except UnicodeDecodeError:
             continue
         except Exception:
             break
-    return pd.read_csv(RULES_PATH, encoding="utf-8", errors="replace")
+    return pd.read_csv(path, encoding="utf-8", errors="replace")
 
 
 def normalize_yes_no(value):
@@ -1451,36 +1454,44 @@ def diagnose(abnormality, template_amount, annealing_temp, cycles,
     """
     诊断函数：根据输入的实验参数，返回可能的异常原因
     """
-    # 加载规则
-    rules = load_rules()
     # 从学生描述中抽取文本线索：优先 MiniMax，失败回退本地规则
     text_clues, clue_source, api_debug = extract_text_clues_with_fallback(description)
+    api_debug["normalized_case"] = build_normalized_case({
+        "abnormality": abnormality,
+        "template_amount": template_amount,
+        "annealing_temp": annealing_temp,
+        "cycles": cycles,
+        "positive_control_normal": positive_control_normal,
+        "negative_control_band": negative_control_band,
+        "description": description,
+        "text_clues": text_clues,
+    })
+    try:
+        api_debug["rules_v2_eval"] = evaluate_rules_v2(api_debug["normalized_case"])
+        if (
+            api_debug["rules_v2_eval"].get("status") == "ok"
+            and api_debug["rules_v2_eval"].get("top1")
+        ):
+            primary_bundle = build_primary_diagnosis_from_rules_v2(api_debug["rules_v2_eval"])
+            primary_results = primary_bundle.get("results", []) or []
+            if primary_results:
+                api_debug["primary_result_source"] = "rules_v2"
+                return primary_results, True, text_clues, clue_source, api_debug
+    except Exception as e:
+        api_debug["rules_v2_error"] = str(e)[:200]
 
-    # 先按实验现象筛选候选规则
-    candidate_rules = rules[rules["abnormality"].astype(str).str.strip() == str(abnormality).strip()]
-    if candidate_rules.empty:
-        return [], False, text_clues, clue_source, api_debug
-
-    # 对候选规则做宽松打分
-    results = []
-    for _, rule in candidate_rules.iterrows():
-        score_data = calculate_score(
-            rule, abnormality, template_amount, annealing_temp, cycles,
-            positive_control_normal, negative_control_band, text_clues=text_clues
-        )
-        # 实验现象已过滤，理论上都会有分；这里做一次兜底
-        if score_data is None:
-            continue
-        results.append({
-            '原因': rule['cause'],
-            '总分': score_data['总分'],
-            '建议': rule['suggestion'],
-            '诊断依据': score_data['明细']
-        })
-    
-    # 按分数降序排序，返回Top 3
-    results = sorted(results, key=lambda x: x['总分'], reverse=True)
-    return results[:3], True, text_clues, clue_source, api_debug
+    fallback_results = diagnose_with_legacy_rules(
+        abnormality,
+        template_amount,
+        annealing_temp,
+        cycles,
+        positive_control_normal,
+        negative_control_band,
+        text_clues=text_clues,
+    )
+    api_debug["primary_result_source"] = "legacy_fallback"
+    api_debug["legacy_result_preview"] = fallback_results
+    return fallback_results, bool(fallback_results), text_clues, clue_source, api_debug
 
 
 def parse_top1_result(diagnosis_result):
@@ -1543,6 +1554,158 @@ def parse_candidate_result_item(candidate_text, rank_hint=None):
         "诊断依据": {},
         "建议": "",
     }
+
+
+def _dedupe_keep_order(items):
+    cleaned = []
+    seen = set()
+    for item in items:
+        text = str(item).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        cleaned.append(text)
+    return cleaned
+
+
+def format_diagnosis_result_text(results):
+    parts = []
+    for index, item in enumerate(results[:3], 1):
+        reason = str(item.get("原因", "")).strip()
+        score = item.get("总分")
+        if not reason:
+            continue
+        score_text = "-" if score is None else score
+        parts.append(f"{index}. {reason} (总分:{score_text})")
+    return "; ".join(parts)
+
+
+def convert_rules_v2_eval_to_display_results(rules_v2_eval):
+    rules_v2_eval = rules_v2_eval or {}
+    ranked_causes = rules_v2_eval.get("ranked_causes", []) or []
+    normalized_case = rules_v2_eval.get("normalized_case", {}) or {}
+
+    display_results = []
+    for index, item in enumerate(ranked_causes[:3], 1):
+        hit_rules = item.get("hit_rules", []) or []
+        hit_combos = item.get("hit_combos", []) or []
+        evidence_chain = _dedupe_keep_order(item.get("evidence_chain", []) or [])
+        suggestions = _dedupe_keep_order(item.get("suggestions", []) or [])
+
+        matched_positive = any("positive_control" in (rule.get("matched_fields", {}) or {}) for rule in hit_rules)
+        matched_negative = any("negative_control" in (rule.get("matched_fields", {}) or {}) for rule in hit_rules)
+        matched_template = any("template_condition" in (rule.get("matched_fields", {}) or {}) for rule in hit_rules)
+        matched_temp = any("annealing_temp_condition" in (rule.get("matched_fields", {}) or {}) for rule in hit_rules)
+        matched_text_hints = []
+        for rule in hit_rules:
+            matched_text_hints.extend((rule.get("matched_fields", {}) or {}).get("text_hint", []) or [])
+        matched_text_hints = _dedupe_keep_order(matched_text_hints)
+
+        detail = {
+            "基础分": round(float(item.get("total_base_score", 0)), 2),
+            "组合规则加成": round(float(item.get("combo_bonus", 0)), 2),
+            "规则命中统计": {
+                "基础规则": len(hit_rules),
+                "组合规则": len(hit_combos),
+            },
+            "阳性对照": {
+                "命中": matched_positive,
+                "加分": 0,
+                "值": normalized_case.get("positive_control", ""),
+            },
+            "阴性对照": {
+                "命中": matched_negative,
+                "加分": 0,
+                "值": normalized_case.get("negative_control", ""),
+            },
+            "模板量范围": {
+                "命中": matched_template,
+                "加分": 0,
+                "值": normalized_case.get("template_condition", ""),
+            },
+            "退火温度范围": {
+                "命中": matched_temp,
+                "加分": 0,
+                "值": normalized_case.get("annealing_temp_condition", ""),
+            },
+            "循环数范围": {
+                "命中": False,
+                "加分": 0,
+            },
+            "文本线索": {
+                "抽取线索": normalized_case.get("text_hint", []) or [],
+                "命中线索": matched_text_hints,
+                "加分": 0,
+            },
+            "命中基础规则": [rule.get("rule_id", "") for rule in hit_rules if str(rule.get("rule_id", "")).strip()],
+            "命中组合规则": [combo.get("combo_id", "") for combo in hit_combos if str(combo.get("combo_id", "")).strip()],
+            "证据链": evidence_chain,
+            "建议列表": suggestions,
+            "最终总分": round(float(item.get("total_score", 0)), 2),
+        }
+
+        display_results.append({
+            "排名": index,
+            "原因": item.get("cause", "未知"),
+            "总分": round(float(item.get("total_score", 0)), 2),
+            "建议": "；".join(suggestions) if suggestions else "",
+            "建议列表": suggestions,
+            "诊断依据": detail,
+        })
+
+    return display_results
+
+
+def build_primary_diagnosis_from_rules_v2(rules_v2_eval):
+    results = convert_rules_v2_eval_to_display_results(rules_v2_eval)
+    return {
+        "results": results,
+        "candidate_texts": [
+            f"{index}. {item.get('原因', '未知')} (总分:{item.get('总分', '-')})"
+            for index, item in enumerate(results, 1)
+        ],
+        "top1_reason": results[0].get("原因", "") if results else "",
+        "top1_score": results[0].get("总分") if results else None,
+        "result_text": format_diagnosis_result_text(results),
+    }
+
+
+def diagnose_with_legacy_rules(
+    abnormality,
+    template_amount,
+    annealing_temp,
+    cycles,
+    positive_control_normal,
+    negative_control_band,
+    text_clues=None,
+):
+    rules = load_rules(LEGACY_RULES_PATH)
+    candidate_rules = rules[rules["abnormality"].astype(str).str.strip() == str(abnormality).strip()]
+    if candidate_rules.empty:
+        return []
+
+    results = []
+    for _, rule in candidate_rules.iterrows():
+        score_data = calculate_score(
+            rule,
+            abnormality,
+            template_amount,
+            annealing_temp,
+            cycles,
+            positive_control_normal,
+            negative_control_band,
+            text_clues=text_clues,
+        )
+        if score_data is None:
+            continue
+        results.append({
+            "原因": rule["cause"],
+            "总分": score_data["总分"],
+            "建议": rule["suggestion"],
+            "诊断依据": score_data["明细"],
+        })
+
+    return sorted(results, key=lambda item: item["总分"], reverse=True)[:3]
 
 
 def build_ranked_results(top_results=None, candidate_texts=None, top1_reason=None, top1_score=None):
@@ -1619,6 +1782,16 @@ def build_diagnosis_context(
 def count_hit_evidence(detail):
     """统计当前 Top1 的命中证据数量"""
     detail = detail or {}
+    evidence_chain = detail.get("证据链", []) or []
+    if evidence_chain:
+        return len([item for item in evidence_chain if str(item).strip()][:5])
+
+    rule_stats = detail.get("规则命中统计", {}) or {}
+    if rule_stats:
+        base_hits = int(safe_to_float(rule_stats.get("基础规则"), 0) or 0)
+        combo_hits = int(safe_to_float(rule_stats.get("组合规则"), 0) or 0)
+        return base_hits + combo_hits
+
     hit_count = 0
     for key in ["阳性对照", "阴性对照", "模板量范围", "退火温度范围", "循环数范围"]:
         section = detail.get(key, {}) or {}
@@ -1690,6 +1863,9 @@ def build_evidence_summary(top1_reason, detail=None, context=None):
     """将现有打分明细和输入信息整理成适合展示的证据摘要"""
     detail = detail or {}
     context = context or {}
+    evidence_chain = _dedupe_keep_order(detail.get("证据链", []) or [])
+    if evidence_chain:
+        return evidence_chain[:5]
     evidence_points = []
 
     abnormality = str(context.get("实验现象") or "").strip()
@@ -1837,8 +2013,6 @@ def load_recent_records(limit=10):
     for row in rows:
         data = dict(row)
         diagnosis_result = data.get("diagnosis_result", "")
-        top1_reason, top1_score = parse_top1_result(diagnosis_result)
-        all_candidates = parse_all_candidates(diagnosis_result)
 
         # 学生补充描述过长时截断，避免摘要区过长
         desc_full = str(data.get("description") or "").strip()
@@ -1848,6 +2022,40 @@ def load_recent_records(limit=10):
 
         # 历史“抽取线索”如果库里没存，就根据学生描述现算一次（不改库结构）
         text_clues = extract_text_clues(desc_full)
+        normalized_info = explain_normalized_case({
+            "abnormality": data.get("abnormality"),
+            "template_amount": data.get("template_amount"),
+            "annealing_temp": data.get("annealing_temp"),
+            "cycles": data.get("cycles"),
+            "positive_control_normal": data.get("positive_control_normal"),
+            "negative_control_band": data.get("negative_control_band"),
+            "description": desc_full,
+            "text_clues": text_clues,
+        })
+        normalized_case = normalized_info.get("normalized_case", {})
+        rules_v2_eval = {}
+        primary_bundle = {
+            "results": [],
+            "candidate_texts": [],
+            "top1_reason": "",
+            "top1_score": None,
+            "result_text": "",
+        }
+        try:
+            rules_v2_eval = evaluate_rules_v2(normalized_case)
+            if rules_v2_eval.get("status") == "ok" and rules_v2_eval.get("top1"):
+                primary_bundle = build_primary_diagnosis_from_rules_v2(rules_v2_eval)
+        except Exception:
+            rules_v2_eval = {}
+
+        top_results = primary_bundle.get("results", []) or []
+        if top_results:
+            top1_reason = primary_bundle.get("top1_reason", "")
+            top1_score = primary_bundle.get("top1_score")
+            all_candidates = primary_bundle.get("candidate_texts", [])
+        else:
+            top1_reason, top1_score = parse_top1_result(diagnosis_result)
+            all_candidates = parse_all_candidates(diagnosis_result)
 
         gel_image_path = data.get("gel_image_path")
         has_image = bool(gel_image_path)
@@ -1867,11 +2075,14 @@ def load_recent_records(limit=10):
             "Top1 原因": top1_reason,
             "Top1 分数": top1_score,
             "候选原因列表": all_candidates,
+            "系统结果列表": top_results,
+            "rules_v2_eval": rules_v2_eval,
             "教师最终原因": data.get("teacher_final_cause") if data.get("teacher_final_cause") else "未确认",
             "教师备注": data.get("teacher_note") if data.get("teacher_note") else "-",
             "教师确认时间": data.get("teacher_confirm_time") if data.get("teacher_confirm_time") else "-",
             "凝胶图路径": gel_image_path if gel_image_path else "",
-            "凝胶图": "有图" if has_image else "无图"
+            "凝胶图": "有图" if has_image else "无图",
+            "normalized_case": normalized_case,
         })
 
     return records
@@ -2032,17 +2243,42 @@ def build_case_review_report(payload):
     current_status = "已确认" if not is_missing_value(teacher_final) else "未确认"
 
     diagnosis_result = db_record.get("diagnosis_result", "")
-    top_results = payload.get("results", []) or []
-    candidate_texts = parse_all_candidates(diagnosis_result)
-    ranked_results = build_ranked_results(top_results=top_results, candidate_texts=candidate_texts)
-    if not ranked_results:
-        top1_reason, top1_score = parse_top1_result(diagnosis_result)
-        ranked_results = build_ranked_results(top1_reason=top1_reason, top1_score=top1_score)
-
     text_clues = payload.get("text_clues")
     if not text_clues and str(description or "").strip():
         text_clues = extract_text_clues(description)
     text_clues = text_clues or []
+
+    rules_v2_eval = {}
+    primary_bundle = {
+        "results": payload.get("results", []) or [],
+        "candidate_texts": [],
+        "top1_reason": "",
+        "top1_score": None,
+        "result_text": "",
+    }
+    try:
+        normalized_case = build_normalized_case({
+            "abnormality": abnormality,
+            "template_amount": template_amount,
+            "annealing_temp": annealing_temp,
+            "cycles": cycles,
+            "positive_control_normal": positive_control,
+            "negative_control_band": negative_control,
+            "description": description,
+            "text_clues": text_clues,
+        })
+        rules_v2_eval = evaluate_rules_v2(normalized_case)
+        if rules_v2_eval.get("status") == "ok" and rules_v2_eval.get("top1"):
+            primary_bundle = build_primary_diagnosis_from_rules_v2(rules_v2_eval)
+    except Exception:
+        rules_v2_eval = {}
+
+    top_results = primary_bundle.get("results", []) or []
+    candidate_texts = primary_bundle.get("candidate_texts", []) or parse_all_candidates(diagnosis_result)
+    ranked_results = build_ranked_results(top_results=top_results, candidate_texts=candidate_texts)
+    if not ranked_results:
+        top1_reason, top1_score = parse_top1_result(diagnosis_result)
+        ranked_results = build_ranked_results(top1_reason=top1_reason, top1_score=top1_score)
 
     top1_result = ranked_results[0] if ranked_results else {}
     top1_reason = top1_result.get("原因", "未识别")

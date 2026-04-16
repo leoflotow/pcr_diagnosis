@@ -1062,6 +1062,7 @@ def render_case_detail(record, all_records, detail_key_prefix):
             st.markdown("- 其他候选原因：无")
 
         render_diagnosis_quality_block(
+            top_results=record.get("系统结果列表", []),
             candidate_texts=candidates,
             top1_reason=record.get("Top1 原因", ""),
             top1_score=record.get("Top1 分数", ""),
