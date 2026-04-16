@@ -13,11 +13,14 @@ import streamlit as st
 from core import (
     DB_PATH,
     apply_common_styles,
+    ensure_page_config,
+    init_access_state,
     init_database,
     load_recent_records,
     parse_all_candidates,
     parse_top1_result,
     render_diagnosis_quality_block,
+    render_entry_guard,
     render_card_title,
     render_page_hero,
     save_teacher_confirmation,
@@ -633,6 +636,303 @@ def compute_consistency_stats(consistency_df):
     }
 
 
+def build_feedback_loop_status(record):
+    """为单条历史记录生成闭环状态信息"""
+    teacher_final = normalize_text(record.get("教师最终原因"))
+    is_confirmed = is_confirmed_cause(teacher_final)
+
+    top1, top2, top3 = extract_record_top_reasons(record)
+    normalized_teacher = normalize_reason_label(teacher_final)
+    normalized_top1 = normalize_reason_label(top1)
+    normalized_candidates = [normalize_reason_label(item) for item in [top1, top2, top3] if normalize_reason_label(item)]
+
+    comparable = bool(is_confirmed and normalized_teacher and normalized_candidates)
+    top1_match = comparable and normalized_teacher == normalized_top1
+    top3_hit = comparable and normalized_teacher in normalized_candidates
+
+    if not is_confirmed:
+        consistency_status = "无法比较"
+    elif not comparable:
+        consistency_status = "无法比较"
+    elif top1_match:
+        consistency_status = "一致"
+    elif top3_hit:
+        consistency_status = "Top3命中但Top1不一致"
+    else:
+        consistency_status = "未命中"
+
+    return {
+        "当前状态": "已确认" if is_confirmed else "未确认",
+        "系统 Top1": normalize_display_text(top1, default="未识别"),
+        "系统 Top2": normalize_display_text(top2, default="未识别"),
+        "系统 Top3": normalize_display_text(top3, default="未识别"),
+        "教师最终确认原因": normalize_display_text(teacher_final, default="未确认"),
+        "教师备注": normalize_display_text(record.get("教师备注"), default="未填写"),
+        "教师确认时间": normalize_display_text(record.get("教师确认时间"), default="未记录"),
+        "教师是否已完成确认": "是" if is_confirmed else "否",
+        "一致性状态": consistency_status,
+        "是否可比较": comparable,
+        "Top1 是否一致": top1_match,
+        "Top3 是否命中": top3_hit,
+    }
+
+
+def build_feedback_loop_summary(loop_status):
+    """生成适合展示的闭环结论语句"""
+    current_status = loop_status.get("当前状态")
+    consistency_status = loop_status.get("一致性状态")
+
+    if current_status != "已确认":
+        return "该案例尚未完成教师确认，暂不能作为闭环案例使用。"
+    if consistency_status == "一致":
+        return "该案例中，系统首选判断与教师最终确认一致，可作为有效教学案例沉淀。"
+    if consistency_status == "Top3命中但Top1不一致":
+        return "该案例中，系统 Top1 判断与教师确认不一致，但 Top3 候选已覆盖真实原因，提示规则排序仍有优化空间。"
+    if consistency_status == "未命中":
+        return "该案例中，系统候选结果未覆盖教师最终确认原因，可作为规则补充与误判纠偏案例。"
+    return "该案例已进入教师确认阶段，但当前记录信息不足，暂无法完成有效闭环比较。"
+
+
+def get_case_value_tag(loop_status, missing_info_count):
+    """生成轻量案例价值标签"""
+    if loop_status.get("当前状态") != "已确认":
+        return "未完成确认案例"
+    if missing_info_count >= 3:
+        return "待补充信息案例"
+    if loop_status.get("一致性状态") == "一致":
+        return "可作为已确认案例"
+    if loop_status.get("一致性状态") == "Top3命中但Top1不一致":
+        return "可作为误判纠偏案例"
+    if loop_status.get("一致性状态") == "未命中":
+        return "可作为规则补充案例"
+    return "待补充信息案例"
+
+
+def render_feedback_loop_block(record):
+    """渲染教师确认反馈闭环展示模块"""
+    loop_status = build_feedback_loop_status(record)
+    missing_info_count = len(
+        [
+            item for item in [
+                record.get("阳性对照是否正常"),
+                record.get("阴性对照是否有带"),
+                record.get("模板量"),
+                record.get("退火温度"),
+                record.get("学生补充描述"),
+            ]
+            if is_blank(item) or str(item).strip() in {"-", "未填写"}
+        ]
+    )
+    case_value_tag = get_case_value_tag(loop_status, missing_info_count)
+    summary_text = build_feedback_loop_summary(loop_status)
+
+    with st.container(border=True):
+        render_card_title("教师确认反馈闭环", "结构化展示系统判断、教师确认及当前案例闭环状态。")
+
+        overview_cols = st.columns(4)
+        overview_cols[0].metric("当前状态", loop_status["当前状态"])
+        overview_cols[1].metric("系统 Top1 判断", loop_status["系统 Top1"])
+        overview_cols[2].metric("教师最终确认原因", loop_status["教师最终确认原因"])
+        overview_cols[3].metric("一致性状态", loop_status["一致性状态"])
+
+        compare_left, compare_right = st.columns(2)
+        with compare_left:
+            st.markdown("**系统判断侧**")
+            st.markdown(f"- 系统 Top1：{loop_status['系统 Top1']}")
+            st.markdown(f"- 系统 Top2：{loop_status['系统 Top2']}")
+            st.markdown(f"- 系统 Top3：{loop_status['系统 Top3']}")
+            st.caption("系统置信度、证据摘要见上方“系统 Top1 诊断可信度解读”模块。")
+        with compare_right:
+            st.markdown("**教师确认侧**")
+            st.markdown(f"- 教师最终确认原因：{loop_status['教师最终确认原因']}")
+            st.markdown(f"- 教师备注：{loop_status['教师备注']}")
+            st.markdown(f"- 教师确认时间：{loop_status['教师确认时间']}")
+            st.markdown(f"- 教师是否已完成确认：{loop_status['教师是否已完成确认']}")
+
+        st.markdown(f"**闭环结论：** {summary_text}")
+        st.markdown(f"**案例价值标签：** `{case_value_tag}`")
+
+
+def normalize_case_for_similarity(record):
+    """提取结构化相似匹配所需字段"""
+    top1, top2, top3 = extract_record_top_reasons(record)
+    teacher_final = normalize_text(record.get("教师最终原因"))
+    text_clues = record.get("抽取到的文本线索", []) or []
+    return {
+        "id": record.get("id"),
+        "time": pd.to_datetime(record.get("提交时间"), errors="coerce"),
+        "abnormality": normalize_text(record.get("实验现象")),
+        "teacher_final": teacher_final if is_confirmed_cause(teacher_final) else "",
+        "teacher_final_normalized": normalize_reason_label(teacher_final),
+        "system_top1": normalize_text(top1),
+        "system_top1_normalized": normalize_reason_label(top1),
+        "system_top2": normalize_text(top2),
+        "system_top2_normalized": normalize_reason_label(top2),
+        "system_top3": normalize_text(top3),
+        "system_top3_normalized": normalize_reason_label(top3),
+        "positive_control": normalize_text(record.get("阳性对照是否正常")),
+        "negative_control": normalize_text(record.get("阴性对照是否有带")),
+        "template_amount": record.get("模板量"),
+        "annealing_temp": record.get("退火温度"),
+        "has_image": bool(normalize_text(record.get("凝胶图路径"))) or normalize_text(record.get("凝胶图")) == "有图",
+        "text_clues": [normalize_reason_label(item) or normalize_text(item) for item in text_clues if normalize_text(item)],
+        "is_confirmed": is_confirmed_cause(teacher_final),
+    }
+
+
+def extract_similarity_reasons(current_case, candidate_case):
+    """基于实际命中字段生成相似依据说明"""
+    reasons = []
+
+    if current_case["abnormality"] and current_case["abnormality"] == candidate_case["abnormality"]:
+        reasons.append(f"同为“{current_case['abnormality']}”异常")
+
+    if current_case["teacher_final_normalized"] and current_case["teacher_final_normalized"] == candidate_case["teacher_final_normalized"]:
+        reasons.append("教师确认原因相同")
+
+    if current_case["system_top1_normalized"] and current_case["system_top1_normalized"] == candidate_case["system_top1_normalized"]:
+        reasons.append("系统首选诊断相同")
+
+    if current_case["negative_control"] and current_case["negative_control"] == candidate_case["negative_control"]:
+        reasons.append("阴性对照状态一致")
+
+    if current_case["positive_control"] and current_case["positive_control"] == candidate_case["positive_control"]:
+        reasons.append("阳性对照状态一致")
+
+    if current_case["has_image"] and candidate_case["has_image"]:
+        reasons.append("均包含凝胶图片")
+
+    current_clues = set(current_case["text_clues"])
+    candidate_clues = set(candidate_case["text_clues"])
+    shared_clues = [item for item in current_clues.intersection(candidate_clues) if item]
+    if shared_clues:
+        reasons.append(f"文本线索均涉及“{'、'.join(shared_clues[:2])}”")
+
+    if current_case["system_top2_normalized"] and current_case["system_top2_normalized"] == candidate_case["system_top2_normalized"]:
+        reasons.append("Top2 候选相近")
+
+    if current_case["system_top3_normalized"] and current_case["system_top3_normalized"] == candidate_case["system_top3_normalized"]:
+        reasons.append("Top3 候选相近")
+
+    return reasons[:3]
+
+
+def compute_case_similarity_score(current_record, candidate_record):
+    """计算轻量、可解释的结构化相似度分数"""
+    current_case = normalize_case_for_similarity(current_record)
+    candidate_case = normalize_case_for_similarity(candidate_record)
+
+    if current_case["id"] == candidate_case["id"]:
+        return {"score": -1, "reasons": []}
+
+    score = 0
+    if current_case["abnormality"] and current_case["abnormality"] == candidate_case["abnormality"]:
+        score += 30
+
+    if current_case["teacher_final_normalized"] and current_case["teacher_final_normalized"] == candidate_case["teacher_final_normalized"]:
+        score += 26
+
+    if current_case["system_top1_normalized"] and current_case["system_top1_normalized"] == candidate_case["system_top1_normalized"]:
+        score += 18
+
+    if current_case["positive_control"] and current_case["positive_control"] == candidate_case["positive_control"]:
+        score += 8
+
+    if current_case["negative_control"] and current_case["negative_control"] == candidate_case["negative_control"]:
+        score += 8
+
+    if current_case["has_image"] == candidate_case["has_image"]:
+        score += 4
+
+    current_template = pd.to_numeric([current_case["template_amount"]], errors="coerce")[0]
+    candidate_template = pd.to_numeric([candidate_case["template_amount"]], errors="coerce")[0]
+    if pd.notna(current_template) and pd.notna(candidate_template) and abs(current_template - candidate_template) <= 1:
+        score += 6
+
+    current_temp = pd.to_numeric([current_case["annealing_temp"]], errors="coerce")[0]
+    candidate_temp = pd.to_numeric([candidate_case["annealing_temp"]], errors="coerce")[0]
+    if pd.notna(current_temp) and pd.notna(candidate_temp) and abs(current_temp - candidate_temp) <= 3:
+        score += 6
+
+    shared_clues = set(current_case["text_clues"]).intersection(set(candidate_case["text_clues"]))
+    score += min(len(shared_clues) * 4, 8)
+
+    if current_case["system_top2_normalized"] and current_case["system_top2_normalized"] == candidate_case["system_top2_normalized"]:
+        score += 3
+    if current_case["system_top3_normalized"] and current_case["system_top3_normalized"] == candidate_case["system_top3_normalized"]:
+        score += 3
+
+    if current_case["is_confirmed"] == candidate_case["is_confirmed"]:
+        score += 2
+
+    reasons = extract_similarity_reasons(current_case, candidate_case)
+    return {"score": score, "reasons": reasons}
+
+
+def get_similar_cases(current_record, all_records, limit=5):
+    """召回并排序相似历史案例，排除当前案例本身"""
+    candidates = []
+    for candidate_record in all_records:
+        if candidate_record.get("id") == current_record.get("id"):
+            continue
+
+        similarity = compute_case_similarity_score(current_record, candidate_record)
+        if similarity["score"] <= 0:
+            continue
+
+        candidate_time = pd.to_datetime(candidate_record.get("提交时间"), errors="coerce")
+        candidate_confirmed = is_confirmed_cause(candidate_record.get("教师最终原因"))
+        candidates.append({
+            "record": candidate_record,
+            "score": similarity["score"],
+            "reasons": similarity["reasons"],
+            "confirmed_priority": 1 if candidate_confirmed else 0,
+            "time": candidate_time,
+            "id": candidate_record.get("id") or 0,
+        })
+
+    ranked_cases = sorted(
+        candidates,
+        key=lambda item: (
+            item["confirmed_priority"],
+            item["score"],
+            item["time"] if pd.notna(item["time"]) else pd.Timestamp.min,
+            item["id"],
+        ),
+        reverse=True,
+    )
+    return ranked_cases[:limit]
+
+
+def render_similar_case_block(current_record, all_records):
+    """渲染相似历史案例回看模块"""
+    similar_cases = get_similar_cases(current_record, all_records, limit=5)
+
+    with st.container(border=True):
+        render_card_title("可参考的相似历史案例", "基于当前数据库中的结构化字段进行轻量匹配，优先展示已确认案例。")
+
+        if not similar_cases:
+            st.info("暂无足够相似的历史案例")
+            return
+
+        for index, case_item in enumerate(similar_cases, 1):
+            record = case_item["record"]
+            teacher_final = normalize_display_text(record.get("教师最终原因"), default="未确认")
+            if teacher_final == "未确认":
+                teacher_final = "未确认"
+            similar_reason_text = "；".join(case_item["reasons"]) if case_item["reasons"] else "结构化字段部分匹配"
+            with st.expander(f"{index}. 记录ID {record.get('id', '-')} | {record.get('提交时间', '-')} | 相似度 {case_item['score']}"):
+                col_left, col_right = st.columns(2)
+                with col_left:
+                    st.markdown(f"- 提交时间：{record.get('提交时间', '-')}")
+                    st.markdown(f"- 实验现象：{record.get('实验现象', '-')}")
+                    st.markdown(f"- 系统 Top1：{record.get('Top1 原因', '-')}")
+                with col_right:
+                    st.markdown(f"- 教师最终确认原因：{teacher_final}")
+                    st.markdown(f"- 是否有图片：{record.get('凝胶图', '无图')}")
+                    st.markdown(f"- 相似依据：{similar_reason_text}")
+
+
 def get_recent_mismatch_cases(consistency_df, limit=10):
     if consistency_df.empty:
         return consistency_df
@@ -742,57 +1042,67 @@ def render_teacher_dashboard():
         else:
             st.caption(f"一致率分母为当前筛选范围内可比较的已确认案例数：{consistency_stats['可比较已确认案例数']} 条。")
 
-        render_card_title("系统判断与教师确认一致性分布", "仅统计当前筛选范围内可比较的已确认案例。")
-        distribution_df = consistency_stats["一致性分布"]
-        if distribution_df["案例数"].sum() == 0:
-            st.info("暂无可用的一致性分布数据。")
-        else:
-            st.bar_chart(distribution_df.set_index("类别"))
-            st.dataframe(distribution_df, use_container_width=True, hide_index=True)
+        dashboard_col_left, dashboard_col_right = st.columns([1.2, 1])
 
-        render_card_title("最近不一致案例", "展示教师已确认但系统 Top1 不一致的最近案例，便于快速复盘。")
-        mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
-        if mismatch_df.empty:
-            st.info("当前筛选范围内暂无最近不一致案例。")
-        else:
-            st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
+        with dashboard_col_left:
+            render_card_title("系统判断与教师确认一致性分布", "仅统计当前筛选范围内可比较的已确认案例。")
+            distribution_df = consistency_stats["一致性分布"]
+            if distribution_df["案例数"].sum() == 0:
+                st.info("暂无可用的一致性分布数据。")
+            else:
+                st.bar_chart(distribution_df.set_index("类别"))
+                st.dataframe(distribution_df, use_container_width=True, hide_index=True)
 
-        render_card_title("最近一致案例", "用于展示系统 Top1 与教师最终确认一致的近期案例。")
-        match_df = get_recent_match_cases(consistency_df, limit=10)
-        if match_df.empty:
-            st.info("当前筛选范围内暂无最近一致案例。")
-        else:
-            st.dataframe(match_df, use_container_width=True, hide_index=True)
+        with dashboard_col_right:
+            render_card_title("高频失败原因 Top 5", "优先统计教师最终确认原因；未确认时回退到系统 Top1 诊断结果。")
+            reason_summary_df = build_reason_summary(filtered_df)
+            if reason_summary_df.empty:
+                st.info("当前筛选范围内暂无可汇总的失败原因数据。")
+            else:
+                top5_df = reason_summary_df[["失败原因", "次数"]].head(5).set_index("失败原因")
+                st.bar_chart(top5_df)
+                st.dataframe(
+                    reason_summary_df[["失败原因", "次数"]].head(5),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
-        render_card_title("高频失败原因 Top 5", "优先统计教师最终确认原因；未确认时回退到系统 Top1 诊断结果。")
-        reason_summary_df = build_reason_summary(filtered_df)
-        if reason_summary_df.empty:
-            st.info("当前筛选范围内暂无可汇总的失败原因数据。")
-        else:
-            top5_df = reason_summary_df[["失败原因", "次数"]].head(5).set_index("失败原因")
-            st.bar_chart(top5_df)
-            st.dataframe(
-                reason_summary_df[["失败原因", "次数"]].head(5),
-                use_container_width=True,
-                hide_index=True,
-            )
+        case_col_left, case_col_right = st.columns(2)
+        with case_col_left:
+            render_card_title("最近不一致案例", "展示教师已确认但系统 Top1 不一致的最近案例，便于快速复盘。")
+            mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
+            if mismatch_df.empty:
+                st.info("当前筛选范围内暂无最近不一致案例。")
+            else:
+                st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
 
-        render_card_title("对照异常统计", "优先读取结构化字段，缺失时自动回退到原始文本关键词匹配。")
-        control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
-        negative_count = control_stats.get("negative_control_band_count")
-        positive_count = control_stats.get("positive_control_failure_count")
-        if negative_count is None and positive_count is None:
-            st.info("暂无可用数据")
-        else:
-            control_cols = st.columns(2)
-            control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
-            control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
+        with case_col_right:
+            render_card_title("最近一致案例", "用于展示系统 Top1 与教师最终确认一致的近期案例。")
+            match_df = get_recent_match_cases(consistency_df, limit=10)
+            if match_df.empty:
+                st.info("当前筛选范围内暂无最近一致案例。")
+            else:
+                st.dataframe(match_df, use_container_width=True, hide_index=True)
 
-        render_card_title("最近诊断记录统计明细表", "按当前筛选条件聚合，按次数降序展示前 10 条。")
-        if reason_summary_df.empty:
-            st.info("当前筛选范围内暂无可展示的聚合明细。")
-        else:
-            st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
+        detail_col_left, detail_col_right = st.columns([0.8, 1.2])
+        with detail_col_left:
+            render_card_title("对照异常统计", "优先读取结构化字段，缺失时自动回退到原始文本关键词匹配。")
+            control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
+            negative_count = control_stats.get("negative_control_band_count")
+            positive_count = control_stats.get("positive_control_failure_count")
+            if negative_count is None and positive_count is None:
+                st.info("暂无可用数据")
+            else:
+                control_cols = st.columns(2)
+                control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
+                control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
+
+        with detail_col_right:
+            render_card_title("最近诊断记录统计明细表", "按当前筛选条件聚合，按次数降序展示前 10 条。")
+            if reason_summary_df.empty:
+                st.info("当前筛选范围内暂无可展示的聚合明细。")
+            else:
+                st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
 
 
 def extract_cause_text(candidate_text):
@@ -805,8 +1115,22 @@ def extract_cause_text(candidate_text):
 
 
 def main():
+    ensure_page_config("教师端案例复盘台")
+    init_access_state()
+    if not st.session_state.get("teacher_verified"):
+        apply_common_styles(theme="teacher")
+        st.session_state["current_role"] = "home"
+        render_page_hero(
+            "教师端案例复盘台",
+            "当前页面需要先从首页教师入口完成访问码验证。",
+            "教师端",
+        )
+        render_entry_guard("教师端")
+        return
+
     init_database()
     apply_common_styles(theme="teacher")
+    st.session_state["current_role"] = "teacher"
     render_page_hero(
         "教师端案例复盘台",
         "查看学生历史案例，完成最终原因确认与教学备注沉淀。",
@@ -826,6 +1150,7 @@ def main():
         records_df = build_teacher_records_dataframe(records)
         filter_options = build_teacher_filter_options(records_df)
 
+        st.markdown("**筛选区**")
         render_card_title("筛选与快速定位", "先缩小记录范围，再进入详情查看与教师确认。")
         filter_col1, filter_col2, filter_col3 = st.columns(3)
         with filter_col1:
@@ -906,6 +1231,7 @@ def main():
             st.info("当前筛选条件下暂无历史记录。")
             return
 
+        st.markdown("**案例列表**")
         display_records = [records[int(idx)] for idx in filtered_records_df["record_index"].tolist()]
 
         for idx, rec in enumerate(display_records, 1):
@@ -966,6 +1292,9 @@ def main():
                     has_image=bool(rec.get("凝胶图路径")),
                     title="系统 Top1 诊断可信度解读",
                 )
+
+                render_feedback_loop_block(rec)
+                render_similar_case_block(rec, records)
 
                 st.markdown(f"- 教师最终原因：{teacher_result}")
                 st.markdown(f"- 教师备注：{rec.get('教师备注', '-')}")

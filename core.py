@@ -48,6 +48,151 @@ BIGMODEL_TEMPERATURE = 1.0
 ALLOWED_TEXT_CLUES = ["污染", "模板量不足", "引物问题", "PCR体系问题", "退火温度问题"]
 
 
+def ensure_page_config(page_title, page_icon="🧪"):
+    """统一页面宽屏配置；重复调用时自动忽略。"""
+    try:
+        st.set_page_config(
+            page_title=page_title,
+            page_icon=page_icon,
+            layout="wide",
+            initial_sidebar_state="expanded",
+        )
+    except Exception:
+        pass
+
+
+def init_access_state():
+    """初始化首页入口与动态导航所需的会话状态。"""
+    defaults = {
+        "current_role": "home",
+        "teacher_entered": False,
+        "dev_entered": False,
+        "teacher_verified": False,
+        "dev_verified": False,
+        "show_teacher_access_panel": False,
+        "show_dev_access_panel": False,
+        "navigation_target": None,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def request_navigation(target):
+    """记录下一次需要切换到的目标页面。"""
+    st.session_state["navigation_target"] = target
+
+
+def enter_student_role():
+    st.session_state["current_role"] = "student"
+    request_navigation("student")
+
+
+def enter_teacher_role():
+    st.session_state["teacher_entered"] = True
+    st.session_state["teacher_verified"] = True
+    st.session_state["show_teacher_access_panel"] = False
+    st.session_state["current_role"] = "teacher"
+    request_navigation("teacher")
+
+
+def enter_dev_role():
+    st.session_state["dev_entered"] = True
+    st.session_state["dev_verified"] = True
+    st.session_state["show_dev_access_panel"] = False
+    st.session_state["current_role"] = "dev"
+    request_navigation("dev")
+
+
+def go_home(clear_entries=False):
+    """返回首页；可选清空教师端/开发端入口状态。"""
+    st.session_state["current_role"] = "home"
+    if clear_entries:
+        st.session_state["teacher_entered"] = False
+        st.session_state["dev_entered"] = False
+        st.session_state["teacher_verified"] = False
+        st.session_state["dev_verified"] = False
+        st.session_state["show_teacher_access_panel"] = False
+        st.session_state["show_dev_access_panel"] = False
+    request_navigation("home")
+
+
+def get_current_role_label():
+    role_map = {
+        "home": "首页",
+        "student": "学生",
+        "teacher": "教师",
+        "dev": "开发调试",
+    }
+    return role_map.get(st.session_state.get("current_role", "home"), "首页")
+
+
+def get_config_value(name):
+    """优先从 `.streamlit/secrets.toml` 读取，失败时回退到环境变量。"""
+    try:
+        secret_value = st.secrets[name]
+        normalized_secret = str(secret_value).strip()
+        if normalized_secret:
+            return normalized_secret
+    except Exception:
+        pass
+
+    env_value = os.getenv(name, "")
+    normalized_env = str(env_value or "").strip()
+    return normalized_env or None
+
+
+def get_teacher_access_code():
+    return get_config_value("TEACHER_ACCESS_CODE")
+
+
+def get_dev_access_code():
+    return get_config_value("DEV_ACCESS_CODE")
+
+
+def verify_access_code(input_code, expected_code):
+    """轻量访问码校验；未配置时不放行。"""
+    normalized_expected = str(expected_code or "").strip()
+    normalized_input = str(input_code or "").strip()
+    if not normalized_expected:
+        return False
+    return normalized_input == normalized_expected
+
+
+def logout_teacher_access():
+    st.session_state["teacher_verified"] = False
+    st.session_state["teacher_entered"] = False
+    st.session_state["show_teacher_access_panel"] = False
+    if st.session_state.get("current_role") == "teacher":
+        st.session_state["current_role"] = "home"
+    request_navigation("home")
+
+
+def logout_dev_access():
+    st.session_state["dev_verified"] = False
+    st.session_state["dev_entered"] = False
+    st.session_state["show_dev_access_panel"] = False
+    if st.session_state.get("current_role") == "dev":
+        st.session_state["current_role"] = "home"
+    request_navigation("home")
+
+
+def render_entry_guard(page_name):
+    """教师端/开发调试端的轻量访问拦截提示。"""
+    with st.container(border=True):
+        render_card_title("页面访问受限", f"当前会话尚未获得“{page_name}”入口。")
+        st.warning(f"请先从首页的“{page_name}入口”完成访问码验证，再进入本页面。")
+        col_home, col_reset = st.columns(2)
+        with col_home:
+            if st.button("返回首页", key=f"guard_home_{page_name}", use_container_width=True):
+                go_home(clear_entries=False)
+                st.switch_page("app.py")
+        with col_reset:
+            if st.button("返回首页并重置入口状态", key=f"guard_reset_{page_name}", use_container_width=True):
+                go_home(clear_entries=True)
+                st.switch_page("app.py")
+
+
 def apply_common_styles(theme="student"):
     """
     注入全局样式（只做视觉优化，不改业务逻辑）
@@ -55,6 +200,12 @@ def apply_common_styles(theme="student"):
     """
     # 三个角色页的主色区分：学生蓝、教师青、开发灰黑
     palette_map = {
+        "home": {
+            "primary": "#3657d6",
+            "primary_2": "#5b46c5",
+            "accent": "#7c8df7",
+            "bg": "#f3f6ff",
+        },
         "student": {
             "primary": "#1d4ed8",
             "primary_2": "#4338ca",
@@ -94,35 +245,98 @@ def apply_common_styles(theme="student"):
         }}
 
         .stApp {{
-            background: var(--pcr-bg);
+            background: linear-gradient(180deg, var(--pcr-bg) 0%, #f8fbff 100%);
         }}
 
         .main .block-container {{
-            padding-top: 1.2rem;
-            padding-bottom: 2.2rem;
-            max-width: 1100px;
+            padding-top: 1rem;
+            padding-bottom: 2.9rem;
+            padding-left: clamp(1rem, 2.2vw, 2.4rem);
+            padding-right: clamp(1rem, 2.2vw, 2.4rem);
+            max-width: 1520px;
+        }}
+
+        @media (min-width: 1400px) {{
+            .main .block-container {{
+                max-width: min(1540px, 96vw);
+            }}
+        }}
+
+        @media (max-width: 768px) {{
+            .main .block-container {{
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
+                padding-top: 0.7rem;
+            }}
+        }}
+
+        section[data-testid="stSidebar"] {{
+            background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(241,245,255,0.96) 100%);
+            border-right: 1px solid rgba(148, 163, 184, 0.18);
+        }}
+
+        section[data-testid="stSidebar"] > div {{
+            padding-top: 0.75rem;
+        }}
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {{
+            border-radius: 12px;
+            margin-bottom: 0.28rem;
+            padding: 0.56rem 0.72rem;
+            border: 1px solid transparent;
+            transition: all 0.18s ease;
+        }}
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {{
+            background: rgba(255, 255, 255, 0.85);
+            border-color: rgba(148, 163, 184, 0.2);
+        }}
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {{
+            background: rgba(255, 255, 255, 0.98);
+            border-color: rgba(59, 130, 246, 0.22);
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
         }}
 
         .pcr-hero {{
             background: linear-gradient(135deg, var(--pcr-primary) 0%, var(--pcr-primary-2) 100%);
             color: #ffffff;
-            border-radius: 18px;
-            padding: 1.2rem 1.25rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+            border-radius: 24px;
+            padding: 1.55rem 1.65rem;
+            margin-bottom: 1.15rem;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+            position: relative;
+            overflow: hidden;
+        }}
+
+        .pcr-hero::after {{
+            content: "";
+            position: absolute;
+            right: -80px;
+            bottom: -180px;
+            width: 340px;
+            height: 340px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
         }}
 
         .pcr-hero h1 {{
-            margin: 0.35rem 0 0.4rem 0;
-            font-size: 1.85rem;
+            margin: 0.45rem 0 0.45rem 0;
+            font-size: clamp(1.85rem, 2.4vw, 2.5rem);
             font-weight: 700;
-            letter-spacing: 0.2px;
+            letter-spacing: 0.1px;
+            position: relative;
+            z-index: 1;
         }}
 
         .pcr-hero p {{
             margin: 0;
             opacity: 0.96;
-            font-size: 0.99rem;
+            font-size: 1.02rem;
+            line-height: 1.65;
+            max-width: 72ch;
+            position: relative;
+            z-index: 1;
         }}
 
         .pcr-role-badge {{
@@ -131,45 +345,57 @@ def apply_common_styles(theme="student"):
             border: 1px solid rgba(255, 255, 255, 0.35);
             color: #ffffff;
             border-radius: 999px;
-            padding: 0.2rem 0.75rem;
-            font-size: 0.78rem;
-            font-weight: 600;
+            padding: 0.28rem 0.82rem;
+            font-size: 0.79rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            position: relative;
+            z-index: 1;
         }}
 
         .pcr-card-title {{
             color: var(--pcr-text);
-            font-size: 1.1rem;
+            font-size: 1.16rem;
             font-weight: 700;
-            margin: 0.1rem 0 0.55rem 0;
+            margin: 0.05rem 0 0.34rem 0;
+            line-height: 1.35;
         }}
 
         .pcr-muted {{
             color: var(--pcr-muted);
-            font-size: 0.92rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 0.2rem;
         }}
 
         /* 统一卡片边框、阴影、圆角，适配 st.container(border=True) */
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             border-color: var(--pcr-border) !important;
-            border-radius: 14px !important;
+            border-radius: 18px !important;
             background: var(--pcr-card);
-            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }}
+
+        div[data-testid="stVerticalBlockBorderWrapper"] > div {{
+            padding: 0.14rem 0.18rem;
         }}
 
         .pcr-top1-card {{
             border: 1px solid #bfd4ff;
-            background: #eff6ff;
-            border-radius: 12px;
-            padding: 0.75rem 0.9rem;
-            margin-bottom: 0.5rem;
+            background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
+            border-radius: 16px;
+            padding: 0.95rem 1rem;
+            margin-bottom: 0.7rem;
         }}
 
         .pcr-sub-card {{
             border: 1px solid var(--pcr-border);
             background: #ffffff;
-            border-radius: 12px;
-            padding: 0.65rem 0.85rem;
-            margin-bottom: 0.45rem;
+            border-radius: 14px;
+            padding: 0.82rem 0.95rem;
+            margin-bottom: 0.65rem;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
         }}
 
         .pcr-status-pill {{
@@ -194,6 +420,198 @@ def apply_common_styles(theme="student"):
         }}
 
         /* 按钮风格统一 */
+        .pcr-tile {{
+            height: 100%;
+            border: 1px solid var(--pcr-border);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,250,255,0.96) 100%);
+            border-radius: 18px;
+            padding: 1rem 1rem 0.95rem 1rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }}
+
+        .pcr-tile-tag {{
+            display: inline-block;
+            margin-bottom: 0.55rem;
+            padding: 0.18rem 0.62rem;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--pcr-primary);
+            font-size: 0.76rem;
+            font-weight: 700;
+        }}
+
+        .pcr-tile h3 {{
+            margin: 0 0 0.4rem 0;
+            font-size: 1.04rem;
+            color: var(--pcr-text);
+        }}
+
+        .pcr-tile p {{
+            margin: 0;
+            color: var(--pcr-muted);
+            font-size: 0.94rem;
+            line-height: 1.65;
+        }}
+
+        .pcr-soft-note {{
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-left: 4px solid var(--pcr-primary);
+            background: rgba(255, 255, 255, 0.84);
+            border-radius: 16px;
+            padding: 0.95rem 1rem;
+        }}
+
+        .pcr-soft-note-title {{
+            margin: 0 0 0.28rem 0;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--pcr-text);
+        }}
+
+        .pcr-soft-note p {{
+            margin: 0;
+            color: var(--pcr-muted);
+            line-height: 1.68;
+            font-size: 0.94rem;
+        }}
+
+        .pcr-status-card {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 16px;
+            padding: 0.85rem 0.95rem;
+            background: #ffffff;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+            margin-bottom: 0.7rem;
+        }}
+
+        .pcr-status-card b {{
+            display: block;
+            margin-bottom: 0.28rem;
+            font-size: 0.95rem;
+            color: var(--pcr-text);
+        }}
+
+        .pcr-status-card p {{
+            margin: 0;
+            font-size: 0.88rem;
+            line-height: 1.58;
+            color: var(--pcr-muted);
+        }}
+
+        .pcr-status-success {{ border-left: 4px solid #16a34a; }}
+        .pcr-status-warning {{ border-left: 4px solid #ea580c; }}
+        .pcr-status-error {{ border-left: 4px solid #dc2626; }}
+        .pcr-status-neutral {{ border-left: 4px solid #64748b; }}
+
+        .pcr-step-header {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,249,255,0.95) 100%);
+            padding: 1rem 1rem 0.8rem 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }}
+
+        .pcr-step-kicker {{
+            color: var(--pcr-primary);
+            font-weight: 700;
+            font-size: 0.84rem;
+            margin-bottom: 0.18rem;
+        }}
+
+        .pcr-step-title {{
+            color: var(--pcr-text);
+            font-weight: 700;
+            font-size: 1.16rem;
+            margin-bottom: 0.3rem;
+        }}
+
+        .pcr-step-desc {{
+            color: var(--pcr-muted);
+            font-size: 0.93rem;
+            line-height: 1.6;
+        }}
+
+        [data-testid="stMetric"] {{
+            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,249,255,0.94) 100%);
+            border: 1px solid var(--pcr-border);
+            border-radius: 16px;
+            padding: 0.9rem 1rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }}
+
+        [data-testid="stMetricLabel"] {{
+            font-size: 0.88rem;
+            font-weight: 700;
+        }}
+
+        [data-testid="stMetricValue"] {{
+            font-size: clamp(1.5rem, 2.1vw, 2.1rem);
+        }}
+
+        div[data-testid="stDataFrame"] {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 16px;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+        }}
+
+        [data-testid="stExpander"] {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 16px;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+            margin-bottom: 0.7rem;
+        }}
+
+        [data-testid="stExpander"] details summary {{
+            background: rgba(248, 250, 252, 0.9);
+        }}
+
+        .stAlert {{
+            border-radius: 14px;
+        }}
+
+        div.stButton > button, div.stDownloadButton > button, div[data-testid="stFormSubmitButton"] button {{
+            border-radius: 12px;
+            font-weight: 700;
+            border: 1px solid #c9d6ef;
+            min-height: 2.8rem;
+            padding-left: 0.95rem;
+            padding-right: 0.95rem;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+        }}
+
+        button[kind="primary"] {{
+            background: linear-gradient(135deg, var(--pcr-primary) 0%, var(--pcr-primary-2) 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+        }}
+
+        .stMarkdown p, .stMarkdown li {{
+            line-height: 1.68;
+        }}
+
+        .stMarkdown ul {{
+            margin-top: 0.25rem;
+            margin-bottom: 0.4rem;
+        }}
+
+        [data-testid="stHorizontalBlock"] {{
+            gap: 1rem;
+        }}
+
+        .stProgress > div > div > div > div {{
+            background: linear-gradient(90deg, var(--pcr-primary) 0%, var(--pcr-accent) 100%);
+        }}
+
+        .stProgress > div > div {{
+            height: 0.48rem;
+            border-radius: 999px;
+        }}
+
         div.stButton > button, div.stDownloadButton > button {{
             border-radius: 10px;
             font-weight: 600;
@@ -224,6 +642,39 @@ def render_card_title(title, desc=""):
     st.markdown(f'<div class="pcr-card-title">{title}</div>', unsafe_allow_html=True)
     if desc:
         st.markdown(f'<div class="pcr-muted">{desc}</div>', unsafe_allow_html=True)
+
+
+def render_info_tiles(items, columns=3):
+    """横向信息卡片，用于首页说明与步骤展示。"""
+    if not items:
+        return
+
+    cols = st.columns(columns)
+    for index, item in enumerate(items):
+        with cols[index % columns]:
+            st.markdown(
+                f"""
+                <div class="pcr-tile">
+                    <span class="pcr-tile-tag">{item.get("tag", "模块")}</span>
+                    <h3>{item.get("title", "")}</h3>
+                    <p>{item.get("desc", "")}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_soft_notice(title, desc):
+    """轻量提示卡。"""
+    st.markdown(
+        f"""
+        <div class="pcr-soft-note">
+            <div class="pcr-soft-note-title">{title}</div>
+            <p>{desc}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def run_system_self_check():
@@ -314,6 +765,41 @@ def render_system_self_check():
             st.error(msg)
         else:
             st.warning(msg)
+
+
+def render_system_self_check():
+    """渲染系统自检区域，使用统一状态卡布局。"""
+    st.markdown("### 系统自检")
+    checks = run_system_self_check()
+    items = [
+        ("rules_csv", "rules.csv 读取"),
+        ("sqlite", "SQLite 数据库连接"),
+        ("uploads", "uploads 文件夹"),
+        ("bigmodel_api_key", "BIGMODEL_API_KEY"),
+        ("bigmodel_base_url", "BIGMODEL_BASE_URL"),
+        ("bigmodel_model", "当前模型"),
+        ("extractor_strategy", "文本抽取优先方式"),
+    ]
+
+    cols = st.columns(3)
+    level_class_map = {
+        "success": "pcr-status-success",
+        "warning": "pcr-status-warning",
+        "error": "pcr-status-error",
+    }
+    for index, (key, label) in enumerate(items):
+        item = checks.get(key, {"level": "warning", "status": "未知", "detail": ""})
+        css_class = level_class_map.get(item["level"], "pcr-status-neutral")
+        with cols[index % 3]:
+            st.markdown(
+                f"""
+                <div class="pcr-status-card {css_class}">
+                    <b>{label}：{item['status']}</b>
+                    <p>{item['detail']}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def run_rules_library_check():
@@ -1391,7 +1877,282 @@ def load_record_by_id(record_id):
     return dict(row) if row else None
 
 
-def build_case_summary(payload):
+def normalize_report_value(value, empty_text="未填写"):
+    """统一格式化复盘报告字段值。"""
+    if isinstance(value, list):
+        cleaned_items = [str(item).strip() for item in value if not is_missing_value(item)]
+        return "、".join(cleaned_items) if cleaned_items else empty_text
+    if is_missing_value(value):
+        return empty_text
+    return str(value).strip()
+
+
+def append_report_section(lines, title, body_lines):
+    """按统一格式追加报告区块。"""
+    valid_lines = [str(item).strip() for item in body_lines if str(item).strip()]
+    if not valid_lines:
+        return
+    if lines:
+        lines.append("")
+    lines.append(title)
+    lines.extend(valid_lines)
+
+
+def normalize_reason_for_report(reason):
+    """轻量归一化原因标签，便于报告中的一致性判断。"""
+    text = str(reason or "").strip().lower().replace(" ", "")
+    if not text:
+        return ""
+
+    alias_groups = {
+        "模板量不足": ["模板量不足", "模板浓度低", "模板少", "模板过低"],
+        "污染": ["污染", "气溶胶污染", "阴性对照污染"],
+        "引物问题": ["引物问题", "引物失效", "引物设计问题"],
+        "PCR体系问题": ["pcr体系问题", "体系漏加", "反应体系配置错误", "pcr体系漏加试剂"],
+        "退火温度过高": ["退火温度过高", "退火温度偏高"],
+        "退火温度过低": ["退火温度过低", "退火温度偏低"],
+        "退火温度问题": ["退火温度问题"],
+    }
+    for canonical, aliases in alias_groups.items():
+        for alias in aliases:
+            if alias in text:
+                return canonical
+    return text
+
+
+def build_report_consistency_status(teacher_final_cause, ranked_results):
+    """为复盘报告生成一致性状态。"""
+    teacher_reason = normalize_reason_for_report(teacher_final_cause)
+    if not teacher_reason:
+        return "无法比较"
+
+    ranked_results = ranked_results or []
+    normalized_candidates = []
+    for item in ranked_results[:3]:
+        normalized = normalize_reason_for_report(item.get("原因", ""))
+        if normalized:
+            normalized_candidates.append(normalized)
+
+    if not normalized_candidates:
+        return "无法比较"
+    if teacher_reason == normalized_candidates[0]:
+        return "一致"
+    if teacher_reason in normalized_candidates[1:]:
+        return "Top3命中但Top1不一致"
+    return "未命中"
+
+
+def build_feedback_loop_summary_for_report(status_text):
+    """生成报告中的闭环结论语句。"""
+    if status_text == "一致":
+        return "系统首选判断与教师最终确认一致，可作为稳定的教学复盘案例。"
+    if status_text == "Top3命中但Top1不一致":
+        return "系统候选结果已覆盖真实原因，但排序仍有优化空间，可作为纠偏案例参考。"
+    if status_text == "未命中":
+        return "系统候选结果未覆盖教师最终确认原因，建议将该案例作为规则补充与误判复盘样例。"
+    return "该案例尚未完成有效教师确认，当前报告以系统诊断结果为主，暂不能形成完整闭环结论。"
+
+
+def get_action_advice_by_reason(reason):
+    """基于 Top1 原因给出轻量模板化建议。"""
+    normalized_reason = normalize_reason_for_report(reason)
+    if normalized_reason == "模板量不足":
+        return "建议补查模板浓度、完整性及加样量，并复核模板保存条件。"
+    if normalized_reason == "污染":
+        return "建议重点检查阴性对照、操作环境、移液流程及分区操作是否规范。"
+    if normalized_reason == "引物问题":
+        return "建议复核引物设计、退火位点匹配、保存条件及是否存在失效情况。"
+    if normalized_reason == "PCR体系问题":
+        return "建议复核 PCR 体系配制、关键试剂是否漏加，以及加样顺序和配比是否正确。"
+    if normalized_reason in {"退火温度过高", "退火温度过低", "退火温度问题"}:
+        return "建议复核退火温度设定与 PCR 程序参数，并结合梯度退火实验进一步确认。"
+    return "建议结合对照结果、关键参数和实验记录，再次核对可能的异常来源。"
+
+
+def build_review_suggestions(top1_reason, missing_items=None, top1_suggestion="", confidence_level=""):
+    """生成报告中的复盘建议。"""
+    suggestions = []
+
+    top1_suggestion = normalize_report_value(top1_suggestion, "")
+    if top1_suggestion:
+        suggestions.append(f"系统建议：{top1_suggestion}")
+
+    base_advice = get_action_advice_by_reason(top1_reason)
+    if base_advice:
+        suggestions.append(base_advice)
+
+    missing_items = missing_items or []
+    if missing_items:
+        missing_text = "；".join(missing_items[:3])
+        suggestions.append(f"当前仍建议优先补充以下信息后再复核：{missing_text}。")
+    elif confidence_level == "高":
+        suggestions.append("当前关键信息相对完整，可将本案例作为课堂复盘示例进一步沉淀。")
+
+    deduped = []
+    for item in suggestions:
+        if item and item not in deduped:
+            deduped.append(item)
+    return deduped[:3]
+
+
+def build_case_review_report(payload):
+    """生成规范化复盘报告文本。"""
+    payload = payload or {}
+    record_id = payload.get("record_id")
+    db_record = load_record_by_id(record_id) or {}
+
+    submit_time = db_record.get("diagnosis_time") or payload.get("submit_time")
+    abnormality = db_record.get("abnormality") or payload.get("abnormality")
+    template_amount = db_record.get("template_amount", payload.get("template_amount"))
+    annealing_temp = db_record.get("annealing_temp", payload.get("annealing_temp"))
+    cycles = db_record.get("cycles", payload.get("cycles"))
+    positive_control = db_record.get("positive_control_normal") or payload.get("positive_control_normal")
+    negative_control = db_record.get("negative_control_band") or payload.get("negative_control_band")
+    description = db_record.get("description") or payload.get("description")
+    image_path = db_record.get("gel_image_path") or payload.get("gel_image_path", "")
+    has_image = bool(str(image_path or "").strip())
+
+    teacher_final = db_record.get("teacher_final_cause")
+    teacher_note = db_record.get("teacher_note")
+    teacher_confirm_time = db_record.get("teacher_confirm_time")
+    current_status = "已确认" if not is_missing_value(teacher_final) else "未确认"
+
+    diagnosis_result = db_record.get("diagnosis_result", "")
+    top_results = payload.get("results", []) or []
+    candidate_texts = parse_all_candidates(diagnosis_result)
+    ranked_results = build_ranked_results(top_results=top_results, candidate_texts=candidate_texts)
+    if not ranked_results:
+        top1_reason, top1_score = parse_top1_result(diagnosis_result)
+        ranked_results = build_ranked_results(top1_reason=top1_reason, top1_score=top1_score)
+
+    text_clues = payload.get("text_clues")
+    if not text_clues and str(description or "").strip():
+        text_clues = extract_text_clues(description)
+    text_clues = text_clues or []
+
+    top1_result = ranked_results[0] if ranked_results else {}
+    top1_reason = top1_result.get("原因", "未识别")
+    top1_detail = top1_result.get("诊断依据", {}) or {}
+    top1_suggestion = top1_result.get("建议", "")
+
+    context = build_diagnosis_context(
+        abnormality=abnormality,
+        positive_control_normal=positive_control,
+        negative_control_band=negative_control,
+        template_amount=template_amount,
+        annealing_temp=annealing_temp,
+        cycles=cycles,
+        description=description or "",
+        text_clues=text_clues,
+        gel_image_path=image_path,
+        has_image=has_image,
+    )
+    confidence_level, confidence_reason = compute_confidence_level(
+        ranked_results,
+        detail=top1_detail,
+        context=context,
+    )
+    evidence_points = build_evidence_summary(top1_reason, detail=top1_detail, context=context)
+    missing_items = detect_missing_key_info(context)
+    consistency_status = build_report_consistency_status(teacher_final, ranked_results)
+    feedback_summary = build_feedback_loop_summary_for_report(consistency_status)
+    review_suggestions = build_review_suggestions(
+        top1_reason,
+        missing_items=missing_items,
+        top1_suggestion=top1_suggestion,
+        confidence_level=confidence_level,
+    )
+
+    lines = ["《PCR-电泳异常复盘报告》"]
+
+    append_report_section(
+        lines,
+        "一、报告标题区",
+        [
+            f"案例编号：{normalize_report_value(record_id, '未记录')}",
+            f"提交时间：{normalize_report_value(submit_time, '未记录')}",
+            f"是否有图片：{'有图片' if has_image else '无图片'}",
+            f"当前状态：{current_status}",
+        ],
+    )
+
+    append_report_section(
+        lines,
+        "二、基本实验信息",
+        [
+            f"异常现象：{normalize_report_value(abnormality)}",
+            f"阳性对照结果：{normalize_report_value(positive_control)}",
+            f"阴性对照结果：{normalize_report_value(negative_control)}",
+            f"模板相关信息：{normalize_report_value(template_amount)}",
+            f"退火温度 / 程序设置信息：退火温度 {normalize_report_value(annealing_temp)}；循环数 {normalize_report_value(cycles)}",
+            f"学生补充描述：{normalize_report_value(description)}",
+            f"文本线索：{normalize_report_value(text_clues)}",
+        ],
+    )
+
+    diagnosis_lines = [
+        f"Top1 原因：{normalize_report_value(ranked_results[0].get('原因') if len(ranked_results) > 0 else '', '未识别')}",
+        f"Top2 原因：{normalize_report_value(ranked_results[1].get('原因') if len(ranked_results) > 1 else '', '未识别')}",
+        f"Top3 原因：{normalize_report_value(ranked_results[2].get('原因') if len(ranked_results) > 2 else '', '未识别')}",
+    ]
+    if confidence_level != "未知" or confidence_reason:
+        diagnosis_lines.append(f"Top1 置信度：{confidence_level}")
+    if confidence_reason:
+        diagnosis_lines.append(f"置信度说明：{confidence_reason}")
+    if evidence_points:
+        diagnosis_lines.append("证据摘要：")
+        diagnosis_lines.extend([f"- {point}" for point in evidence_points[:5]])
+    if missing_items:
+        diagnosis_lines.append("缺失信息提示：")
+        diagnosis_lines.extend([f"- {item}" for item in missing_items])
+    else:
+        diagnosis_lines.append("缺失信息提示：当前关键信息较完整，判断依据相对充分。")
+    append_report_section(lines, "三、系统诊断结果", diagnosis_lines)
+
+    evidence_section_lines = []
+    if evidence_points:
+        evidence_section_lines.append("系统主要依据如下：")
+        evidence_section_lines.extend([f"- {point}" for point in evidence_points[:5]])
+    elif top1_detail:
+        evidence_section_lines.append(
+            "当前历史记录未生成独立证据摘要，系统主要依据为规则匹配得分、对照结果与关键参数命中情况。"
+        )
+    else:
+        evidence_section_lines.append("当前记录未保存完整打分明细，暂无更详细的关键证据可展示。")
+    append_report_section(lines, "四、诊断依据 / 关键证据", evidence_section_lines)
+
+    teacher_review_lines = [
+        f"教师最终确认原因：{normalize_report_value(teacher_final, '未确认')}",
+        f"教师备注：{normalize_report_value(teacher_note)}",
+    ]
+    if not is_missing_value(teacher_confirm_time):
+        teacher_review_lines.append(f"教师确认时间：{normalize_report_value(teacher_confirm_time)}")
+    if current_status == "未确认":
+        teacher_review_lines.append("该案例尚未完成教师确认。")
+    else:
+        teacher_review_lines.append(f"一致性状态：{consistency_status}")
+        teacher_review_lines.append(f"闭环结论：{feedback_summary}")
+    append_report_section(lines, "五、教师复核结果", teacher_review_lines)
+
+    append_report_section(
+        lines,
+        "六、改进建议 / 复盘建议",
+        [f"- {item}" for item in review_suggestions] if review_suggestions else ["- 建议结合更多实验记录继续复核当前案例。"],
+    )
+
+    append_report_section(
+        lines,
+        "七、报告尾部说明",
+        [
+            "本报告由系统自动生成，供实验教学复盘与教师复核参考。",
+            "最终结论以教师确认结果为准；若尚未确认，则当前结论仅供课堂分析使用。",
+        ],
+    )
+
+    return "\n".join(lines)
+
+
+def _build_case_summary_legacy(payload):
     """
     生成结构化案例摘要文本（txt内容）
     优先使用数据库已保存值，缺失时回退到当前内存 payload
@@ -1459,3 +2220,7 @@ def build_case_summary(payload):
     ]
     return "\n".join(lines)
 
+
+def build_case_summary(payload):
+    """兼容旧调用入口：输出规范化复盘报告文本。"""
+    return build_case_review_report(payload)

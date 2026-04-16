@@ -15,53 +15,73 @@ from core import (
     apply_common_styles,
     clear_history_records,
     clear_uploaded_images,
+    ensure_page_config,
+    init_access_state,
     init_database,
     render_card_title,
+    render_entry_guard,
     render_page_hero,
+    render_soft_notice,
     render_system_self_check,
     run_rules_library_check,
 )
 
 
 def main():
+    ensure_page_config("开发调试端控制台")
+    init_access_state()
+    if not st.session_state.get("dev_verified"):
+        apply_common_styles(theme="dev")
+        st.session_state["current_role"] = "home"
+        render_page_hero(
+            "开发调试端控制台",
+            "当前页面需要先从首页开发调试入口完成访问码验证。",
+            "开发调试端",
+        )
+        render_entry_guard("开发调试端")
+        return
+
     init_database()
     apply_common_styles(theme="dev")
+    st.session_state["current_role"] = "dev"
     render_page_hero(
         "开发调试端控制台",
         "集中查看系统状态、规则健康度与演示环境清理能力。",
         "开发调试端",
     )
 
-    with st.container(border=True):
-        render_card_title("系统自检", "快速检查规则库、数据库、环境变量与模型配置。")
-        render_system_self_check()
+    top_col_left, top_col_right = st.columns([1.1, 0.9])
 
-    with st.container(border=True):
-        render_card_title("API 调试信息", "用于确认本次文本线索抽取是否真正走了 AI 接口。")
-        api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
-        base_url_env = os.getenv("BIGMODEL_BASE_URL", "").strip()
-        base_url_exists = bool(base_url_env)
-        base_url = base_url_env or BIGMODEL_DEFAULT_BASE_URL
-        model = os.getenv("BIGMODEL_MODEL", BIGMODEL_MODEL)
+    with top_col_left:
+        with st.container(border=True):
+            render_card_title("系统自检", "快速检查规则库、数据库、环境变量与模型配置。")
+            render_system_self_check()
 
-        st.markdown(f"- 检测到 BIGMODEL_API_KEY：{'是' if api_key_exists else '否'}")
-        st.markdown(f"- 检测到 BIGMODEL_BASE_URL：{'是' if base_url_exists else '否'}")
-        st.markdown(f"- 当前 Base URL：{base_url}")
-        st.markdown(f"- 当前模型：{model}")
-        st.markdown("- 文本抽取策略：优先 AI（MiniMax），失败时回退本地规则")
+    with top_col_right:
+        with st.container(border=True):
+            render_card_title("API 调试信息", "用于确认本次文本线索抽取是否真正走了 AI 接口。")
+            api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
+            base_url_env = os.getenv("BIGMODEL_BASE_URL", "").strip()
+            base_url_exists = bool(base_url_env)
+            base_url = base_url_env or BIGMODEL_DEFAULT_BASE_URL
+            model = os.getenv("BIGMODEL_MODEL", BIGMODEL_MODEL)
 
-        # 展示最近一次实际调用结果（如果学生端已经执行过诊断）
-        last_api_debug = st.session_state.get("last_api_debug", {})
-        if last_api_debug:
-            st.markdown("#### 最近一次抽取调试")
-            st.markdown(f"- 本次抽取方式：{last_api_debug.get('extractor_used', '未知')}")
-            st.markdown(f"- API Key 掩码：{last_api_debug.get('api_key_masked', '-') or '-'}")
-            st.markdown(f"- 失败原因摘要：{last_api_debug.get('fail_reason', '-') or '-'}")
-            error_detail = (last_api_debug.get("error_detail", "") or "").strip()
-            if error_detail:
-                st.markdown(f"- 异常摘要：{error_detail}")
-        else:
-            st.info("当前还没有最近一次抽取调试信息，请先到“学生端”执行一次诊断。")
+            render_soft_notice("当前接口配置", f"BIGMODEL_API_KEY：{'已检测到' if api_key_exists else '未检测到'}；BIGMODEL_BASE_URL：{'已检测到' if base_url_exists else '未检测到'}。")
+            st.markdown(f"- 当前 Base URL：{base_url}")
+            st.markdown(f"- 当前模型：{model}")
+            st.markdown("- 文本抽取策略：优先 AI，失败时回退本地规则")
+
+            last_api_debug = st.session_state.get("last_api_debug", {})
+            if last_api_debug:
+                st.markdown("#### 最近一次抽取调试")
+                st.markdown(f"- 本次抽取方式：{last_api_debug.get('extractor_used', '未知')}")
+                st.markdown(f"- API Key 掩码：{last_api_debug.get('api_key_masked', '-') or '-'}")
+                st.markdown(f"- 失败原因摘要：{last_api_debug.get('fail_reason', '-') or '-'}")
+                error_detail = (last_api_debug.get("error_detail", "") or "").strip()
+                if error_detail:
+                    st.markdown(f"- 异常摘要：{error_detail}")
+            else:
+                st.info("当前还没有最近一次抽取调试信息，请先到“学生端”执行一次诊断。")
 
     with st.container(border=True):
         render_card_title("规则库查看 / 校验", "先看表，再一键做必要字段与数据质量检查。")

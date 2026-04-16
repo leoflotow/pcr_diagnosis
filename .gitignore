@@ -58,6 +58,9 @@ data/app.db
 uploads/*
 !uploads/.gitkeep
 config/
+.streamlit/secrets.toml
+.streamlit/*.toml
+!.streamlit/secrets.toml.example
 .claude/
 CLAUDE.md
 .python-3.10.11-installer.exe

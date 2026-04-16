@@ -13,9 +13,11 @@ from core import (
     apply_common_styles,
     build_case_summary,
     diagnose,
+    ensure_page_config,
     init_database,
     render_diagnosis_quality_block,
     render_card_title,
+    render_info_tiles,
     render_page_hero,
     save_diagnosis_record,
     save_uploaded_image,
@@ -24,13 +26,25 @@ from core import (
 
 STUDENT_FORM_DEFAULTS = {
     "student_form_abnormality": "无条带",
-    "student_form_template_amount": 2.0,
-    "student_form_annealing_temp": 55.0,
+    "student_form_template_amount": 1.0,
+    "student_form_annealing_temp": 60.0,
     "student_form_cycles": 30,
     "student_form_positive_control_normal": "是",
     "student_form_negative_control_band": "否",
     "student_form_description": "",
 }
+
+STUDENT_DEMO_DATA = {
+    "student_form_abnormality": "无条带",
+    "student_form_template_amount": 1.0,
+    "student_form_annealing_temp": 60.0,
+    "student_form_cycles": 30,
+    "student_form_positive_control_normal": "否",
+    "student_form_negative_control_band": "否",
+    "student_form_description": "怀疑模板量不足，PCR体系可能漏加。",
+}
+
+STUDENT_FORM_STATE_VERSION = 2
 
 STUDENT_STEP_TITLES = [
     "实验现象与对照情况",
@@ -104,6 +118,17 @@ def init_student_wizard_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
+    if st.session_state.get("student_form_state_version") != STUDENT_FORM_STATE_VERSION:
+        legacy_default_mapping = {
+            "student_form_template_amount": (2.0, 1.0),
+            "student_form_annealing_temp": (55.0, 60.0),
+            "student_form_cycles": (30, 30),
+        }
+        for key, (legacy_value, new_value) in legacy_default_mapping.items():
+            if key not in st.session_state or st.session_state.get(key) == legacy_value:
+                st.session_state[key] = new_value
+        st.session_state["student_form_state_version"] = STUDENT_FORM_STATE_VERSION
+
     if "student_current_step" not in st.session_state:
         st.session_state["student_current_step"] = 1
     if "student_last_payload" not in st.session_state:
@@ -121,20 +146,31 @@ def clear_student_uploaded_image():
     st.session_state["student_uploaded_image_bytes"] = None
     st.session_state["student_uploaded_image_name"] = ""
     st.session_state["student_uploaded_image_type"] = ""
+    st.session_state.pop("student_form_gel_image_file", None)
+
+
+def reset_student_form_state(overrides=None, target_step=None):
+    """按默认值或演示数据重置学生端表单状态。"""
+    form_values = dict(STUDENT_FORM_DEFAULTS)
+    if overrides:
+        form_values.update(overrides)
+
+    for key, value in form_values.items():
+        st.session_state[key] = value
+
+    if target_step is None:
+        target_step = st.session_state.get("student_current_step", 1)
+    st.session_state["student_current_step"] = target_step
+    st.session_state["student_last_payload"] = None
+    clear_student_uploaded_image()
 
 
 def load_student_demo_data():
-    """加载演示数据到向导状态"""
-    st.session_state["student_form_abnormality"] = "无条带"
-    st.session_state["student_form_template_amount"] = 1.0
-    st.session_state["student_form_annealing_temp"] = 65.0
-    st.session_state["student_form_cycles"] = 30
-    st.session_state["student_form_positive_control_normal"] = "否"
-    st.session_state["student_form_negative_control_band"] = "否"
-    st.session_state["student_form_description"] = "怀疑模板量不足，PCR体系可能漏加。"
-    st.session_state["student_current_step"] = 1
-    st.session_state["student_last_payload"] = None
-    clear_student_uploaded_image()
+    """加载演示数据到向导状态。"""
+    reset_student_form_state(
+        STUDENT_DEMO_DATA,
+        target_step=st.session_state.get("student_current_step", 1),
+    )
 
 
 def persist_uploaded_file(uploaded_file):
@@ -242,6 +278,24 @@ def render_student_wizard_header():
     st.progress(current_step / total_steps)
     st.info(f"第 {current_step} 步 / 共 {total_steps} 步：{STUDENT_STEP_TITLES[current_step - 1]}")
     st.caption("请按步骤完成输入；可随时返回上一步修改信息。")
+
+
+def render_student_wizard_header():
+    """渲染更清晰的当前步骤提示。"""
+    current_step = st.session_state["student_current_step"]
+    total_steps = len(STUDENT_STEP_TITLES)
+    with st.container(border=True):
+        st.markdown(
+            f"""
+            <div class="pcr-step-header">
+                <div class="pcr-step-kicker">当前步骤</div>
+                <div class="pcr-step-title">第 {current_step} / {total_steps} 步：{STUDENT_STEP_TITLES[current_step - 1]}</div>
+                <div class="pcr-step-desc">请按步骤完成输入；可随时返回上一步调整信息，诊断只会在最后一步触发。</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.progress(current_step / total_steps)
 
 
 def render_step_1_basic_info():
@@ -417,19 +471,24 @@ def render_student_results(payload):
 
     if results:
         with st.container(border=True):
-            render_card_title("案例摘要导出", "可直接复制文本，或下载为 TXT 文件。")
+            render_card_title("复盘报告导出", "可预览规范化复盘报告，并下载为 TXT 文件。")
             summary_key = f"student_case_summary_{record_id}"
             generate_key = f"student_generate_case_summary_{record_id}"
-            download_name = f"case_summary_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+            if record_id:
+                download_name = f"pcr_review_report_case_{record_id}.txt"
+            else:
+                download_name = f"pcr_review_report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+            st.caption("点击下方按钮可生成规范化复盘报告，并下载为 TXT 文件。")
 
-            if st.button("生成案例摘要", key=generate_key):
+            if st.button("生成复盘报告", key=generate_key):
                 st.session_state[summary_key] = build_case_summary(payload)
 
             summary_text = st.session_state.get(summary_key, "")
             if summary_text:
-                st.text_area("案例摘要文本", value=summary_text, height=300)
+                st.markdown("**复盘报告预览**")
+                st.text_area("复盘报告预览", value=summary_text, height=420)
                 st.download_button(
-                    "下载 TXT",
+                    "下载复盘报告（TXT）",
                     data=summary_text,
                     file_name=download_name,
                     mime="text/plain",
@@ -438,8 +497,10 @@ def render_student_results(payload):
 
 def main():
     """学生端主流程"""
+    ensure_page_config("学生端诊断工作台")
     init_database()
     apply_common_styles(theme="student")
+    st.session_state["current_role"] = "student"
     init_student_wizard_state()
 
     render_page_hero(
@@ -456,6 +517,54 @@ def main():
             "3. 补充文字描述并上传图片（可选）\n"
             "4. 预览输入并点击“开始诊断”\n"
             "5. 查看诊断结果、诊断依据与案例摘要"
+        )
+        if st.button("加载演示数据", key="student_load_demo"):
+            load_student_demo_data()
+            st.success("已加载演示数据，可按步骤继续演示。")
+            st.rerun()
+
+    render_student_wizard_header()
+
+    current_step = st.session_state["student_current_step"]
+    if current_step == 1:
+        render_step_1_basic_info()
+    elif current_step == 2:
+        render_step_2_pcr_params()
+    elif current_step == 3:
+        render_step_3_text_and_image()
+    else:
+        render_step_4_review()
+
+    render_student_step_navigation()
+
+    payload = st.session_state.get("student_last_payload")
+    if payload is not None:
+        render_student_results(payload)
+
+def main():
+    """学生端主流程。"""
+    ensure_page_config("学生端诊断工作台")
+    init_database()
+    apply_common_styles(theme="student")
+    st.session_state["current_role"] = "student"
+    init_student_wizard_state()
+
+    render_page_hero(
+        "学生端诊断工作台",
+        "填写实验参数与补充描述，快速获得可解释的诊断候选结果。",
+        "学生端",
+    )
+
+    with st.container(border=True):
+        render_card_title("操作步骤", "分步完成输入，再统一进入诊断结果区。")
+        render_info_tiles(
+            [
+                {"tag": "步骤 1", "title": "实验现象与对照", "desc": "先确认异常现象、阳性对照与阴性对照状态。"},
+                {"tag": "步骤 2", "title": "PCR 关键参数", "desc": "填写模板量、退火温度和循环数等关键参数。"},
+                {"tag": "步骤 3", "title": "补充描述与图片", "desc": "补充自由文本线索，并按需上传凝胶图片。"},
+                {"tag": "步骤 4", "title": "确认并诊断", "desc": "预览输入摘要后再启动诊断，并导出复盘报告。"},
+            ],
+            columns=4,
         )
         if st.button("加载演示数据", key="student_load_demo"):
             load_student_demo_data()
