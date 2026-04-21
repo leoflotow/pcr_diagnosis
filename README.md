@@ -1,6 +1,6 @@
 # pcr_diagnosis
 
-PCR 电泳异常智能诊断助手，一个基于 Streamlit + SQLite 的课堂演示原型系统。
+PCR 电泳异常智能诊断助手。
 
 ## 功能概览
 
