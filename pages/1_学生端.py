@@ -111,12 +111,18 @@ def render_scoring_detail(detail, fallback_score):
 
     st.markdown(f"- 最终总分：{detail.get('最终总分', fallback_score)}")
 
+# --- 新增：持久化同步函数 ---
+def sync_val(key):
+    """组件值变化时，立刻同步到持久化字典中"""
+    if key in st.session_state:
+        st.session_state["student_data_storage"][key] = st.session_state[key]
+# ----------------------------
 
 def init_student_wizard_state():
     """初始化学生端向导状态"""
-    for key, value in STUDENT_FORM_DEFAULTS.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    # 新增：建立独立于组件生命周期的持久化存储区
+    if "student_data_storage" not in st.session_state:
+        st.session_state["student_data_storage"] = STUDENT_FORM_DEFAULTS.copy()
 
     if st.session_state.get("student_form_state_version") != STUDENT_FORM_STATE_VERSION:
         legacy_default_mapping = {
@@ -125,9 +131,15 @@ def init_student_wizard_state():
             "student_form_cycles": (30, 30),
         }
         for key, (legacy_value, new_value) in legacy_default_mapping.items():
-            if key not in st.session_state or st.session_state.get(key) == legacy_value:
-                st.session_state[key] = new_value
+            # 这里改为更新持久化存储区
+            if st.session_state["student_data_storage"].get(key) == legacy_value:
+                st.session_state["student_data_storage"][key] = new_value
         st.session_state["student_form_state_version"] = STUDENT_FORM_STATE_VERSION
+
+    # 关键修复：将被 Streamlit 自动销毁的组件数据，从持久化字典中恢复出来
+    for key, value in st.session_state["student_data_storage"].items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
     if "student_current_step" not in st.session_state:
         st.session_state["student_current_step"] = 1
@@ -156,6 +168,8 @@ def reset_student_form_state(overrides=None, target_step=None):
         form_values.update(overrides)
 
     for key, value in form_values.items():
+        # 同时重置持久化字典和当前 session 键
+        st.session_state["student_data_storage"][key] = value
         st.session_state[key] = value
 
     if target_step is None:
@@ -192,15 +206,16 @@ def get_persisted_uploaded_file():
 
 
 def collect_student_form_payload():
-    """收集当前学生端输入数据"""
+    """收集当前学生端输入数据（核心修复：从安全的 storage 读取）"""
+    storage = st.session_state["student_data_storage"]
     return {
-        "abnormality": st.session_state.get("student_form_abnormality", "无条带"),
-        "template_amount": st.session_state.get("student_form_template_amount", 0.0),
-        "annealing_temp": st.session_state.get("student_form_annealing_temp", 0.0),
-        "cycles": st.session_state.get("student_form_cycles", 30),
-        "positive_control_normal": st.session_state.get("student_form_positive_control_normal", "是"),
-        "negative_control_band": st.session_state.get("student_form_negative_control_band", "否"),
-        "description": st.session_state.get("student_form_description", ""),
+        "abnormality": storage.get("student_form_abnormality", "无条带"),
+        "template_amount": storage.get("student_form_template_amount", 0.0),
+        "annealing_temp": storage.get("student_form_annealing_temp", 0.0),
+        "cycles": storage.get("student_form_cycles", 30),
+        "positive_control_normal": storage.get("student_form_positive_control_normal", "是"),
+        "negative_control_band": storage.get("student_form_negative_control_band", "否"),
+        "description": storage.get("student_form_description", ""),
         "gel_image_file": get_persisted_uploaded_file(),
     }
 
@@ -272,15 +287,6 @@ def run_student_diagnosis():
 
 
 def render_student_wizard_header():
-    """渲染当前步骤提示"""
-    current_step = st.session_state["student_current_step"]
-    total_steps = len(STUDENT_STEP_TITLES)
-    st.progress(current_step / total_steps)
-    st.info(f"第 {current_step} 步 / 共 {total_steps} 步：{STUDENT_STEP_TITLES[current_step - 1]}")
-    st.caption("请按步骤完成输入；可随时返回上一步修改信息。")
-
-
-def render_student_wizard_header():
     """渲染更清晰的当前步骤提示。"""
     current_step = st.session_state["student_current_step"]
     total_steps = len(STUDENT_STEP_TITLES)
@@ -304,10 +310,11 @@ def render_step_1_basic_info():
         render_card_title("第 1 步：实验现象与对照情况", "先确认当前看到的异常现象与对照表现。")
         col_left, col_right = st.columns(2)
         with col_left:
-            st.selectbox("实验现象", ABNORMALITY_OPTIONS, key="student_form_abnormality")
-            st.radio("阳性对照是否正常", ["是", "否"], key="student_form_positive_control_normal")
+            # 增加 on_change=sync_val 和 args 使得修改能即时保存
+            st.selectbox("实验现象", ABNORMALITY_OPTIONS, key="student_form_abnormality", on_change=sync_val, args=("student_form_abnormality",))
+            st.radio("阳性对照是否正常", ["是", "否"], key="student_form_positive_control_normal", on_change=sync_val, args=("student_form_positive_control_normal",))
         with col_right:
-            st.radio("阴性对照是否有带", ["是", "否"], key="student_form_negative_control_band")
+            st.radio("阴性对照是否有带", ["是", "否"], key="student_form_negative_control_band", on_change=sync_val, args=("student_form_negative_control_band",))
             st.caption("如还有其他现象，可在第 3 步补充描述中继续说明。")
 
 
@@ -317,10 +324,10 @@ def render_step_2_pcr_params():
         render_card_title("第 2 步：PCR 关键参数", "填写当前实验中最关键的 PCR 参数信息。")
         col_left, col_right = st.columns(2)
         with col_left:
-            st.number_input("模板量 (μL)", min_value=0.0, step=0.5, key="student_form_template_amount")
-            st.number_input("循环数", min_value=1, step=1, key="student_form_cycles")
+            st.number_input("模板量 (μL)", min_value=0.0, step=0.5, key="student_form_template_amount", on_change=sync_val, args=("student_form_template_amount",))
+            st.number_input("循环数", min_value=1, step=1, key="student_form_cycles", on_change=sync_val, args=("student_form_cycles",))
         with col_right:
-            st.number_input("退火温度 (℃)", min_value=0.0, step=0.5, key="student_form_annealing_temp")
+            st.number_input("退火温度 (℃)", min_value=0.0, step=0.5, key="student_form_annealing_temp", on_change=sync_val, args=("student_form_annealing_temp",))
             st.caption("当前项目已支持的关键参数主要包括模板量、退火温度和循环数。")
 
 
@@ -330,9 +337,11 @@ def render_step_3_text_and_image():
         render_card_title("第 3 步：补充描述与图片上传", "补充文字线索，并上传凝胶图用于案例留存。")
         st.text_area(
             "学生补充描述",
-            height=4,
+            height=100,
             placeholder="请补充任何其他可能的信息，例如模板情况、体系怀疑点、异常观察等...",
             key="student_form_description",
+            on_change=sync_val,
+            args=("student_form_description",)
         )
         uploaded_file = st.file_uploader(
             "上传凝胶图片（可选）",
@@ -493,53 +502,6 @@ def render_student_results(payload):
                     file_name=download_name,
                     mime="text/plain",
                 )
-
-
-def main():
-    """学生端主流程"""
-    ensure_page_config("学生端诊断工作台")
-    init_database()
-    apply_common_styles(theme="student")
-    st.session_state["current_role"] = "student"
-    init_student_wizard_state()
-
-    render_page_hero(
-        "学生端诊断工作台",
-        "填写实验参数与补充描述，快速获得可解释的诊断候选结果。",
-        "学生端",
-    )
-
-    with st.container(border=True):
-        render_card_title("操作步骤", "分步完成输入，再统一进入诊断结果区。")
-        st.markdown(
-            "1. 确认实验现象与对照情况\n"
-            "2. 填写 PCR 关键参数\n"
-            "3. 补充文字描述并上传图片（可选）\n"
-            "4. 预览输入并点击“开始诊断”\n"
-            "5. 查看诊断结果、诊断依据与案例摘要"
-        )
-        if st.button("加载演示数据", key="student_load_demo"):
-            load_student_demo_data()
-            st.success("已加载演示数据，可按步骤继续演示。")
-            st.rerun()
-
-    render_student_wizard_header()
-
-    current_step = st.session_state["student_current_step"]
-    if current_step == 1:
-        render_step_1_basic_info()
-    elif current_step == 2:
-        render_step_2_pcr_params()
-    elif current_step == 3:
-        render_step_3_text_and_image()
-    else:
-        render_step_4_review()
-
-    render_student_step_navigation()
-
-    payload = st.session_state.get("student_last_payload")
-    if payload is not None:
-        render_student_results(payload)
 
 def main():
     """学生端主流程。"""
