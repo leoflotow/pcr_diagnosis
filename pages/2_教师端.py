@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -25,6 +26,28 @@ from core import (
     render_page_hero,
     save_teacher_confirmation,
 )
+
+
+def inject_teacher_dashboard_layout_styles():
+    """让教师端看板同一行的卡片尽量等高。"""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stHorizontalBlock"] [data-testid="column"] > div {
+            height: 100%;
+        }
+        [data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
+            height: 100%;
+        }
+        [data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] > div {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 FIELD_ALIAS_MAP = {
@@ -1308,67 +1331,79 @@ def render_teacher_dashboard(records_by_id, all_records):
             else:
                 st.caption(f"一致率分母为当前筛选范围内可比较的已确认案例数：{consistency_stats['可比较已确认案例数']} 条。")
 
-            dashboard_col_left, dashboard_col_right = st.columns([1.2, 1])
+        dashboard_col_left, dashboard_col_right = st.columns(2)
 
-            with dashboard_col_left:
-                render_card_title("系统判断与教师确认一致性分布", "仅统计当前筛选范围内可比较的已确认案例。")
+        with dashboard_col_left:
+            with st.container(border=True):
+                open_dashboard_card(13.5)
+                render_card_title("系统判断与教师复核一致性分布", "统计范围：当前筛选条件下，已完成教师复核且可进行一致性比对的案例。")
                 distribution_df = consistency_stats["一致性分布"]
                 if distribution_df["案例数"].sum() == 0:
-                    st.info("暂无可用的一致性分布数据。")
+                    st.info("当前筛选范围内暂无可用于一致性分析的已确认案例。")
                 else:
                     st.bar_chart(distribution_df.set_index("类别"))
                     st.dataframe(distribution_df, use_container_width=True, hide_index=True)
+                close_dashboard_card()
 
-            with dashboard_col_right:
-                render_card_title("高频失败原因 Top 5", "优先统计教师最终确认原因；未确认时回退到系统 Top1 诊断结果。")
+        with dashboard_col_right:
+            with st.container(border=True):
+                open_dashboard_card(13.5)
+                render_card_title("高频失败原因 Top 5", "统计规则：已完成教师复核的记录采用教师最终确认原因；未复核记录采用系统首位诊断结果。")
                 reason_summary_df = build_reason_summary(filtered_df)
                 if reason_summary_df.empty:
                     st.info("当前筛选范围内暂无可汇总的失败原因数据。")
                 else:
-                    top5_df = reason_summary_df[["失败原因", "次数"]].head(5).set_index("失败原因")
-                    st.bar_chart(top5_df)
-                    st.dataframe(
-                        reason_summary_df[["失败原因", "次数"]].head(5),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
+                    render_top_reason_visualization(reason_summary_df, top_n=5)
+                close_dashboard_card()
 
-            case_col_left, case_col_right = st.columns(2)
-            with case_col_left:
-                render_card_title("最近不一致案例", "展示教师已确认但系统 Top1 不一致的最近案例，便于快速复盘。")
+        case_col_left, case_col_right = st.columns(2)
+        with case_col_left:
+            with st.container(border=True):
+                open_dashboard_card(9.5)
+                render_card_title("最近不一致案例", "展示教师已完成复核、但系统首位判断与教师结论不一致的近期案例。")
                 mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
                 if mismatch_df.empty:
-                    st.info("当前筛选范围内暂无最近不一致案例。")
+                    st.info("当前筛选范围内暂无近期不一致案例。")
                 else:
                     st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
+                close_dashboard_card()
 
-            with case_col_right:
-                render_card_title("最近一致案例", "用于展示系统 Top1 与教师最终确认一致的近期案例。")
+        with case_col_right:
+            with st.container(border=True):
+                open_dashboard_card(9.5)
+                render_card_title("最近一致案例", "展示系统首位判断与教师最终确认一致的近期案例。")
                 match_df = get_recent_match_cases(consistency_df, limit=10)
                 if match_df.empty:
-                    st.info("当前筛选范围内暂无最近一致案例。")
+                    st.info("当前筛选范围内暂无近期一致案例。")
                 else:
                     st.dataframe(match_df, use_container_width=True, hide_index=True)
+                close_dashboard_card()
 
-            detail_col_left, detail_col_right = st.columns([0.8, 1.2])
-            with detail_col_left:
-                render_card_title("对照异常统计", "优先读取结构化字段，缺失时自动回退到原始文本关键词匹配。")
+        detail_col_left, detail_col_right = st.columns(2)
+        with detail_col_left:
+            with st.container(border=True):
+                open_dashboard_card(10.5)
+                render_card_title("对照异常统计", "优先读取结构化记录；缺失时自动回退到原始文本关键词匹配。")
                 control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
                 negative_count = control_stats.get("negative_control_band_count")
                 positive_count = control_stats.get("positive_control_failure_count")
                 if negative_count is None and positive_count is None:
-                    st.info("暂无可用数据")
+                    st.info("当前筛选范围内暂无可用于对照异常统计的数据。")
                 else:
                     control_cols = st.columns(2)
                     control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
                     control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
+                close_dashboard_card()
 
-            with detail_col_right:
-                render_card_title("最近诊断记录统计明细表", "按当前筛选条件聚合，按次数降序展示前 10 条。")
+        with detail_col_right:
+            with st.container(border=True):
+                open_dashboard_card(10.5)
+                render_card_title("失败原因聚合明细", "按当前筛选条件聚合统计，并按次数降序展示前 10 项。")
                 if reason_summary_df.empty:
-                    st.info("当前筛选范围内暂无可展示的聚合明细。")
+                    st.info("当前筛选范围内暂无可展示的聚合结果。")
                 else:
                     st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
+                close_dashboard_card()
 
     render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records)
 
@@ -1398,6 +1433,7 @@ def main():
 
     init_database()
     apply_common_styles(theme="teacher")
+    inject_teacher_dashboard_layout_styles()
     st.session_state["current_role"] = "teacher"
     render_page_hero(
         "教师端案例复盘台",
@@ -1504,6 +1540,94 @@ def main():
         st.markdown("**案例列表**")
         display_records = [records[int(idx)] for idx in filtered_records_df["record_index"].tolist()]
         render_case_record_list(display_records, records, list_key_prefix="history")
+
+
+def render_top_reason_rankings(reason_summary_df, top_n=5):
+    """用横向排名条替代默认柱图，避免中文长标签挤压。"""
+    top_df = reason_summary_df[["失败原因", "次数"]].head(top_n).copy()
+    if top_df.empty:
+        st.info("当前筛选范围内暂无可汇总的失败原因数据。")
+        return
+
+    max_count = max(int(top_df["次数"].max()), 1)
+    for rank, row in enumerate(top_df.itertuples(index=False), 1):
+        reason = str(row[0])
+        count = int(row[1])
+        progress_value = count / max_count
+
+        with st.container(border=True):
+            rank_col, reason_col, count_col = st.columns([0.16, 0.58, 0.26])
+            with rank_col:
+                st.markdown(f"**TOP {rank}**")
+            with reason_col:
+                st.markdown(f"**{reason}**")
+            with count_col:
+                st.markdown(f"**{count} 次**")
+            st.caption(f"相对最高频原因占比 {progress_value:.0%}")
+            st.markdown(
+                f"""
+                <div style="margin-top: 0.45rem;">
+                    <div style="width: 100%; height: 14px; background: #e5eefb; border-radius: 999px; overflow: hidden;">
+                        <div style="width: {progress_value * 100:.1f}%; height: 14px; background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%); border-radius: 999px;"></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_top_reason_visualization(reason_summary_df, top_n=5):
+    """类别足够时用环形图，类别过少时回退到横向排名条。"""
+    top_df = reason_summary_df[["失败原因", "次数"]].head(top_n).copy()
+    if top_df.empty:
+        st.info("当前筛选范围内暂无可汇总的失败原因数据。")
+        return
+
+    chart_df = top_df.copy()
+    chart_df["占比"] = chart_df["次数"] / chart_df["次数"].sum()
+
+    if len(chart_df) >= 3:
+        color_scale = alt.Scale(
+            range=["#0f766e", "#0ea5e9", "#6366f1", "#14b8a6", "#84cc16"]
+        )
+        donut_chart = (
+            alt.Chart(chart_df)
+            .mark_arc(innerRadius=68, outerRadius=115)
+            .encode(
+                theta=alt.Theta("次数:Q"),
+                color=alt.Color("失败原因:N", legend=alt.Legend(title="失败原因"), scale=color_scale),
+                tooltip=[
+                    alt.Tooltip("失败原因:N", title="失败原因"),
+                    alt.Tooltip("次数:Q", title="次数"),
+                    alt.Tooltip("占比:Q", title="占比", format=".1%"),
+                ],
+            )
+            .properties(height=280)
+        )
+
+        text_chart = (
+            alt.Chart(pd.DataFrame({"label": ["失败原因构成"]}))
+            .mark_text(fontSize=15, fontWeight="bold", color="#0f172a")
+            .encode(text="label:N")
+        )
+
+        st.altair_chart(donut_chart + text_chart, use_container_width=True)
+        st.dataframe(
+            chart_df.assign(占比=chart_df["占比"].map(lambda x: f"{x:.1%}")),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        render_top_reason_rankings(reason_summary_df, top_n=top_n)
+
+
+def open_dashboard_card(min_height_rem):
+    """保留接口但不再注入额外高度容器，避免卡片顶部出现空白。"""
+    return None
+
+
+def close_dashboard_card():
+    return None
 
 
 if __name__ == "__main__":

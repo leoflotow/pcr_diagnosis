@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 开发调试端页面
 """
@@ -11,20 +11,190 @@ import streamlit as st
 from core import (
     BIGMODEL_DEFAULT_BASE_URL,
     BIGMODEL_MODEL,
+    DB_PATH,
     RULES_PATH,
+    UPLOAD_DIR,
     apply_common_styles,
     clear_history_records,
     clear_uploaded_images,
     ensure_page_config,
     init_access_state,
     init_database,
+    read_csv_with_fallback,
     render_card_title,
     render_entry_guard,
     render_page_hero,
     render_soft_notice,
-    render_system_self_check,
-    run_rules_library_check,
 )
+
+
+LEGACY_RULE_COLUMNS = {
+    "abnormality",
+    "cause",
+    "positive_control_normal",
+    "negative_control_band",
+    "min_template",
+    "max_template",
+    "min_temp",
+    "max_temp",
+    "score",
+    "suggestion",
+}
+
+V2_RULE_COLUMNS = {
+    "rule_id",
+    "abnormality",
+    "band_pattern",
+    "cause",
+    "priority",
+    "positive_control",
+    "negative_control",
+    "template_condition",
+    "annealing_temp_condition",
+    "text_hint",
+    "required_fields",
+}
+
+
+def validate_rules_dataframe(rules_df):
+    """同时兼容旧版 rules.csv 和新版规则表结构。"""
+    result = {
+        "ok": True,
+        "schema_name": "unknown",
+        "issues": [],
+        "warnings": [],
+    }
+
+    columns = set(rules_df.columns)
+    missing_legacy = sorted(LEGACY_RULE_COLUMNS - columns)
+    missing_v2 = sorted(V2_RULE_COLUMNS - columns)
+
+    if not missing_v2:
+        result["schema_name"] = "v2"
+    elif not missing_legacy:
+        result["schema_name"] = "legacy"
+    else:
+        result["ok"] = False
+        result["issues"].append(
+            "规则表字段不匹配。"
+            f"旧版缺少：{', '.join(missing_legacy)}；"
+            f"新版缺少：{', '.join(missing_v2)}"
+        )
+        return result
+
+    if rules_df.empty:
+        result["ok"] = False
+        result["issues"].append("rules.csv 为空")
+        return result
+
+    if result["schema_name"] == "v2":
+        invalid_priority = pd.to_numeric(rules_df["priority"], errors="coerce").isna().sum()
+        if invalid_priority:
+            result["warnings"].append(f"存在 {invalid_priority} 条无法解析的 priority 值")
+    else:
+        invalid_score = pd.to_numeric(rules_df["score"], errors="coerce").isna().sum()
+        if invalid_score:
+            result["warnings"].append(f"存在 {invalid_score} 条无法解析的 score 值")
+
+    return result
+
+
+def get_self_check_items():
+    """生成系统自检项。"""
+    items = []
+
+    try:
+        rules_df = read_csv_with_fallback(RULES_PATH)
+        validation = validate_rules_dataframe(rules_df)
+        if validation["ok"]:
+            items.append(("success", "规则文件（rules.csv）", f"读取正常，识别为 {validation['schema_name']} 结构，共 {len(rules_df)} 条规则"))
+        else:
+            items.append(("error", "规则文件（rules.csv）", "；".join(validation["issues"])))
+    except Exception as exc:
+        items.append(("error", "规则文件（rules.csv）", f"读取失败：{exc}"))
+
+    if os.path.exists(DB_PATH):
+        items.append(("success", "SQLite 数据库", f"连接文件可用：{DB_PATH}"))
+    else:
+        items.append(("warning", "SQLite 数据库", f"未找到数据库文件：{DB_PATH}"))
+
+    if os.path.isdir(UPLOAD_DIR):
+        items.append(("success", "上传目录", f"目录可用：{UPLOAD_DIR}"))
+    else:
+        items.append(("warning", "上传目录", f"未找到目录：{UPLOAD_DIR}"))
+
+    api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
+    items.append(("success" if api_key_exists else "warning", "模型访问凭据", "已配置 BIGMODEL_API_KEY" if api_key_exists else "未配置 BIGMODEL_API_KEY"))
+    return items
+
+
+def render_self_check_items():
+    """使用原生卡片布局渲染系统自检。"""
+    items = get_self_check_items()
+    cols = st.columns(2)
+    for index, (level, title, detail) in enumerate(items):
+        with cols[index % 2]:
+            with st.container(border=True):
+                st.markdown(f"**{title}**")
+                if level == "success":
+                    st.success(detail)
+                elif level == "warning":
+                    st.warning(detail)
+                else:
+                    st.error(detail)
+
+
+def render_api_debug_panel():
+    """渲染 API 调试信息面板。"""
+    api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
+    base_url_env = os.getenv("BIGMODEL_BASE_URL", "").strip()
+    base_url_exists = bool(base_url_env)
+    base_url = base_url_env or BIGMODEL_DEFAULT_BASE_URL
+    model = os.getenv("BIGMODEL_MODEL", BIGMODEL_MODEL)
+
+    render_card_title("API 调试信息", "用于核验文本线索抽取是否实际调用模型接口，并查看最近一次接口调试记录。")
+    render_soft_notice(
+        "当前接口配置概览",
+        f"BIGMODEL_API_KEY：{'已检测到' if api_key_exists else '未检测到'}；BIGMODEL_BASE_URL：{'已检测到' if base_url_exists else '未检测到'}。",
+    )
+    st.markdown(f"- 当前接口地址：{base_url}")
+    st.markdown(f"- 当前模型标识：{model}")
+    st.markdown("- 文本线索抽取策略：优先调用大模型接口，失败时自动回退本地规则。")
+
+    last_api_debug = st.session_state.get("last_api_debug", {})
+    if last_api_debug:
+        st.markdown("#### 最近一次抽取记录")
+        st.markdown(f"- 抽取方式：{last_api_debug.get('extractor_used', '未知')}")
+        st.markdown(f"- API Key 掩码：{last_api_debug.get('api_key_masked', '-') or '-'}")
+        st.markdown(f"- 失败原因摘要：{last_api_debug.get('fail_reason', '-') or '-'}")
+        error_detail = (last_api_debug.get("error_detail", "") or "").strip()
+        if error_detail:
+            st.markdown(f"- 异常详情：{error_detail}")
+    else:
+        st.info("当前暂无最近一次接口调试记录。请先在“学生端”完成一次诊断，以生成抽取日志。")
+
+
+def run_rules_library_check():
+    """规则库检查，统一使用编码兼容读取。"""
+    result = {"ok": True, "issues": [], "warnings": []}
+
+    if not os.path.exists(RULES_PATH):
+        result["ok"] = False
+        result["issues"].append("rules.csv 不存在")
+        return result
+
+    try:
+        rules_df = read_csv_with_fallback(RULES_PATH)
+    except Exception as exc:
+        result["ok"] = False
+        result["issues"].append(f"rules.csv 读取失败：{exc}")
+        return result
+
+    validation = validate_rules_dataframe(rules_df)
+    result["ok"] = validation["ok"]
+    result["issues"].extend(validation["issues"])
+    result["warnings"].extend(validation["warnings"])
+    return result
 
 
 def main():
@@ -50,58 +220,22 @@ def main():
         "开发调试端",
     )
 
-    top_col_left, top_col_right = st.columns([1.1, 0.9])
+    top_col_left, top_col_right = st.columns([1, 1])
 
     with top_col_left:
         with st.container(border=True):
-            render_card_title("系统自检", "快速检查规则库、数据库、环境变量与模型配置。")
-            render_system_self_check()
+            render_card_title("系统自检", "用于核验规则文件、数据库、上传目录及关键运行配置是否处于可用状态。")
+            render_self_check_items()
 
     with top_col_right:
         with st.container(border=True):
-            render_card_title("API 调试信息", "用于确认本次文本线索抽取是否真正走了 AI 接口。")
-            api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
-            base_url_env = os.getenv("BIGMODEL_BASE_URL", "").strip()
-            base_url_exists = bool(base_url_env)
-            base_url = base_url_env or BIGMODEL_DEFAULT_BASE_URL
-            model = os.getenv("BIGMODEL_MODEL", BIGMODEL_MODEL)
-
-            render_soft_notice("当前接口配置", f"BIGMODEL_API_KEY：{'已检测到' if api_key_exists else '未检测到'}；BIGMODEL_BASE_URL：{'已检测到' if base_url_exists else '未检测到'}。")
-            st.markdown(f"- 当前 Base URL：{base_url}")
-            st.markdown(f"- 当前模型：{model}")
-            st.markdown("- 文本抽取策略：优先 AI，失败时回退本地规则")
-
-            last_api_debug = st.session_state.get("last_api_debug", {})
-            if last_api_debug:
-                st.markdown("#### 最近一次抽取调试")
-                st.markdown(f"- 本次抽取方式：{last_api_debug.get('extractor_used', '未知')}")
-                st.markdown(f"- API Key 掩码：{last_api_debug.get('api_key_masked', '-') or '-'}")
-                st.markdown(f"- 失败原因摘要：{last_api_debug.get('fail_reason', '-') or '-'}")
-                error_detail = (last_api_debug.get("error_detail", "") or "").strip()
-                if error_detail:
-                    st.markdown(f"- 异常摘要：{error_detail}")
-                normalized_case = last_api_debug.get("normalized_case")
-                if normalized_case:
-                    st.markdown("#### 标准化病例")
-                    st.json(normalized_case)
-                rules_v2_eval = last_api_debug.get("rules_v2_eval") or {}
-                if rules_v2_eval:
-                    st.markdown("#### 新版规则并行结果")
-                    st.markdown(f"- Top1：{rules_v2_eval.get('top1') or '-'}")
-                    st.markdown(f"- Top2：{rules_v2_eval.get('top2') or '-'}")
-                    st.markdown(f"- Top3：{rules_v2_eval.get('top3') or '-'}")
-                    st.markdown(f"- 基础规则命中数：{len(rules_v2_eval.get('base_rule_hits') or [])}")
-                    st.markdown(f"- 组合规则命中数：{len(rules_v2_eval.get('combo_hits') or [])}")
-                rules_v2_error = (last_api_debug.get("rules_v2_error", "") or "").strip()
-                if rules_v2_error:
-                    st.warning(f"新版规则并行评估失败：{rules_v2_error}")
-            else:
-                st.info("当前还没有最近一次抽取调试信息，请先到“学生端”执行一次诊断。")
+            render_api_debug_panel()
+            st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
 
     with st.container(border=True):
         render_card_title("规则库查看 / 校验", "先看表，再一键做必要字段与数据质量检查。")
         try:
-            rules_df = pd.read_csv(RULES_PATH)
+            rules_df = read_csv_with_fallback(RULES_PATH)
             st.dataframe(rules_df, use_container_width=True, height=260)
         except Exception:
             st.warning("rules.csv 不存在或读取失败，暂无法展示规则表。")

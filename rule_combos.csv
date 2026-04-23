@@ -21,3 +21,5 @@ C019,引物二聚体或非特异性扩增,negative_control=目标大小相近带,band_pattern=prime
 C020,循环参数不合适,abnormality=条带弱,text_hint=循环偏少,positive_control=正常,22,support,条带弱且文本提示循环偏少，支持循环参数偏弱,1
 C021,循环参数不合适,abnormality=多条带或非特异扩增,text_hint=循环偏多,positive_control=正常,22,support,多条带且循环偏多，支持循环数过高放大非特异产物,1
 C022,电泳或上样问题,abnormality=条带拖尾或弥散,text_hint=电泳问题,text_hint=上样过量,26,support,拖尾或弥散并伴随电泳或上样异常线索，支持电泳或上样问题,1
+C023,上样量过高或盐浓度过高,abnormality=条带畸形,text_hint=上样过量,positive_control=正常,25,support,明确提及上样过量，强支持上样量/盐浓度问题,1
+C024,凝胶不均或电泳散热不良,abnormality=条带畸形,text_hint=电泳问题,positive_control=正常,20,support,提及电泳问题，支持凝胶或散热异常,1

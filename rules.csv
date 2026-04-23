@@ -23,3 +23,6 @@ R021,阳性对照无带,no_band,PCR体系漏加或关键试剂失活,100,无带,无带,any,any,漏加试
 R022,阳性对照无带,no_band,退火温度过高,68,无带,无带,any,偏高,退火偏高,positive_control|annealing_temp_condition,60,若阳性对照无带且退火温度明显偏高，可考虑程序设置过严导致扩增失败,降低退火温度并用阳性对照优先验证程序,1
 R023,阳性对照无带,weak,循环参数不合适,72,弱带,无带,any,any,循环偏少,positive_control|negative_control|text_hint,64,阳性对照仅表现为弱带时，可考虑循环数不足或扩增程序偏弱,适当提高循环数或优化程序后再判断样本,1
 R024,条带弱,primer_dimer_like,引物二聚体或非特异性扩增,76,正常,小分子弱带,any,偏低,引物问题|退火偏低,negative_control|annealing_temp_condition,72,低分子量小带结合条带弱和退火偏低，更支持引物二聚体或低特异性扩增,适当提高退火温度并降低引物浓度,1
+R025,条带畸形,distorted,上样量过高或盐浓度过高,75,正常,无带,any,any,上样过量|电泳问题,positive_control|negative_control|text_hint,72,条带过宽或横向扩散，常见于上样量过高或样品盐浓度过高,适当减少上样体积，检查样品盐浓度，必要时脱盐处理,1
+R026,条带畸形,distorted,条带位置偏移（Marker异常或产物降解/未酶切）,70,正常,无带,any,any,Marker异常|模板差|产物未酶切,positive_control|negative_control|text_hint,70,条带大小与预期不符，可能为Marker异常、产物降解或未酶切,对比Marker状态，核对目的序列，检查模板完整性,1
+R027,条带畸形,distorted,凝胶不均或电泳散热不良,80,正常,无带,any,any,电泳问题,positive_control|negative_control|text_hint,75,条带呈弧形或左右高低不一，常见于凝胶不均或电泳散热不良,重新水平灌胶，降低电压并确保散热,1

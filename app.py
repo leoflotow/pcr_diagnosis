@@ -14,83 +14,95 @@ from core import (
     get_current_role_label,
     get_dev_access_code,
     get_teacher_access_code,
+    go_home,
     init_access_state,
     init_database,
     logout_dev_access,
     logout_teacher_access,
-    return_to_home,
     render_card_title,
-    render_page_hero,
-    render_soft_notice,
-    switch_to_home_page,
     verify_access_code,
 )
-from navigation_state import get_home_page, register_home_page
 
 
-PAGE_TARGETS = {
-    "student": "pages/1_学生端.py",
-    "teacher": "pages/2_教师端.py",
-    "dev": "pages/3_开发调试端.py",
-}
+def render_teacher_access_panel_inline():
+    """教师端访问码验证区，放在教师入口卡片内部。"""
+    teacher_code = get_teacher_access_code()
 
+    if st.session_state.get("teacher_verified"):
+        st.success("教师端已验证")
+        if st.button("进入教师端", key="home_open_teacher_direct", use_container_width=True):
+            enter_teacher_role()
+            st.rerun()
+        return
 
-def render_teacher_access_panel():
-    """教师端访问码验证区。"""
     if not st.session_state.get("show_teacher_access_panel"):
+        if st.button("验证教师端访问码", key="home_show_teacher_access", use_container_width=True):
+            st.session_state["show_teacher_access_panel"] = True
+            st.rerun()
         return
 
-    with st.container(border=True):
-        render_card_title("教师入口验证", "输入教师访问码后，当前会话中教师端才会显示在导航中。")
-        teacher_code = get_teacher_access_code()
-        if not teacher_code:
-            st.warning("当前未配置教师访问码 `TEACHER_ACCESS_CODE`，暂时无法进入教师端。")
+    st.caption("请输入教师访问码后进入教师端。")
+    if not teacher_code:
+        st.warning("当前未配置教师访问码 `TEACHER_ACCESS_CODE`，暂时无法进入教师端。")
 
-        input_col, button_col = st.columns([2, 1])
-        with input_col:
-            input_code = st.text_input(
-                "教师访问码",
-                key="teacher_access_code_input",
-                type="password",
-                placeholder="请输入教师访问码",
-            )
-        with button_col:
-            st.write("")
-            st.write("")
-            if st.button("验证并进入教师端", key="verify_teacher_access", use_container_width=True):
-                if not teacher_code:
-                    st.error("教师访问码未配置，无法完成验证。")
-                elif verify_access_code(input_code, teacher_code):
-                    enter_teacher_role()
-                    st.success("教师访问码验证成功。")
-                    st.rerun()
-                else:
-                    st.error("教师访问码错误，请重新输入。")
+    input_code = st.text_input(
+        "教师访问码",
+        key="teacher_access_code_input",
+        type="password",
+        placeholder="请输入教师访问码",
+        label_visibility="collapsed",
+    )
+
+    verify_col, cancel_col = st.columns(2)
+    with verify_col:
+        if st.button("验证并进入", key="verify_teacher_access", use_container_width=True):
+            if not teacher_code:
+                st.error("教师访问码未配置，无法完成验证。")
+            elif verify_access_code(input_code, teacher_code):
+                enter_teacher_role()
+                st.success("教师访问码验证成功。")
+                st.rerun()
+            else:
+                st.error("教师访问码错误，请重新输入。")
+
+    with cancel_col:
+        if st.button("取消", key="cancel_teacher_access", use_container_width=True):
+            st.session_state["show_teacher_access_panel"] = False
+            st.rerun()
 
 
-def render_dev_access_panel():
-    """开发调试端访问码验证区。"""
-    if not st.session_state.get("show_dev_access_panel"):
-        return
+def render_dev_access_panel_bottom():
+    """开发调试端访问码验证区，放在首页底部。"""
+    dev_code = get_dev_access_code()
 
-    with st.container(border=True):
-        render_card_title("开发调试入口验证", "输入开发访问码后，当前会话中开发调试端才会显示在导航中。")
-        dev_code = get_dev_access_code()
+    with st.expander("开发调试", expanded=st.session_state.get("show_dev_access_panel", False)):
+        if st.session_state.get("dev_verified"):
+            st.success("开发调试端已验证")
+            if st.button("进入开发调试端", key="page_open_dev_direct", use_container_width=True):
+                enter_dev_role()
+                st.rerun()
+            return
+
+        if not st.session_state.get("show_dev_access_panel"):
+            if st.button("开发调试入口", key="page_show_dev_access", use_container_width=True):
+                st.session_state["show_dev_access_panel"] = True
+                st.rerun()
+            return
+
         if not dev_code:
             st.warning("当前未配置开发访问码 `DEV_ACCESS_CODE`，暂时无法进入开发调试端。")
 
-        input_col, button_col = st.columns([2, 1])
-        with input_col:
-            input_code = st.text_input(
-                "开发访问码",
-                key="dev_access_code_input",
-                type="password",
-                placeholder="请输入开发访问码",
-            )
-        with button_col:
-            st.write("")
-            st.write("")
-            if st.button("验证并进入开发调试端", key="verify_dev_access", use_container_width=True):
+        input_code = st.text_input(
+            "开发访问码",
+            key="dev_access_code_input",
+            type="password",
+            placeholder="请输入开发访问码",
+            label_visibility="collapsed",
+        )
+
+        action_col1, action_col2 = st.columns(2)
+        with action_col1:
+            if st.button("验证并进入", key="verify_dev_access", use_container_width=True):
                 if not dev_code:
                     st.error("开发访问码未配置，无法完成验证。")
                 elif verify_access_code(input_code, dev_code):
@@ -100,95 +112,94 @@ def render_dev_access_panel():
                 else:
                     st.error("开发访问码错误，请重新输入。")
 
+        with action_col2:
+            if st.button("收起", key="hide_dev_access_panel", use_container_width=True):
+                st.session_state["show_dev_access_panel"] = False
+                st.rerun()
+
 
 def render_home_portal():
     """首页统一门户。"""
     st.session_state["current_role"] = "home"
     apply_common_styles(theme="home")
 
-    render_page_hero(
-        "PCR-电泳异常智能复盘助手",
-        "首页作为统一入口：学生端可直接进入，教师端和开发调试端需要先完成访问码验证。",
-        "项目首页",
+    st.markdown(
+        """
+        <div class="pcr-hero">
+            <h1 style="text-align: center;">PCR电泳异常智能复盘助手</h1>
+            <p style="text-align: center; max-width: none; white-space: nowrap;">用于 PCR 电泳异常案例诊断、教师复核与教学复盘的实验教学辅助系统。</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     with st.container(border=True):
-        render_card_title("角色入口", "教师端与开发调试端只有验证成功后，才会在当前会话的左侧导航中显示。")
-        col_student, col_teacher, col_dev = st.columns(3)
+        render_card_title("角色入口")
+        col_student, col_teacher = st.columns(2)
 
         with col_student:
-            st.markdown("**学生入口**")
-            st.caption("直接进入学生诊断工作台，无需访问码。")
-            if st.button("进入学生端", key="home_enter_student", type="primary", use_container_width=True):
-                enter_student_role()
-                st.rerun()
+            with st.container(border=True):
+                st.markdown("**学生入口**")
+                st.caption("直接进入学生诊断工作台，无需访问码。")
+                st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
+                if st.button("进入学生端", key="home_enter_student", type="primary", use_container_width=True):
+                    enter_student_role()
+                    st.rerun()
 
         with col_teacher:
-            st.markdown("**教师入口**")
-            st.caption("点击后显示教师访问码验证区。")
-            if st.session_state.get("teacher_verified"):
-                st.success("教师端已验证")
-                if st.button("进入教师端", key="home_open_teacher_direct", use_container_width=True):
-                    enter_teacher_role()
-                    st.rerun()
-            else:
-                if st.button("验证教师端访问码", key="home_show_teacher_access", use_container_width=True):
-                    st.session_state["show_teacher_access_panel"] = True
-                    st.session_state["show_dev_access_panel"] = False
-                    st.rerun()
-
-        with col_dev:
-            st.markdown("**开发调试入口**")
-            st.caption("点击后显示开发访问码验证区。")
-            if st.session_state.get("dev_verified"):
-                st.success("开发调试端已验证")
-                if st.button("进入开发调试端", key="home_open_dev_direct", use_container_width=True):
-                    enter_dev_role()
-                    st.rerun()
-            else:
-                if st.button("验证开发访问码", key="home_show_dev_access", use_container_width=True):
-                    st.session_state["show_dev_access_panel"] = True
-                    st.session_state["show_teacher_access_panel"] = False
-                    st.rerun()
-
-    render_teacher_access_panel()
-    render_dev_access_panel()
+            with st.container(border=True):
+                st.markdown("**教师入口**")
+                st.caption("输入教师访问码后进入教师端。")
+                st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
+                render_teacher_access_panel_inline()
 
     with st.container(border=True):
-        render_card_title("当前会话状态", "验证状态和当前角色仅保存在当前会话中。")
-        st.markdown(f"- 当前角色：{get_current_role_label()}")
-        st.markdown(f"- 教师端已验证：{'是' if st.session_state.get('teacher_verified') else '否'}")
-        st.markdown(f"- 开发调试端已验证：{'是' if st.session_state.get('dev_verified') else '否'}")
+        render_card_title("当前访问状态", "当前角色与访问权限仅在本次会话中生效。")
+        status_col1, status_col2, status_col3 = st.columns(3)
+        with status_col1:
+            st.metric("当前角色", get_current_role_label())
+        with status_col2:
+            st.metric("教师端访问", "已开启" if st.session_state.get("teacher_verified") else "未开启")
+        with status_col3:
+            st.metric("开发调试访问", "已开启" if st.session_state.get("dev_verified") else "未开启")
+
         col_home, col_reset = st.columns(2)
         with col_home:
             if st.button("返回首页", key="home_keep_home", use_container_width=True):
-                return_to_home(clear_entries=False)
+                go_home(clear_entries=False)
+                st.rerun()
         with col_reset:
             if st.button("清空全部入口状态", key="home_reset_access", use_container_width=True):
-                return_to_home(clear_entries=True)
+                go_home(clear_entries=True)
+                st.rerun()
 
-    with st.container(border=True):
-        render_card_title("使用说明", "本次只做轻量访问码验证，不做账号体系。")
-        render_soft_notice(
-            "当前规则",
-            "教师端使用 `TEACHER_ACCESS_CODE`，开发调试端使用 `DEV_ACCESS_CODE`。未配置访问码时，不会自动放行。",
-        )
+    render_dev_access_panel_bottom()
+
+
+HOME_PAGE = st.Page(render_home_portal, title="首页", icon="🏠", default=True)
+STUDENT_PAGE = st.Page("pages/1_学生端.py", title="学生端", icon="🎓")
+TEACHER_PAGE = st.Page("pages/2_教师端.py", title="教师端", icon="🧑‍🏫")
+DEV_PAGE = st.Page("pages/3_开发调试端.py", title="开发调试端", icon="🛠️")
+
+PAGE_TARGETS = {
+    "home": HOME_PAGE,
+    "student": STUDENT_PAGE,
+    "teacher": TEACHER_PAGE,
+    "dev": DEV_PAGE,
+}
 
 
 def build_navigation_pages():
     """根据当前会话状态动态组装页面导航。"""
-    home_page = register_home_page(
-        st.Page(render_home_portal, title="首页", icon="🏠", default=True)
-    )
     pages = [
-        home_page,
-        st.Page("pages/1_学生端.py", title="学生端", icon="🎓"),
+        HOME_PAGE,
+        STUDENT_PAGE,
     ]
 
     if st.session_state.get("teacher_verified"):
-        pages.append(st.Page("pages/2_教师端.py", title="教师端", icon="🧑‍🏫"))
+        pages.append(TEACHER_PAGE)
     if st.session_state.get("dev_verified"):
-        pages.append(st.Page("pages/3_开发调试端.py", title="开发调试端", icon="🛠️"))
+        pages.append(DEV_PAGE)
 
     return pages
 
@@ -201,46 +212,39 @@ def render_sidebar_status():
         st.caption(f"开发调试端：{'已验证' if st.session_state.get('dev_verified') else '未验证'}")
 
         if st.button("返回首页", key="sidebar_go_home", use_container_width=True):
-            return_to_home(clear_entries=False)
+            go_home(clear_entries=False)
+            st.rerun()
 
         if st.session_state.get("teacher_verified"):
             if st.button("退出教师访问", key="sidebar_logout_teacher", use_container_width=True):
                 logout_teacher_access()
-                switch_to_home_page()
+                st.rerun()
 
         if st.session_state.get("dev_verified"):
             if st.button("退出开发访问", key="sidebar_logout_dev", use_container_width=True):
                 logout_dev_access()
-                switch_to_home_page()
+                st.rerun()
 
 
 def handle_pending_navigation():
     """处理首页验证成功后的自动跳转。"""
     target = st.session_state.get("navigation_target")
     if not target:
-        st.session_state["navigation_target"] = None
         return
 
-    if target == "home":
-        st.session_state["navigation_target"] = None
-        home_page = get_home_page()
-        if home_page is not None:
-            st.switch_page(home_page)
-        return
-
-    target_path = PAGE_TARGETS.get(target)
     st.session_state["navigation_target"] = None
-    if target_path:
-        st.switch_page(target_path)
+    target_page = PAGE_TARGETS.get(target)
+    if target_page:
+        st.switch_page(target_page)
 
 
 def main():
-    ensure_page_config("PCR-电泳异常智能复盘助手")
+    ensure_page_config("PCR电泳异常智能复盘助手")
     init_database()
     init_access_state()
 
-    pages = build_navigation_pages()
     render_sidebar_status()
+    pages = build_navigation_pages()
     navigator = st.navigation(pages, position="sidebar")
     handle_pending_navigation()
     navigator.run()

@@ -35,11 +35,16 @@ LEGACY_RULES_PATH = "rules_v2.csv"
 # 上传图片保存目录
 UPLOAD_DIR = "uploads"
 # 页面里使用的实验现象选项（也用于规则校验）
-ABNORMALITY_OPTIONS = ["无条带", "条带弱", "多条带", "条带拖尾", "阴性对照有带", "阳性对照无带"]
+ABNORMALITY_OPTIONS = ["无条带", "条带弱", "多条带", "条带拖尾", "阴性对照有带", "阳性对照无带", "条带畸形"]
 # 规则库必要字段
+# 规则库必要字段 (匹配最新的 rules.csv 完整结构)
 REQUIRED_RULE_COLUMNS = [
-    "abnormality", "cause", "positive_control_normal", "negative_control_band",
-    "min_template", "max_template", "min_temp", "max_temp", "score", "suggestion"
+    "rule_id", "abnormality", "band_pattern", "cause", "priority",
+    "positive_control", "negative_control", "template_condition",
+    "annealing_temp_condition", "text_hint", "required_fields",
+    "base_score", "evidence_text", "suggestion", "enabled",
+    "positive_control_normal", "negative_control_band", "min_template",
+    "max_template", "min_temp", "max_temp", "score"
 ]
 
 # BigModel API 配置（后续如果要切换地址，只改这里）
@@ -50,6 +55,21 @@ BIGMODEL_TEMPERATURE = 1.0
 
 # 文本线索标签（统一用这 5 类）
 ALLOWED_TEXT_CLUES = ["污染", "模板量不足", "引物问题", "PCR体系问题", "退火温度问题"]
+CSV_FALLBACK_ENCODINGS = ["utf-8", "utf-8-sig", "gb18030", "gbk", "cp936"]
+
+
+def read_csv_with_fallback(file_path, **kwargs):
+    """按常见编码顺序读取 CSV，优先 UTF-8，失败后回退中文编码。"""
+    last_error = None
+    for encoding in CSV_FALLBACK_ENCODINGS:
+        try:
+            return pd.read_csv(file_path, encoding=encoding, **kwargs)
+        except UnicodeDecodeError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise last_error
+    return pd.read_csv(file_path, **kwargs)
 
 
 def ensure_page_config(page_title, page_icon="🧪"):
@@ -492,6 +512,54 @@ def apply_common_styles(theme="student"):
             font-size: 0.94rem;
         }}
 
+        .pcr-dev-panel {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 18px;
+            background: #ffffff;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+            padding: 1rem 1rem 0.9rem 1rem;
+            min-height: 23rem;
+            margin-bottom: 1rem;
+        }}
+
+        .pcr-dev-panel.compact {{
+            min-height: 17rem;
+        }}
+
+        .pcr-dev-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.8rem;
+            margin-top: 0.8rem;
+        }}
+
+        .pcr-dev-check-card {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 14px;
+            padding: 0.9rem 0.95rem;
+            background: #ffffff;
+            min-height: 7.5rem;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+        }}
+
+        .pcr-dev-check-card b {{
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.96rem;
+            color: var(--pcr-text);
+        }}
+
+        .pcr-dev-check-card p {{
+            margin: 0;
+            color: var(--pcr-muted);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }}
+
+        .pcr-dev-check-card.success {{ border-left: 4px solid #16a34a; background: #f0fdf4; }}
+        .pcr-dev-check-card.warning {{ border-left: 4px solid #d97706; background: #fffbeb; }}
+        .pcr-dev-check-card.error {{ border-left: 4px solid #dc2626; background: #fef2f2; }}
+
         .pcr-status-card {{
             border: 1px solid var(--pcr-border);
             border-radius: 16px;
@@ -688,6 +756,24 @@ def render_soft_notice(title, desc):
         <div class="pcr-soft-note">
             <div class="pcr-soft-note-title">{title}</div>
             <p>{desc}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_page_hero(title, subtitle, role_text=""):
+    """统一的页面顶部 hero；首页可不显示左上角角标。"""
+    badge_html = ""
+    if str(role_text or "").strip():
+        badge_html = f'<span class="pcr-role-badge">{role_text}</span>'
+
+    st.markdown(
+        f"""
+        <div class="pcr-hero">
+            {badge_html}
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2474,3 +2560,103 @@ def _build_case_summary_legacy(payload):
 def build_case_summary(payload):
     """兼容旧调用入口：输出规范化复盘报告文本。"""
     return build_case_review_report(payload)
+
+
+# ---------- 规则库编辑相关函数 ----------
+def check_rule_duplicate(new_rule, existing_df):
+    """
+    检查新规则是否与现有规则完全重复。
+    重复定义：abnormality 和 cause 完全相同。
+    返回：(is_duplicate, 重复的行索引列表)
+    """
+    if existing_df.empty:
+        return False, []
+    new_abn = str(new_rule.get("abnormality", "")).strip()
+    new_cause = str(new_rule.get("cause", "")).strip()
+    mask = (existing_df["abnormality"].astype(str).str.strip() == new_abn) & \
+           (existing_df["cause"].astype(str).str.strip() == new_cause)
+    duplicate_indices = existing_df[mask].index.tolist()
+    return len(duplicate_indices) > 0, duplicate_indices
+
+
+def check_rule_conflict(new_rule, existing_df):
+    """
+    检查新规则与现有规则是否存在潜在冲突。
+    冲突定义：同一 abnormality 下，新规则的数值范围与已有规则重叠，且总分差异较大（>10分）。
+    返回：冲突描述列表（每项为字符串）。
+    """
+    conflicts = []
+    new_abn = str(new_rule.get("abnormality", "")).strip()
+    same_abn_df = existing_df[existing_df["abnormality"].astype(str).str.strip() == new_abn]
+    if same_abn_df.empty:
+        return conflicts
+
+    # 解析新规则的数值边界（any 表示无限制）
+    def parse_range(min_val, max_val):
+        min_v = safe_to_float(min_val, None)
+        max_v = safe_to_float(max_val, None)
+        return min_v, max_v
+
+    new_min_tpl, new_max_tpl = parse_range(new_rule.get("min_template"), new_rule.get("max_template"))
+    new_min_temp, new_max_temp = parse_range(new_rule.get("min_temp"), new_rule.get("max_temp"))
+    new_score = safe_to_float(new_rule.get("score"), 0)
+
+    for idx, row in same_abn_df.iterrows():
+        exist_min_tpl, exist_max_tpl = parse_range(row.get("min_template"), row.get("max_template"))
+        exist_min_temp, exist_max_temp = parse_range(row.get("min_temp"), row.get("max_temp"))
+        exist_score = safe_to_float(row.get("score"), 0)
+
+        # 检查模板量范围重叠
+        tpl_overlap = False
+        if new_min_tpl is None or exist_min_tpl is None:
+            tpl_overlap = True
+        else:
+            if new_max_tpl is not None and exist_max_tpl is not None:
+                tpl_overlap = not (new_max_tpl < exist_min_tpl or exist_max_tpl < new_min_tpl)
+            else:
+                tpl_overlap = True
+
+        # 检查退火温度范围重叠
+        temp_overlap = False
+        if new_min_temp is None or exist_min_temp is None:
+            temp_overlap = True
+        else:
+            if new_max_temp is not None and exist_max_temp is not None:
+                temp_overlap = not (new_max_temp < exist_min_temp or exist_max_temp < new_min_temp)
+            else:
+                temp_overlap = True
+
+        if tpl_overlap and temp_overlap and abs(new_score - exist_score) > 10:
+            conflicts.append(
+                f"与行 {idx} 的规则（原因：{row.get('cause', '')}，"
+                f"模板量范围 {row.get('min_template')}~{row.get('max_template')}，"
+                f"温度范围 {row.get('min_temp')}~{row.get('max_temp')}，"
+                f"分数 {exist_score}）存在重叠且分数差异较大，可能造成诊断歧义。"
+            )
+
+    return conflicts
+
+
+def append_rule_to_csv(new_rule_dict, rules_path=RULES_PATH):
+    """
+    将新规则追加写入 CSV 文件。
+    返回：(是否成功, 消息)
+    """
+    try:
+        # 读取原有数据以保留列顺序
+        if os.path.exists(rules_path):
+            df_existing = pd.read_csv(rules_path, encoding="utf-8-sig")
+        else:
+            df_existing = pd.DataFrame(columns=REQUIRED_RULE_COLUMNS)
+
+        # 构造新行 DataFrame 并拼接
+        new_row_df = pd.DataFrame([new_rule_dict])
+        # 确保列顺序一致
+        new_row_df = new_row_df[REQUIRED_RULE_COLUMNS]
+        updated_df = pd.concat([df_existing, new_row_df], ignore_index=True)
+
+        # 写回文件（保留 utf-8-sig 编码，便于 Excel 打开）
+        updated_df.to_csv(rules_path, index=False, encoding="utf-8-sig")
+        return True, "新规则已成功添加。"
+    except Exception as e:
+        return False, f"写入规则文件失败：{str(e)[:120]}"

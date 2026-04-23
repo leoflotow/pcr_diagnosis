@@ -43,6 +43,7 @@ STANDARD_BAND_PATTERNS = {
     "smear",
     "primer_dimer_like",
     "single_clear",
+    "distorted",
     UNKNOWN_LABEL,
 }
 
@@ -133,6 +134,11 @@ def normalize_abnormality(raw_value):
         "条带拖尾或弥散": "条带拖尾或弥散",
         "阴性对照有带": "阴性对照有带",
         "阳性对照无带": "阳性对照无带",
+        "条带畸形": "条带畸形",
+        "条带过宽": "条带畸形",
+        "横向扩散": "条带畸形",
+        "条带位置偏移": "条带畸形",
+        "弯曲条带": "条带畸形"
     }
     return alias_map.get(text, UNKNOWN_LABEL)
 
@@ -281,6 +287,7 @@ def infer_band_pattern_from_abnormality(abnormality):
         "条带大小不对": "unexpected_size",
         "条带拖尾或弥散": "smear",
         "阳性对照无带": "no_band",
+        "条带畸形": "distorted",
     }
     return mapping.get(abnormality, UNKNOWN_LABEL)
 
