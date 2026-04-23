@@ -29,13 +29,16 @@ def render_teacher_access_panel_inline():
     teacher_code = get_teacher_access_code()
 
     if st.session_state.get("teacher_verified"):
-        st.success("教师端已验证")
+        render_home_entry_status("已验证", "success")
+        st.markdown("<div style='height: 0.65rem;'></div>", unsafe_allow_html=True)
         if st.button("进入教师端", key="home_open_teacher_direct", use_container_width=True):
             enter_teacher_role()
             st.rerun()
         return
 
     if not st.session_state.get("show_teacher_access_panel"):
+        render_home_entry_status("需访问码", "warning")
+        st.markdown("<div style='height: 0.65rem;'></div>", unsafe_allow_html=True)
         if st.button("验证教师端访问码", key="home_show_teacher_access", use_container_width=True):
             st.session_state["show_teacher_access_panel"] = True
             st.rerun()
@@ -69,6 +72,33 @@ def render_teacher_access_panel_inline():
         if st.button("取消", key="cancel_teacher_access", use_container_width=True):
             st.session_state["show_teacher_access_panel"] = False
             st.rerun()
+
+
+def render_home_entry_status(text, kind="neutral"):
+    """首页角色入口的小状态标签。"""
+    palette = {
+        "success": ("#dcfce7", "#166534", "#86efac"),
+        "warning": ("#ffedd5", "#9a3412", "#fdba74"),
+        "neutral": ("#e0f2fe", "#075985", "#bae6fd"),
+    }
+    bg, color, border = palette.get(kind, palette["neutral"])
+    st.markdown(
+        f"""
+        <span style="
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.65rem;
+            padding: 0.16rem 0.62rem;
+            border-radius: 999px;
+            border: 1px solid {border};
+            background: {bg};
+            color: {color};
+            font-size: 0.78rem;
+            font-weight: 700;
+        ">{text}</span>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_dev_access_panel_bottom():
@@ -141,7 +171,8 @@ def render_home_portal():
             with st.container(border=True):
                 st.markdown("**学生入口**")
                 st.caption("直接进入学生诊断工作台，无需访问码。")
-                st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
+                render_home_entry_status("无需验证", "neutral")
+                st.markdown("<div style='height: 0.65rem;'></div>", unsafe_allow_html=True)
                 if st.button("进入学生端", key="home_enter_student", type="primary", use_container_width=True):
                     enter_student_role()
                     st.rerun()
@@ -149,8 +180,10 @@ def render_home_portal():
         with col_teacher:
             with st.container(border=True):
                 st.markdown("**教师入口**")
-                st.caption("输入教师访问码后进入教师端。")
-                st.markdown("<div style='height: 1.2rem;'></div>", unsafe_allow_html=True)
+                if st.session_state.get("teacher_verified"):
+                    st.caption("教师访问已验证，可直接进入教师端。")
+                else:
+                    st.caption("输入教师访问码后进入教师端。")
                 render_teacher_access_panel_inline()
 
     with st.container(border=True):

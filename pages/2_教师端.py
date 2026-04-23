@@ -6,6 +6,7 @@
 import os
 import re
 import sqlite3
+import html
 
 import altair as alt
 import pandas as pd
@@ -29,10 +30,240 @@ from core import (
 
 
 def inject_teacher_dashboard_layout_styles():
-    """让教师端看板同一行的卡片尽量等高。"""
+    """教师端专属布局样式，仅优化视觉与排版。"""
     st.markdown(
         """
         <style>
+        .main .block-container {
+            max-width: min(1500px, 96vw);
+            padding-top: 0.85rem;
+        }
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {
+            background: rgba(15, 118, 110, 0.1);
+            border-color: rgba(15, 118, 110, 0.28);
+            box-shadow: inset 4px 0 0 #0f766e, 0 10px 22px rgba(15, 23, 42, 0.06);
+        }
+
+        .pcr-teacher-header {
+            border: 1px solid rgba(15, 118, 110, 0.16);
+            border-radius: 18px;
+            padding: 1.1rem 1.25rem;
+            margin: 0.15rem 0 1rem 0;
+            background:
+                radial-gradient(circle at 92% 12%, rgba(20, 184, 166, 0.18), transparent 30%),
+                linear-gradient(135deg, #0f766e 0%, #14532d 100%);
+            color: #ffffff;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.13);
+            overflow: hidden;
+        }
+
+        .pcr-teacher-header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .pcr-teacher-header h1 {
+            margin: 0.45rem 0 0.28rem 0;
+            font-size: clamp(1.7rem, 2.1vw, 2.35rem);
+            line-height: 1.2;
+            font-weight: 800;
+            letter-spacing: 0;
+        }
+
+        .pcr-teacher-header p {
+            margin: 0;
+            max-width: 58rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.98rem;
+            line-height: 1.65;
+        }
+
+        .pcr-teacher-header-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            padding-top: 0.12rem;
+        }
+
+        .pcr-teacher-chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.9rem;
+            padding: 0.28rem 0.72rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #ffffff;
+            font-size: 0.78rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .pcr-teacher-chip.soft {
+            background: rgba(236, 253, 245, 0.96);
+            color: #065f46;
+            border-color: rgba(187, 247, 208, 0.8);
+        }
+
+        .pcr-section-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.38rem;
+            margin: 0.1rem 0 0.35rem 0;
+            padding: 0.2rem 0.56rem;
+            border-radius: 999px;
+            background: rgba(15, 118, 110, 0.08);
+            color: #0f766e;
+            font-size: 0.76rem;
+            font-weight: 800;
+        }
+
+        .pcr-card-divider {
+            height: 1px;
+            margin: 0.75rem 0 0.9rem 0;
+            background: linear-gradient(90deg, rgba(15, 118, 110, 0.16), rgba(148, 163, 184, 0.08));
+        }
+
+        .pcr-stack-bar {
+            display: flex;
+            height: 0.68rem;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #e2e8f0;
+            margin: 0.35rem 0 0.7rem 0;
+        }
+
+        .pcr-stack-segment {
+            height: 100%;
+            min-width: 0;
+        }
+
+        .pcr-stack-legend {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+            color: #475569;
+            font-size: 0.82rem;
+        }
+
+        .pcr-legend-dot {
+            display: inline-block;
+            width: 0.62rem;
+            height: 0.62rem;
+            border-radius: 999px;
+            margin-right: 0.32rem;
+            vertical-align: -0.05rem;
+        }
+
+        .pcr-record-row {
+            border: 1px solid #dbe3f0;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            padding: 0.72rem 0.86rem;
+            margin: 0.72rem 0 0.42rem 0;
+            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
+        }
+
+        .pcr-record-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .pcr-record-title {
+            color: #0f172a;
+            font-size: 0.96rem;
+            font-weight: 800;
+            line-height: 1.5;
+        }
+
+        .pcr-record-meta {
+            color: #64748b;
+            font-size: 0.82rem;
+            line-height: 1.5;
+            margin-top: 0.18rem;
+        }
+
+        .pcr-record-tags {
+            display: flex;
+            gap: 0.38rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .pcr-tag {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.55rem;
+            padding: 0.13rem 0.5rem;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #334155;
+            font-size: 0.74rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .pcr-tag.ok {
+            background: #dcfce7;
+            color: #166534;
+            border-color: #86efac;
+        }
+
+        .pcr-tag.warn {
+            background: #ffedd5;
+            color: #9a3412;
+            border-color: #fdba74;
+        }
+
+        .pcr-tag.info {
+            background: #dbeafe;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+
+        .pcr-tag.muted {
+            background: #f1f5f9;
+            color: #64748b;
+            border-color: #e2e8f0;
+        }
+
+        .pcr-filter-hint {
+            margin: 0.25rem 0 0.8rem 0;
+            color: #475569;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 12px !important;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.055);
+        }
+
+        [data-testid="stMetric"] {
+            border-radius: 12px;
+            min-height: 6.15rem;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
+        }
+
+        [data-testid="stMetricValue"] {
+            font-size: clamp(1.42rem, 1.9vw, 2rem);
+        }
+
+        div[data-testid="stDataFrame"], [data-testid="stExpander"] {
+            border-radius: 12px;
+        }
+
         [data-testid="stHorizontalBlock"] [data-testid="column"] > div {
             height: 100%;
         }
@@ -43,6 +274,13 @@ def inject_teacher_dashboard_layout_styles():
             height: 100%;
             display: flex;
             flex-direction: column;
+        }
+
+        @media (max-width: 900px) {
+            .pcr-teacher-header-actions,
+            .pcr-record-tags {
+                justify-content: flex-start;
+            }
         }
         </style>
         """,
@@ -95,6 +333,39 @@ REASON_NORMALIZATION_RULES = [
     ("退火温度过高", ["退火温度过高", "退火温度偏高"]),
     ("退火温度过低", ["退火温度过低", "退火温度偏低"]),
 ]
+
+
+def escape_html(value, default=""):
+    """转义展示文本，避免历史记录内容破坏页面结构。"""
+    text = normalize_display_text(value, default=default)
+    return html.escape(str(text), quote=True)
+
+
+def render_teacher_page_header(record_count):
+    """教师端紧凑页头。"""
+    st.markdown(
+        f"""
+        <div class="pcr-teacher-header">
+            <div class="pcr-teacher-header-top">
+                <div>
+                    <span class="pcr-teacher-chip">教师端</span>
+                    <h1>教师端案例复盘台</h1>
+                    <p>查看学生历史案例，完成最终原因确认与教学备注沉淀。</p>
+                </div>
+                <div class="pcr-teacher-header-actions">
+                    <span class="pcr-teacher-chip soft">教师已验证</span>
+                    <span class="pcr-teacher-chip">数据 {record_count} 条</span>
+                    <span class="pcr-teacher-chip">最近30天</span>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_section_kicker(text):
+    st.markdown(f'<div class="pcr-section-kicker">{html.escape(text)}</div>', unsafe_allow_html=True)
 
 
 def normalize_field_key(value):
@@ -1147,14 +1418,32 @@ def render_case_detail(record, all_records, detail_key_prefix):
 def render_case_record_list(records_to_render, all_records, list_key_prefix):
     for idx, record in enumerate(records_to_render, 1):
         loop_status = build_feedback_loop_status(record)
-        status_class = "pcr-status-ok" if loop_status["当前状态"] == "已确认" else "pcr-status-pending"
+        status_class = "ok" if loop_status["当前状态"] == "已确认" else "warn"
         status_label = loop_status["当前状态"]
+        consistency_status = loop_status["一致性状态"]
+        consistency_class = "ok" if consistency_status == "一致" else "info" if "Top3" in consistency_status else "warn"
+        image_status = normalize_display_text(record.get("凝胶图"), default="无图")
+        image_class = "info" if "有" in image_status else "muted"
+        teacher_final = loop_status["教师最终确认原因"]
 
         st.markdown(
             f"""
-            <div class="pcr-sub-card">
-                <b>{idx}. {record.get('提交时间', '-')} | {record.get('实验现象', '-')} | Top1: {record.get('Top1 原因', '-')} | 教师确认: {loop_status['教师最终确认原因']} | 一致性: {loop_status['一致性状态']} | {record.get('凝胶图', '无图')}</b>
-                <span class="pcr-status-pill {status_class}">{status_label}</span>
+            <div class="pcr-record-row">
+                <div class="pcr-record-main">
+                    <div>
+                        <div class="pcr-record-title">
+                            {idx}. {escape_html(record.get('提交时间'), '-')} ｜ {escape_html(record.get('实验现象'), '-')} ｜ Top1：{escape_html(record.get('Top1 原因'), '-')}
+                        </div>
+                        <div class="pcr-record-meta">
+                            教师确认：{escape_html(teacher_final, '未确认')} ｜ 一致性：{escape_html(consistency_status, '-')}
+                        </div>
+                    </div>
+                    <div class="pcr-record-tags">
+                        <span class="pcr-tag {status_class}">{escape_html(status_label, '-')}</span>
+                        <span class="pcr-tag {consistency_class}">{escape_html(consistency_status, '-')}</span>
+                        <span class="pcr-tag {image_class}">{escape_html(image_status, '无图')}</span>
+                    </div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1164,6 +1453,7 @@ def render_case_record_list(records_to_render, all_records, list_key_prefix):
 
 def render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records):
     with st.container(border=True):
+        render_section_kicker("案例追踪")
         render_card_title("统计结果对应案例明细", "基于当前统计筛选范围做二次过滤，快速查看统计结论对应的具体案例。")
 
         view_col, limit_col = st.columns([1.4, 0.8])
@@ -1259,6 +1549,66 @@ def get_recent_match_cases(consistency_df, limit=10):
     ]].head(limit)
 
 
+def render_consistency_distribution_visualization(distribution_df):
+    """用紧凑堆叠条和精简柱图展示一致性分布。"""
+    if distribution_df.empty or "案例数" not in distribution_df.columns or distribution_df["案例数"].sum() == 0:
+        st.info("当前筛选范围内暂无可用于一致性分析的已确认案例。")
+        return
+
+    color_map = {
+        "Top1 一致": "#0f766e",
+        "Top1 不一致但 Top3 命中": "#0ea5e9",
+        "Top3 也未命中": "#f59e0b",
+    }
+    total = max(int(distribution_df["案例数"].sum()), 1)
+    segments = []
+    legends = []
+    for _, row in distribution_df.iterrows():
+        category = str(row["类别"])
+        count = int(row["案例数"])
+        width = count / total * 100
+        color = color_map.get(category, "#64748b")
+        segments.append(
+            f'<div class="pcr-stack-segment" style="width:{width:.1f}%; background:{color};"></div>'
+        )
+        legends.append(
+            f'<span><span class="pcr-legend-dot" style="background:{color};"></span>{html.escape(category)} {count} 条</span>'
+        )
+
+    st.markdown(
+        f"""
+        <div class="pcr-stack-bar">{''.join(segments)}</div>
+        <div class="pcr-stack-legend">{''.join(legends)}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    chart_df = distribution_df.copy()
+    bar_chart = (
+        alt.Chart(chart_df)
+        .mark_bar(cornerRadiusTopRight=5, cornerRadiusBottomRight=5)
+        .encode(
+            y=alt.Y("类别:N", title=None, sort=None, axis=alt.Axis(labelLimit=180)),
+            x=alt.X("案例数:Q", title="案例数", axis=alt.Axis(tickMinStep=1)),
+            color=alt.Color(
+                "类别:N",
+                legend=None,
+                scale=alt.Scale(
+                    domain=list(color_map.keys()),
+                    range=list(color_map.values()),
+                ),
+            ),
+            tooltip=[
+                alt.Tooltip("类别:N", title="类别"),
+                alt.Tooltip("案例数:Q", title="案例数"),
+            ],
+        )
+        .properties(height=220)
+    )
+    st.altair_chart(bar_chart, use_container_width=True)
+    st.dataframe(distribution_df, use_container_width=True, hide_index=True)
+
+
 def render_teacher_dashboard(records_by_id, all_records):
     dashboard_df, column_mapping, load_error = load_teacher_dashboard_data()
     filtered_df = pd.DataFrame()
@@ -1266,12 +1616,13 @@ def render_teacher_dashboard(records_by_id, all_records):
     reason_summary_df = pd.DataFrame(columns=["失败原因", "次数", "已确认数", "未确认数"])
 
     with st.container(border=True):
+        render_section_kicker("统计总览")
         render_card_title("学情统计看板", "基于历史诊断记录自动汇总，支持按时间范围筛选；存在缺失字段时自动降级显示。")
 
         if load_error:
             st.warning(load_error)
 
-        filter_cols = st.columns(2 if column_mapping.get("class") else 1)
+        filter_cols = st.columns([1, 1, 2] if column_mapping.get("class") else [1, 2])
         with filter_cols[0]:
             time_scope = st.selectbox(
                 "统计时间范围",
@@ -1306,104 +1657,106 @@ def render_teacher_dashboard(records_by_id, all_records):
             st.caption("未识别到可用时间字段，时间范围筛选已自动降级为“全部数据”，最近 30 天指标显示为“无法统计”。")
 
         metrics = compute_dashboard_stats(filtered_df, class_scoped_df, column_mapping)
+        st.markdown('<div class="pcr-card-divider"></div>', unsafe_allow_html=True)
         metric_cols = st.columns(4)
         for col, (label, value) in zip(metric_cols, metrics.items()):
             col.metric(label, value)
-        consistency_stats = {}
-        if dashboard_df.empty:
-            st.info("暂无历史诊断数据，学情统计看板已就绪，待学生提交记录后自动更新。")
+
+    if dashboard_df.empty:
+        st.info("暂无历史诊断数据，学情统计看板已就绪，待学生提交记录后自动更新。")
+        return
+
+    if filtered_df.empty:
+        st.info("当前筛选条件下暂无可统计数据。")
+        render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records)
+        return
+
+    consistency_df = build_consistency_dataframe(filtered_df, column_mapping)
+    consistency_stats = compute_consistency_stats(consistency_df)
+    reason_summary_df = build_reason_summary(filtered_df)
+
+    with st.container(border=True):
+        render_section_kicker("一致性复盘")
+        render_card_title("系统判断 vs 教师确认一致率", "复用当前筛选结果统计 Top1 一致率、Top3 命中率及最近一致/不一致案例。")
+        consistency_metric_cols = st.columns(4)
+        consistency_metric_cols[0].metric("已确认案例数", consistency_stats["已确认案例数"])
+        consistency_metric_cols[1].metric("Top1 一致率", consistency_stats["Top1 一致率"])
+        consistency_metric_cols[2].metric("Top3 命中率", consistency_stats["Top3 命中率"])
+        consistency_metric_cols[3].metric("无法比较案例数", consistency_stats["无法比较案例数"])
+
+        if consistency_stats["可比较已确认案例数"] == 0:
+            st.info("当前筛选范围内暂无可比较的已确认案例。")
         else:
-            if filtered_df.empty:
-                st.info("当前筛选条件下暂无可统计数据。")
+            st.caption(f"一致率分母为当前筛选范围内可比较的已确认案例数：{consistency_stats['可比较已确认案例数']} 条。")
 
-            render_card_title("系统判断 vs 教师确认一致率", "复用当前筛选结果统计 Top1 一致率、Top3 命中率及最近一致/不一致案例。")
-            consistency_df = build_consistency_dataframe(filtered_df, column_mapping)
-            consistency_stats = compute_consistency_stats(consistency_df)
+    dashboard_col_left, dashboard_col_right = st.columns(2)
 
-            consistency_metric_cols = st.columns(4)
-            consistency_metric_cols[0].metric("已确认案例数", consistency_stats["已确认案例数"])
-            consistency_metric_cols[1].metric("Top1 一致率", consistency_stats["Top1 一致率"])
-            consistency_metric_cols[2].metric("Top3 命中率", consistency_stats["Top3 命中率"])
-            consistency_metric_cols[3].metric("无法比较案例数", consistency_stats["无法比较案例数"])
+    with dashboard_col_left:
+        with st.container(border=True):
+            open_dashboard_card(13.5)
+            render_card_title("系统判断与教师复核一致性分布", "统计范围：当前筛选条件下，已完成教师复核且可进行一致性比对的案例。")
+            distribution_df = consistency_stats.get("一致性分布", pd.DataFrame())
+            render_consistency_distribution_visualization(distribution_df)
+            close_dashboard_card()
 
-            if consistency_stats["可比较已确认案例数"] == 0:
-                st.info("当前筛选范围内暂无可比较的已确认案例。")
+    with dashboard_col_right:
+        with st.container(border=True):
+            open_dashboard_card(13.5)
+            render_card_title("高频失败原因 Top 5", "统计规则：已完成教师复核的记录采用教师最终确认原因；未复核记录采用系统首位诊断结果。")
+            if reason_summary_df.empty:
+                st.info("当前筛选范围内暂无可汇总的失败原因数据。")
             else:
-                st.caption(f"一致率分母为当前筛选范围内可比较的已确认案例数：{consistency_stats['可比较已确认案例数']} 条。")
+                render_top_reason_visualization(reason_summary_df, top_n=5)
+            close_dashboard_card()
 
-        dashboard_col_left, dashboard_col_right = st.columns(2)
+    case_col_left, case_col_right = st.columns(2)
+    with case_col_left:
+        with st.container(border=True):
+            open_dashboard_card(9.5)
+            render_card_title("最近不一致案例", "展示教师已完成复核、但系统首位判断与教师结论不一致的近期案例。")
+            mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
+            if mismatch_df.empty:
+                st.info("当前筛选范围内暂无近期不一致案例。")
+            else:
+                st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
+            close_dashboard_card()
 
-        with dashboard_col_left:
-            with st.container(border=True):
-                open_dashboard_card(13.5)
-                render_card_title("系统判断与教师复核一致性分布", "统计范围：当前筛选条件下，已完成教师复核且可进行一致性比对的案例。")
-                distribution_df = consistency_stats.get("一致性分布", pd.DataFrame())
-                if distribution_df["案例数"].sum() == 0:
-                    st.info("当前筛选范围内暂无可用于一致性分析的已确认案例。")
-                else:
-                    st.bar_chart(distribution_df.set_index("类别"))
-                    st.dataframe(distribution_df, use_container_width=True, hide_index=True)
-                close_dashboard_card()
+    with case_col_right:
+        with st.container(border=True):
+            open_dashboard_card(9.5)
+            render_card_title("最近一致案例", "展示系统首位判断与教师最终确认一致的近期案例。")
+            match_df = get_recent_match_cases(consistency_df, limit=10)
+            if match_df.empty:
+                st.info("当前筛选范围内暂无近期一致案例。")
+            else:
+                st.dataframe(match_df, use_container_width=True, hide_index=True)
+            close_dashboard_card()
 
-        with dashboard_col_right:
-            with st.container(border=True):
-                open_dashboard_card(13.5)
-                render_card_title("高频失败原因 Top 5", "统计规则：已完成教师复核的记录采用教师最终确认原因；未复核记录采用系统首位诊断结果。")
-                reason_summary_df = build_reason_summary(filtered_df)
-                if reason_summary_df.empty:
-                    st.info("当前筛选范围内暂无可汇总的失败原因数据。")
-                else:
-                    render_top_reason_visualization(reason_summary_df, top_n=5)
-                close_dashboard_card()
+    detail_col_left, detail_col_right = st.columns(2)
+    with detail_col_left:
+        with st.container(border=True):
+            open_dashboard_card(10.5)
+            render_card_title("对照异常统计", "优先读取结构化记录；缺失时自动回退到原始文本关键词匹配。")
+            control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
+            negative_count = control_stats.get("negative_control_band_count")
+            positive_count = control_stats.get("positive_control_failure_count")
+            if negative_count is None and positive_count is None:
+                st.info("当前筛选范围内暂无可用于对照异常统计的数据。")
+            else:
+                control_cols = st.columns(2)
+                control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
+                control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
+            close_dashboard_card()
 
-        case_col_left, case_col_right = st.columns(2)
-        with case_col_left:
-            with st.container(border=True):
-                open_dashboard_card(9.5)
-                render_card_title("最近不一致案例", "展示教师已完成复核、但系统首位判断与教师结论不一致的近期案例。")
-                mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
-                if mismatch_df.empty:
-                    st.info("当前筛选范围内暂无近期不一致案例。")
-                else:
-                    st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
-                close_dashboard_card()
-
-        with case_col_right:
-            with st.container(border=True):
-                open_dashboard_card(9.5)
-                render_card_title("最近一致案例", "展示系统首位判断与教师最终确认一致的近期案例。")
-                match_df = get_recent_match_cases(consistency_df, limit=10)
-                if match_df.empty:
-                    st.info("当前筛选范围内暂无近期一致案例。")
-                else:
-                    st.dataframe(match_df, use_container_width=True, hide_index=True)
-                close_dashboard_card()
-
-        detail_col_left, detail_col_right = st.columns(2)
-        with detail_col_left:
-            with st.container(border=True):
-                open_dashboard_card(10.5)
-                render_card_title("对照异常统计", "优先读取结构化记录；缺失时自动回退到原始文本关键词匹配。")
-                control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
-                negative_count = control_stats.get("negative_control_band_count")
-                positive_count = control_stats.get("positive_control_failure_count")
-                if negative_count is None and positive_count is None:
-                    st.info("当前筛选范围内暂无可用于对照异常统计的数据。")
-                else:
-                    control_cols = st.columns(2)
-                    control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
-                    control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
-                close_dashboard_card()
-
-        with detail_col_right:
-            with st.container(border=True):
-                open_dashboard_card(10.5)
-                render_card_title("失败原因聚合明细", "按当前筛选条件聚合统计，并按次数降序展示前 10 项。")
-                if reason_summary_df.empty:
-                    st.info("当前筛选范围内暂无可展示的聚合结果。")
-                else:
-                    st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
-                close_dashboard_card()
+    with detail_col_right:
+        with st.container(border=True):
+            open_dashboard_card(10.5)
+            render_card_title("失败原因聚合明细", "按当前筛选条件聚合统计，并按次数降序展示前 10 项。")
+            if reason_summary_df.empty:
+                st.info("当前筛选范围内暂无可展示的聚合结果。")
+            else:
+                st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
+            close_dashboard_card()
 
     render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records)
 
@@ -1435,18 +1788,15 @@ def main():
     apply_common_styles(theme="teacher")
     inject_teacher_dashboard_layout_styles()
     st.session_state["current_role"] = "teacher"
-    render_page_hero(
-        "教师端案例复盘台",
-        "查看学生历史案例，完成最终原因确认与教学备注沉淀。",
-        "教师端",
-    )
 
     records = load_recent_records(limit=5000)
     records_by_id = build_records_by_id(records)
+    render_teacher_page_header(len(records))
 
     render_teacher_dashboard(records_by_id, records)
 
     with st.container(border=True):
+        render_section_kicker("记录复核")
         render_card_title("最近诊断记录", "可展开每条记录查看完整信息并进行教师确认。")
 
         if not records:
@@ -1456,8 +1806,8 @@ def main():
         records_df = build_teacher_records_dataframe(records)
         filter_options = build_teacher_filter_options(records_df)
 
-        st.markdown("**筛选区**")
         render_card_title("筛选与快速定位", "先缩小记录范围，再进入详情查看与教师确认。")
+        st.markdown('<div class="pcr-filter-hint">按确认状态、异常类型、教师最终原因与关键词快速定位需要复核的案例。</div>', unsafe_allow_html=True)
         filter_col1, filter_col2, filter_col3 = st.columns(3)
         with filter_col1:
             confirm_status = st.selectbox(
