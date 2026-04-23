@@ -1309,7 +1309,7 @@ def render_teacher_dashboard(records_by_id, all_records):
         metric_cols = st.columns(4)
         for col, (label, value) in zip(metric_cols, metrics.items()):
             col.metric(label, value)
-
+        consistency_stats = {}
         if dashboard_df.empty:
             st.info("暂无历史诊断数据，学情统计看板已就绪，待学生提交记录后自动更新。")
         else:
