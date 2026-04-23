@@ -306,6 +306,146 @@ def main():
                     st.info(msg_db)
                     st.info(msg_up)
 
+    # ---------- 新增：规则库在线编辑器 ----------
+    with st.container():
+        render_card_title("✏️ 规则库在线编辑", "通过表单逐条添加新规则，系统将自动检测重复与冲突。")
+        with st.expander("➕ 添加新规则 (全面匹配 rules.csv)", expanded=False):
+            with st.form("add_rule_form", clear_on_submit=True):
+                st.markdown("**请填写新规则的全部字段（与现有 rules.csv 格式保持一致）**")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    abnormality = st.selectbox("实验现象 (abnormality) *", ABNORMALITY_OPTIONS, key="new_abnormality")
+                    band_pattern = st.selectbox("条带特征 (band_pattern) *",
+                                                ['no_band', 'weak', 'multiple', 'unexpected_size', 'smear',
+                                                 'primer_dimer_like', 'any'],
+                                                key="new_band_pattern")
+                    cause = st.text_input("异常原因 (cause) *", placeholder="例如：模板量不足", key="new_cause")
+                    priority = st.number_input("优先级 (priority) *", min_value=0, max_value=100, value=80, step=1,
+                                               key="new_priority")
+
+                    positive_control = st.selectbox("阳性对照 (positive_control) *", ['正常', '无带', '弱带', 'any'],
+                                                    key="new_pos_ctrl")
+                    negative_control = st.selectbox("阴性对照 (negative_control) *",
+                                                    ['无带', '目标大小相近带', '小分子弱带', '拖尾或弥散', 'any'],
+                                                    key="new_neg_ctrl")
+
+                with col2:
+                    template_condition = st.selectbox("模板条件 (template_condition)", ['偏低', '降解或不纯', 'any'],
+                                                      index=2, key="new_tpl_cond")
+                    annealing_temp_condition = st.selectbox("退火温度条件 (annealing_temp_condition)",
+                                                            ['any', '偏高', '偏低'], key="new_temp_cond")
+                    text_hint = st.text_input("文本提示关键词 (text_hint)", value="any", key="new_text_hint")
+                    required_fields = st.text_input("必填字段 (required_fields)",
+                                                    value="positive_control|negative_control", key="new_req_fields")
+                    base_score = st.number_input("基础分数 (base_score) *", min_value=0, max_value=100, value=75,
+                                                 step=1, key="new_base_score")
+                    enabled = st.checkbox("启用规则 (enabled)", value=True, key="new_enabled")
+
+                evidence_text = st.text_area("证据描述 (evidence_text) *",
+                                             placeholder="例如：阳性对照正常且阴性对照无带，样本无条带...",
+                                             key="new_evidence")
+                suggestion = st.text_area("建议措施 (suggestion) *",
+                                          placeholder="例如：增加模板输入量并复核模板定量结果...", key="new_suggestion")
+
+                st.markdown("---")
+                st.markdown("**⚙️ 旧版兼容字段** *(自动保持空白，无需修改)*")
+                col3, col4 = st.columns(2)
+                with col3:
+                    # 修复：将原本默认的 "any" 删掉，保持真正的空值
+                    min_template = st.text_input("min_template", value="")
+                    max_template = st.text_input("max_template", value="")
+                    score = st.text_input("旧版分数 (score)", value="")
+                with col4:
+                    min_temp = st.text_input("min_temp", value="")
+                    max_temp = st.text_input("max_temp", value="")
+                    pos_normal = st.text_input("positive_control_normal", value="")
+                    neg_band = st.text_input("negative_control_band", value="")
+                st.markdown("---")
+
+                submitted_add = st.form_submit_button("✅ 确认添加规则")
+
+                if submitted_add:
+                    # 字段完整性校验
+                    if not cause.strip():
+                        st.error("❌ 异常原因不能为空。")
+                    elif not evidence_text.strip():
+                        st.error("❌ 证据描述不能为空。")
+                    elif not suggestion.strip():
+                        st.error("❌ 建议措施不能为空。")
+                    else:
+                        # 自动生成新的 rule_id
+                        try:
+                            df_existing = pd.read_csv(RULES_PATH, encoding="utf-8-sig")
+                            if not df_existing.empty and "rule_id" in df_existing.columns:
+                                rule_ids = df_existing["rule_id"].dropna().astype(str)
+                                max_id = 0
+                                for rid in rule_ids:
+                                    if rid.startswith("R") and rid[1:].isdigit():
+                                        max_id = max(max_id, int(rid[1:]))
+                                new_rule_id = f"R{max_id + 1:03d}"
+                            else:
+                                new_rule_id = "R001"
+                        except Exception:
+                            df_existing = pd.DataFrame()
+                            new_rule_id = "R001"
+
+                        # 辅助函数：将空字符串转换为 None，以便写入 CSV 时变成真正的空值（NaN）
+                        def to_none_if_empty(val):
+                            if isinstance(val, str) and not val.strip():
+                                return None
+                            return val
+
+                        # 构造符合 rules.csv 格式的新规则完整字典
+                        new_rule = {
+                            "rule_id": new_rule_id,
+                            "abnormality": abnormality,
+                            "band_pattern": band_pattern,
+                            "cause": cause.strip(),
+                            "priority": priority,
+                            "positive_control": positive_control,
+                            "negative_control": negative_control,
+                            "template_condition": template_condition,
+                            "annealing_temp_condition": annealing_temp_condition,
+                            "text_hint": text_hint.strip(),
+                            "required_fields": required_fields.strip(),
+                            "base_score": base_score,
+                            "evidence_text": evidence_text.strip(),
+                            "suggestion": suggestion.strip(),
+                            "enabled": 1 if enabled else 0,
+                            # 修复：将所有兼容字段交给 to_none_if_empty 处理
+                            "positive_control_normal": to_none_if_empty(pos_normal),
+                            "negative_control_band": to_none_if_empty(neg_band),
+                            "min_template": to_none_if_empty(min_template),
+                            "max_template": to_none_if_empty(max_template),
+                            "min_temp": to_none_if_empty(min_temp),
+                            "max_temp": to_none_if_empty(max_temp),
+                            "score": to_none_if_empty(score)
+                        }
+
+                        # 重复检测
+                        is_dup, dup_indices = check_rule_duplicate(new_rule, df_existing)
+                        if is_dup:
+                            st.error(f"❌ 规则重复：已存在相同实验现象和异常原因的规则（行索引 {dup_indices}）。")
+                        else:
+                            # 冲突检测
+                            conflicts = check_rule_conflict(new_rule, df_existing)
+                            if conflicts:
+                                st.warning("⚠️ 检测到潜在冲突：")
+                                for c in conflicts:
+                                    st.warning(f"- {c}")
+                                st.session_state["pending_rule"] = new_rule
+                                st.session_state["show_confirm_button"] = True
+                            else:
+                                st.success("✅ 未检测到明显冲突。")
+                                success, msg = append_rule_to_csv(new_rule)
+                                if success:
+                                    st.success(f"✅ {msg} (新增规则编号: {new_rule_id})")
+                                    st.session_state["dev_rules_check_result"] = None
+                                else:
+                                    st.error(f"❌ {msg}")
+                                st.session_state.pop("pending_rule", None)
+                                st.session_state.pop("show_confirm_button", None)
 
 if __name__ == "__main__":
     main()
