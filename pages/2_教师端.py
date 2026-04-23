@@ -1337,7 +1337,7 @@ def render_teacher_dashboard(records_by_id, all_records):
             with st.container(border=True):
                 open_dashboard_card(13.5)
                 render_card_title("系统判断与教师复核一致性分布", "统计范围：当前筛选条件下，已完成教师复核且可进行一致性比对的案例。")
-                distribution_df = consistency_stats["一致性分布"]
+                distribution_df = consistency_stats.get("一致性分布", pd.DataFrame())
                 if distribution_df["案例数"].sum() == 0:
                     st.info("当前筛选范围内暂无可用于一致性分析的已确认案例。")
                 else:
