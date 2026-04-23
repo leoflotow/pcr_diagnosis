@@ -14,6 +14,7 @@ from core import (
     DB_PATH,
     RULES_PATH,
     UPLOAD_DIR,
+    ABNORMALITY_OPTIONS,
     apply_common_styles,
     clear_history_records,
     clear_uploaded_images,
