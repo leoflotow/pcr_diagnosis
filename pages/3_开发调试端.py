@@ -26,6 +26,9 @@ from core import (
     render_entry_guard,
     render_page_hero,
     render_soft_notice,
+    check_rule_duplicate,
+    check_rule_conflict,
+    append_rule_to_csv
 )
 
 
@@ -319,7 +322,7 @@ def main():
                     abnormality = st.selectbox("实验现象 (abnormality) *", ABNORMALITY_OPTIONS, key="new_abnormality")
                     band_pattern = st.selectbox("条带特征 (band_pattern) *",
                                                 ['no_band', 'weak', 'multiple', 'unexpected_size', 'smear',
-                                                 'primer_dimer_like', 'any'],
+                                                 'primer_dimer_like', 'any','distorted'],
                                                 key="new_band_pattern")
                     cause = st.text_input("异常原因 (cause) *", placeholder="例如：模板量不足", key="new_cause")
                     priority = st.number_input("优先级 (priority) *", min_value=0, max_value=100, value=80, step=1,
