@@ -29,16 +29,12 @@ def render_teacher_access_panel_inline():
     teacher_code = get_teacher_access_code()
 
     if st.session_state.get("teacher_verified"):
-        render_home_entry_status("已验证", "success")
-        st.markdown("<div style='height: 0.65rem;'></div>", unsafe_allow_html=True)
         if st.button("进入教师端", key="home_open_teacher_direct", use_container_width=True):
             enter_teacher_role()
             st.rerun()
         return
 
     if not st.session_state.get("show_teacher_access_panel"):
-        render_home_entry_status("需访问码", "warning")
-        st.markdown("<div style='height: 0.65rem;'></div>", unsafe_allow_html=True)
         if st.button("验证教师端访问码", key="home_show_teacher_access", use_container_width=True):
             st.session_state["show_teacher_access_panel"] = True
             st.rerun()
@@ -157,13 +153,13 @@ def render_home_portal():
         """
         <div class="pcr-home-hero">
             <div>
-                <h1>PCR电泳异常智能复盘助手</h1>
-                <p>面向实验教学与计算机创新竞赛的智能诊断工作台，串联学生输入、规则推理、教师复核与案例沉淀。</p>
+                <h1>PCR电泳异常诊断助手</h1>
+                <p>记录 PCR 电泳实验现象，整理可能原因，帮助学生和教师一起完成分析与确认。</p>
                 <div class="pcr-home-proof">
-                    <span>规则矩阵诊断</span>
-                    <span>文本线索抽取</span>
-                    <span>教师闭环复核</span>
-                    <span>课堂案例复盘</span>
+                    <span>现象记录</span>
+                    <span>规则判断</span>
+                    <span>教师确认</span>
+                    <span>记录整理</span>
                 </div>
             </div>
             <div class="pcr-gel-panel">
@@ -184,16 +180,16 @@ def render_home_portal():
     )
 
     with st.container(border=True):
-        render_card_title("工作台入口", "按课堂角色进入对应流程，学生诊断、教师复核和系统调试各自聚焦。")
-        col_student, col_teacher, col_dev = st.columns(3)
+        render_card_title("进入页面", "请选择你的身份。学生端用于填写实验情况，教师端用于查看和确认记录。开发调试入口在页面底部。")
+        col_student, col_teacher = st.columns(2)
 
         with col_student:
             st.markdown(
                 """
                 <div class="pcr-workbench-card">
-                    <h3>学生诊断工作台</h3>
-                    <p>按步骤录入实验现象、对照结果、PCR 参数和补充描述，生成可解释的诊断候选。</p>
-                    <div class="pcr-workbench-meta"><span>无需验证</span><span>课堂演示</span></div>
+                    <h3>学生端：填写实验情况</h3>
+                    <p>按步骤填写电泳现象、对照结果、PCR 参数和补充说明，查看可能原因和处理建议。</p>
+                    <div class="pcr-workbench-meta"><span>无需验证</span><span>课堂使用</span></div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -206,34 +202,14 @@ def render_home_portal():
             st.markdown(
                 """
                 <div class="pcr-workbench-card">
-                    <h3>教师复核驾驶舱</h3>
-                    <p>查看学生历史案例，分析 Top1/Top3 命中情况，完成最终原因确认和教学备注沉淀。</p>
-                    <div class="pcr-workbench-meta"><span>访问码</span><span>复核闭环</span></div>
+                    <h3>教师端：查看与确认</h3>
+                    <p>查看学生提交的记录，确认可能原因，必要时补充教师说明。</p>
+                    <div class="pcr-workbench-meta"><span>访问码</span><span>教师确认</span></div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
             render_teacher_access_panel_inline()
-
-        with col_dev:
-            st.markdown(
-                """
-                <div class="pcr-workbench-card">
-                    <h3>系统健康控制台</h3>
-                    <p>核验规则库、数据库、上传目录和模型配置，支持演示环境清理与规则在线维护。</p>
-                    <div class="pcr-workbench-meta"><span>调试入口</span><span>环境管理</span></div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            if st.session_state.get("dev_verified"):
-                if st.button("进入开发调试端", key="home_open_dev_card", use_container_width=True):
-                    enter_dev_role()
-                    st.rerun()
-            else:
-                if st.button("打开开发调试入口", key="home_show_dev_card", use_container_width=True):
-                    st.session_state["show_dev_access_panel"] = True
-                    st.rerun()
 
     with st.container(border=True):
         render_card_title("当前访问状态", "当前角色与访问权限仅在本次会话中生效。")
@@ -324,7 +300,7 @@ def handle_pending_navigation():
 
 
 def main():
-    ensure_page_config("PCR电泳异常智能复盘助手")
+    ensure_page_config("PCR电泳异常诊断助手")
     init_database()
     init_access_state()
 

@@ -209,12 +209,12 @@ def render_student_quick_actions():
                 """
                 <div class="pcr-student-toolbar">
                     <div>
-                        <div class="pcr-student-toolbar-title">按步骤完成诊断输入</div>
+                        <div class="pcr-student-toolbar-title">按步骤填写实验情况</div>
                         <p class="pcr-student-toolbar-desc">
-                            当前页面只在最后一步触发诊断；前面步骤可随时返回修改。
+                            前面几步可以随时返回修改；最后一步再生成诊断结果。
                         </p>
                     </div>
-                    <span class="pcr-current-step-chip">课堂演示模式</span>
+                    <span class="pcr-current-step-chip">课堂使用</span>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -412,7 +412,7 @@ def render_student_wizard_header():
                 <div>
                     <div class="pcr-step-kicker">当前步骤</div>
                     <div class="pcr-step-title">第 {current_step} / {total_steps} 步：{STUDENT_STEP_TITLES[current_step - 1]}</div>
-                    <div class="pcr-step-desc">聚焦完成当前输入；诊断会在最后一步统一生成并保存。</div>
+                    <div class="pcr-step-desc">先完成当前步骤；最后一步会统一生成并保存结果。</div>
                 </div>
                 <span class="pcr-current-step-chip">{round(current_step / total_steps * 100)}% 完成</span>
             </div>
@@ -449,7 +449,7 @@ def render_step_2_pcr_params():
         restore_widget_value_from_storage(key)
 
     with st.container(border=True):
-        render_card_title("PCR 关键参数", "填写会影响扩增结果的核心参数，用于匹配规则库。")
+        render_card_title("PCR 关键参数", "填写会影响扩增结果的几个主要参数，用于判断可能原因。")
         col_left, col_right = st.columns(2)
         with col_left:
             st.number_input("模板量 (μL)", min_value=0.0, step=0.5, key="student_form_template_amount", on_change=sync_val, args=("student_form_template_amount",))
@@ -567,7 +567,7 @@ def render_student_results(payload):
     image_save_error = payload.get("image_save_error")
 
     with st.container(border=True):
-        render_card_title("诊断结果", "Top1 高亮展示，Top2/Top3 作为候选补充。")
+        render_card_title("诊断结果", "先显示最可能的原因，下面列出其他可能原因作为参考。")
 
         clue_text = "、".join(text_clues) if text_clues else "未抽取到明显线索"
         st.markdown(
@@ -604,7 +604,7 @@ def render_student_results(payload):
                     <div style="font-size:1.28rem;font-weight:900;color:#07172b;line-height:1.35;margin-bottom:0.35rem;">{html_text(top1.get('原因', '-'))}</div>
                     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.55rem;">
                         <span class="pcr-current-step-chip">总分 {html_text(top1.get('总分', '-'))}</span>
-                        <span class="pcr-current-step-chip">可解释规则命中</span>
+                        <span class="pcr-current-step-chip">有规则依据</span>
                     </div>
                     <div style="color:#334155;line-height:1.65;"><b>建议：</b>{html_text(top1.get('建议', '-'))}</div>
                 </div>
@@ -652,24 +652,24 @@ def render_student_results(payload):
 
     if results:
         with st.container(border=True):
-            render_card_title("复盘报告导出", "可预览规范化复盘报告，并下载为 TXT 文件。")
+            render_card_title("记录报告导出", "可以预览本次诊断记录，并下载为 TXT 文件。")
             summary_key = f"student_case_summary_{record_id}"
             generate_key = f"student_generate_case_summary_{record_id}"
             if record_id:
                 download_name = f"pcr_review_report_case_{record_id}.txt"
             else:
                 download_name = f"pcr_review_report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
-            st.caption("点击下方按钮可生成规范化复盘报告，并下载为 TXT 文件。")
+            st.caption("点击下方按钮可生成本次记录报告，并下载为 TXT 文件。")
 
-            if st.button("生成复盘报告", key=generate_key):
+            if st.button("生成记录报告", key=generate_key):
                 st.session_state[summary_key] = build_case_summary(payload)
 
             summary_text = st.session_state.get(summary_key, "")
             if summary_text:
-                st.markdown("**复盘报告预览**")
-                st.text_area("复盘报告预览", value=summary_text, height=420)
+                st.markdown("**记录报告预览**")
+                st.text_area("记录报告预览", value=summary_text, height=420)
                 st.download_button(
-                    "下载复盘报告（TXT）",
+                    "下载记录报告（TXT）",
                     data=summary_text,
                     file_name=download_name,
                     mime="text/plain",
@@ -677,15 +677,15 @@ def render_student_results(payload):
 
 def main():
     """学生端主流程。"""
-    ensure_page_config("学生端诊断工作台")
+    ensure_page_config("学生端：实验情况填写")
     init_database()
     apply_common_styles(theme="student")
     st.session_state["current_role"] = "student"
     init_student_wizard_state()
 
     render_page_hero(
-        "学生端诊断工作台",
-        "填写实验参数与补充描述，快速获得可解释的诊断候选结果。",
+        "学生端：实验情况填写",
+        "填写实验观察、PCR 条件和补充说明，查看可能原因和处理建议。",
         "学生端",
     )
 

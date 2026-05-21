@@ -337,6 +337,176 @@ def inject_teacher_dashboard_layout_styles():
             border-color: rgba(245, 158, 11, 0.34);
         }
 
+        .pcr-dashboard-empty {
+            min-height: 18.35rem;
+            border: 1px dashed rgba(14, 165, 183, 0.36);
+            border-radius: 14px;
+            background:
+                repeating-linear-gradient(90deg, rgba(14,165,183,0.07) 0 10px, transparent 10px 34px),
+                linear-gradient(180deg, rgba(223,248,251,0.68), rgba(255,255,255,0.92));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1.25rem;
+            margin-top: 0.8rem;
+        }
+
+        .pcr-dashboard-empty b {
+            display: block;
+            color: #07172b;
+            font-size: 1rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .pcr-dashboard-empty span {
+            color: #475569;
+            line-height: 1.65;
+            font-size: 0.92rem;
+        }
+
+        .pcr-case-list-toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.8rem;
+            align-items: center;
+            flex-wrap: wrap;
+            border: 1px solid rgba(14, 165, 183, 0.18);
+            border-radius: 14px;
+            background: linear-gradient(90deg, rgba(223,248,251,0.72), rgba(255,255,255,0.86));
+            padding: 0.72rem 0.86rem;
+            margin: 0.8rem 0 0.2rem 0;
+        }
+
+        .pcr-case-list-toolbar > div:last-child {
+            display: flex;
+            gap: 0.42rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .pcr-case-list-toolbar b {
+            color: #07172b;
+        }
+
+        .pcr-case-list-toolbar span {
+            color: #475569;
+            font-size: 0.88rem;
+        }
+
+        [data-testid="stExpander"] details {
+            border: 1px solid rgba(148, 163, 184, 0.34) !important;
+            border-radius: 12px !important;
+            background: rgba(255,255,255,0.92) !important;
+            box-shadow: 0 7px 18px rgba(11, 31, 58, 0.04);
+            overflow: hidden;
+        }
+
+        [data-testid="stExpander"] summary {
+            min-height: 2.75rem;
+            padding: 0.56rem 0.78rem !important;
+            color: #07172b !important;
+            font-weight: 760 !important;
+        }
+
+        [data-testid="stExpander"] summary:hover {
+            background: rgba(241, 245, 249, 0.82);
+        }
+
+        .pcr-summary-drawer {
+            margin-top: 0.9rem;
+            border: 1px solid rgba(14, 165, 183, 0.28);
+            border-radius: 16px;
+            background:
+                linear-gradient(90deg, rgba(223,248,251,0.82), rgba(255,255,255,0.96));
+            box-shadow: 0 14px 32px rgba(11, 31, 58, 0.08);
+            overflow: hidden;
+        }
+
+        .pcr-summary-drawer summary {
+            cursor: pointer;
+            list-style: none;
+            min-height: 3.4rem;
+            padding: 0.78rem 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.85rem;
+            color: #07172b;
+            font-weight: 860;
+        }
+
+        .pcr-summary-drawer summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .pcr-summary-drawer summary::before {
+            content: "›";
+            width: 1.6rem;
+            height: 1.6rem;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #075985;
+            background: #dff8fb;
+            border: 1px solid rgba(14, 165, 183, 0.3);
+            margin-right: 0.2rem;
+            transition: transform 160ms ease;
+        }
+
+        .pcr-summary-drawer[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .pcr-summary-drawer-title {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex: 1;
+        }
+
+        .pcr-summary-drawer-hint {
+            color: #475569;
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .pcr-summary-drawer-body {
+            border-top: 1px solid rgba(14, 165, 183, 0.16);
+            background: rgba(255,255,255,0.72);
+            padding: 0.75rem 0.9rem 0.9rem;
+        }
+
+        .pcr-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow: hidden;
+            border-radius: 12px;
+            font-size: 0.88rem;
+        }
+
+        .pcr-summary-table th {
+            text-align: left;
+            background: rgba(15, 23, 42, 0.045);
+            color: #475569;
+            font-weight: 800;
+            padding: 0.55rem 0.62rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+        }
+
+        .pcr-summary-table td {
+            padding: 0.55rem 0.62rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+            color: #07172b;
+            vertical-align: top;
+        }
+
+        .pcr-summary-table tr:last-child td {
+            border-bottom: 0;
+        }
+
         @media (max-width: 768px) {
             .pcr-teacher-header {
                 padding: 1rem;
@@ -413,8 +583,8 @@ def render_teacher_page_header(record_count):
             <div class="pcr-teacher-header-top">
                 <div>
                     <span class="pcr-teacher-chip">教师端</span>
-                    <h1>教师端案例复盘台</h1>
-                    <p>查看学生历史案例，完成最终原因确认与教学备注沉淀。</p>
+                    <h1>教师端记录查看</h1>
+                    <p>查看学生提交的记录，确认原因，并补充教师说明。</p>
                 </div>
                 <div class="pcr-teacher-header-actions">
                     <span class="pcr-teacher-chip soft">教师已验证</span>
@@ -1107,14 +1277,14 @@ def build_feedback_loop_summary(loop_status):
     consistency_status = loop_status.get("一致性状态")
 
     if current_status != "已确认":
-        return "该案例尚未完成教师确认，暂不能作为闭环案例使用。"
+        return "该记录还没有完成教师确认，暂时只作为待查看记录。"
     if consistency_status == "一致":
-        return "该案例中，系统首选判断与教师最终确认一致，可作为有效教学案例沉淀。"
+        return "该记录中，系统首选判断与教师最终确认一致。"
     if consistency_status == "Top3命中但Top1不一致":
-        return "该案例中，系统 Top1 判断与教师确认不一致，但 Top3 候选已覆盖真实原因，提示规则排序仍有优化空间。"
+        return "该记录中，系统 Top1 判断与教师确认不一致，但前三个候选原因里包含了教师确认的原因。"
     if consistency_status == "未命中":
-        return "该案例中，系统候选结果未覆盖教师最终确认原因，可作为规则补充与误判纠偏案例。"
-    return "该案例已进入教师确认阶段，但当前记录信息不足，暂无法完成有效闭环比较。"
+        return "该记录中，系统候选结果没有覆盖教师确认的原因，后续可以补充规则。"
+    return "该记录已有教师确认信息，但当前字段不足，暂时无法完成对比。"
 
 
 def get_case_value_tag(loop_status, missing_info_count):
@@ -1151,7 +1321,7 @@ def render_feedback_loop_block(record):
     summary_text = build_feedback_loop_summary(loop_status)
 
     with st.container(border=True):
-        render_card_title("教师确认反馈闭环", "结构化展示系统判断、教师确认及当前案例闭环状态。")
+        render_card_title("教师确认结果", "对照系统判断和教师最终确认，方便查看差异。")
 
         overview_cols = st.columns(4)
         overview_cols[0].metric("当前状态", loop_status["当前状态"])
@@ -1173,7 +1343,7 @@ def render_feedback_loop_block(record):
             st.markdown(f"- 教师确认时间：{loop_status['教师确认时间']}")
             st.markdown(f"- 教师是否已完成确认：{loop_status['教师是否已完成确认']}")
 
-        st.markdown(f"**闭环结论：** {summary_text}")
+        st.markdown(f"**对比说明：** {summary_text}")
         st.markdown(f"**案例价值标签：** `{case_value_tag}`")
 
 
@@ -1437,7 +1607,7 @@ def build_stat_linked_records(linked_df, records_by_id):
 
 def render_case_detail(record, all_records, detail_key_prefix):
     record_id = record.get("id")
-    with st.expander(f"展开查看详情（记录ID: {record_id}）"):
+    with st.expander(f"查看本条记录详情（记录ID: {record_id}）"):
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"- 记录 id：{record_id}")
@@ -1524,8 +1694,78 @@ def render_case_detail(record, all_records, detail_key_prefix):
                     st.rerun()
 
 
-def render_case_record_list(records_to_render, all_records, list_key_prefix):
-    for idx, record in enumerate(records_to_render, 1):
+def build_case_queue_summary_dataframe(records_to_render, start_index=1):
+    """生成折叠区中的轻量案例摘要，避免长列表全部展开。"""
+    rows = []
+    for offset, record in enumerate(records_to_render, start_index):
+        loop_status = build_feedback_loop_status(record)
+        rows.append(
+            {
+                "序号": offset,
+                "记录ID": record.get("id", "-"),
+                "提交时间": normalize_display_text(record.get("提交时间"), default="-"),
+                "实验现象": normalize_display_text(record.get("实验现象"), default="未填写"),
+                "系统 Top1": normalize_display_text(record.get("Top1 原因"), default="-"),
+                "教师确认": normalize_display_text(loop_status["教师最终确认原因"], default="未确认"),
+                "一致性": normalize_display_text(loop_status["一致性状态"], default="-"),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def render_case_summary_drawer(remaining_records, start_index):
+    """用自定义折叠摘要区展示剩余记录，和单条详情折叠形成层级区分。"""
+    summary_df = build_case_queue_summary_dataframe(remaining_records, start_index=start_index)
+    header_cells = "".join(f"<th>{escape_html(column, '-')}</th>" for column in summary_df.columns)
+    body_rows = []
+    for _, row in summary_df.iterrows():
+        cells = "".join(f"<td>{escape_html(row[column], '-')}</td>" for column in summary_df.columns)
+        body_rows.append(f"<tr>{cells}</tr>")
+
+    st.markdown(
+        f"""
+        <details class="pcr-summary-drawer">
+            <summary>
+                <span class="pcr-summary-drawer-title">其余 {len(remaining_records)} 条记录摘要</span>
+                <span class="pcr-summary-drawer-hint">点击展开查看</span>
+            </summary>
+            <div class="pcr-summary-drawer-body">
+                <table class="pcr-summary-table">
+                    <thead><tr>{header_cells}</tr></thead>
+                    <tbody>{''.join(body_rows)}</tbody>
+                </table>
+            </div>
+        </details>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_case_record_list(records_to_render, all_records, list_key_prefix, visible_detail_count=3):
+    if not records_to_render:
+        return
+
+    total_count = len(records_to_render)
+    visible_count = min(visible_detail_count, total_count)
+    st.markdown(
+        f"""
+        <div class="pcr-case-list-toolbar">
+            <div>
+                <b>记录查看列表</b><br/>
+                <span>默认显示前 {visible_count} 条记录，其余记录放在下方摘要中，页面更方便查看。</span>
+            </div>
+            <div>
+                <span class="pcr-tag info">共 {total_count} 条</span>
+                <span class="pcr-tag ok">显示 {visible_count} 条</span>
+                <span class="pcr-tag muted">折叠 {max(total_count - visible_count, 0)} 条</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    visible_records = records_to_render[:visible_count]
+    for idx, record in enumerate(visible_records, 1):
         loop_status = build_feedback_loop_status(record)
         status_class = "ok" if loop_status["当前状态"] == "已确认" else "warn"
         status_label = loop_status["当前状态"]
@@ -1558,6 +1798,25 @@ def render_case_record_list(records_to_render, all_records, list_key_prefix):
             unsafe_allow_html=True,
         )
         render_case_detail(record, all_records, detail_key_prefix=f"{list_key_prefix}_{record.get('id', idx)}")
+
+    remaining_records = records_to_render[visible_count:]
+    if remaining_records:
+        render_case_summary_drawer(remaining_records, start_index=visible_count + 1)
+
+
+def render_dashboard_empty_state(title, detail, min_height_rem=18.35):
+    """渲染等高空态面板，让左右看板在无数据时仍保持视觉平衡。"""
+    st.markdown(
+        f"""
+        <div class="pcr-dashboard-empty" style="min-height:{float(min_height_rem):.2f}rem;">
+            <div>
+                <b>{escape_html(title, '-')}</b>
+                <span>{escape_html(detail, '-')}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records):
@@ -1661,7 +1920,11 @@ def get_recent_match_cases(consistency_df, limit=10):
 def render_consistency_distribution_visualization(distribution_df):
     """用紧凑堆叠条和精简柱图展示一致性分布。"""
     if distribution_df.empty or "案例数" not in distribution_df.columns or distribution_df["案例数"].sum() == 0:
-        st.info("当前筛选范围内暂无可用于一致性分析的已确认案例。")
+        render_dashboard_empty_state(
+            "暂无可比较的一致性数据",
+            "完成教师复核后，这里会展示 Top1 一致、Top3 命中与未命中的分布。",
+            min_height_rem=23.8,
+        )
         return
 
     color_map = {
@@ -1785,8 +2048,8 @@ def render_teacher_dashboard(records_by_id, all_records):
     reason_summary_df = build_reason_summary(filtered_df)
 
     with st.container(border=True):
-        render_section_kicker("一致性复盘")
-        render_card_title("系统判断 vs 教师确认一致率", "复用当前筛选结果统计 Top1 一致率、Top3 命中率及最近一致/不一致案例。")
+        render_section_kicker("结果对照")
+        render_card_title("系统判断 vs 教师确认一致率", "按当前筛选结果统计系统判断和教师确认的匹配情况。")
         consistency_metric_cols = st.columns(4)
         consistency_metric_cols[0].metric("已确认案例数", consistency_stats["已确认案例数"])
         consistency_metric_cols[1].metric("Top1 一致率", consistency_stats["Top1 一致率"])
@@ -1801,56 +2064,71 @@ def render_teacher_dashboard(records_by_id, all_records):
     dashboard_col_left, dashboard_col_right = st.columns(2)
 
     with dashboard_col_left:
-        with st.container(border=True):
+        with st.container(border=True, height=500):
             open_dashboard_card(13.5)
-            render_card_title("系统判断与教师复核一致性分布", "统计范围：当前筛选条件下，已完成教师复核且可进行一致性比对的案例。")
+            render_card_title("系统判断与教师确认一致性分布", "统计当前筛选范围内，已完成教师确认并且可以对比的记录。")
             distribution_df = consistency_stats.get("一致性分布", pd.DataFrame())
             render_consistency_distribution_visualization(distribution_df)
             close_dashboard_card()
 
     with dashboard_col_right:
-        with st.container(border=True):
+        with st.container(border=True, height=500):
             open_dashboard_card(13.5)
-            render_card_title("高频失败原因 Top 5", "统计规则：已完成教师复核的记录采用教师最终确认原因；未复核记录采用系统首位诊断结果。")
+            render_card_title("高频失败原因 Top 5", "已确认记录使用教师确认原因；未确认记录使用系统首位判断。")
             if reason_summary_df.empty:
-                st.info("当前筛选范围内暂无可汇总的失败原因数据。")
+                render_dashboard_empty_state(
+                    "暂无失败原因聚合数据",
+                    "有记录后，这里会显示出现较多的失败原因。",
+                )
             else:
                 render_top_reason_visualization(reason_summary_df, top_n=5)
             close_dashboard_card()
 
     case_col_left, case_col_right = st.columns(2)
     with case_col_left:
-        with st.container(border=True):
+        with st.container(border=True, height=250):
             open_dashboard_card(9.5)
-            render_card_title("最近不一致案例", "展示教师已完成复核、但系统首位判断与教师结论不一致的近期案例。")
+            render_card_title("最近不一致记录", "展示教师已确认，但系统首位判断与教师结论不一致的近期记录。")
             mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
             if mismatch_df.empty:
-                st.info("当前筛选范围内暂无近期不一致案例。")
+                render_dashboard_empty_state(
+                    "暂无近期不一致案例",
+                    "出现教师确认结果与系统首位判断不一致时，会优先显示在这里。",
+                    min_height_rem=4.6,
+                )
             else:
                 st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
             close_dashboard_card()
 
     with case_col_right:
-        with st.container(border=True):
+        with st.container(border=True, height=250):
             open_dashboard_card(9.5)
-            render_card_title("最近一致案例", "展示系统首位判断与教师最终确认一致的近期案例。")
+            render_card_title("最近一致记录", "展示系统首位判断与教师最终确认一致的近期记录。")
             match_df = get_recent_match_cases(consistency_df, limit=10)
             if match_df.empty:
-                st.info("当前筛选范围内暂无近期一致案例。")
+                render_dashboard_empty_state(
+                    "暂无近期一致案例",
+                    "系统首位判断与教师最终确认一致的记录会显示在这里。",
+                    min_height_rem=4.6,
+                )
             else:
                 st.dataframe(match_df, use_container_width=True, hide_index=True)
             close_dashboard_card()
 
     detail_col_left, detail_col_right = st.columns(2)
     with detail_col_left:
-        with st.container(border=True):
+        with st.container(border=True, height=290):
             open_dashboard_card(10.5)
             render_card_title("对照异常统计", "优先读取结构化记录；缺失时自动回退到原始文本关键词匹配。")
             control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
             negative_count = control_stats.get("negative_control_band_count")
             positive_count = control_stats.get("positive_control_failure_count")
             if negative_count is None and positive_count is None:
-                st.info("当前筛选范围内暂无可用于对照异常统计的数据。")
+                render_dashboard_empty_state(
+                    "暂无对照异常统计数据",
+                    "记录中包含阳性/阴性对照结果后，这里会汇总异常对照信号。",
+                    min_height_rem=5.2,
+                )
             else:
                 control_cols = st.columns(2)
                 control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
@@ -1858,11 +2136,15 @@ def render_teacher_dashboard(records_by_id, all_records):
             close_dashboard_card()
 
     with detail_col_right:
-        with st.container(border=True):
+        with st.container(border=True, height=290):
             open_dashboard_card(10.5)
-            render_card_title("失败原因聚合明细", "按当前筛选条件聚合统计，并按次数降序展示前 10 项。")
+            render_card_title("失败原因统计明细", "按当前筛选条件统计原因，并按出现次数排序。")
             if reason_summary_df.empty:
-                st.info("当前筛选范围内暂无可展示的聚合结果。")
+                render_dashboard_empty_state(
+                    "暂无聚合明细",
+                    "有可统计记录后，这里会按失败原因列出结果。",
+                    min_height_rem=5.2,
+                )
             else:
                 st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
             close_dashboard_card()
@@ -1880,13 +2162,13 @@ def extract_cause_text(candidate_text):
 
 
 def main():
-    ensure_page_config("教师端案例复盘台")
+    ensure_page_config("教师端记录查看")
     init_access_state()
     if not st.session_state.get("teacher_verified"):
         apply_common_styles(theme="teacher")
         st.session_state["current_role"] = "home"
         render_page_hero(
-            "教师端案例复盘台",
+            "教师端记录查看",
             "当前页面需要先从首页教师入口完成访问码验证。",
             "教师端",
         )
@@ -1962,7 +2244,7 @@ def main():
             display_label = st.selectbox(
                 "显示条数",
                 list(HISTORY_DISPLAY_OPTIONS.keys()),
-                index=1,
+                index=0,
                 key="teacher_history_display_limit",
             )
 
@@ -1999,7 +2281,6 @@ def main():
             st.info("当前筛选条件下暂无历史记录。")
             return
 
-        st.markdown("**案例列表**")
         display_records = [records[int(idx)] for idx in filtered_records_df["record_index"].tolist()]
         render_case_record_list(display_records, records, list_key_prefix="history")
 
@@ -2039,48 +2320,13 @@ def render_top_reason_rankings(reason_summary_df, top_n=5):
 
 
 def render_top_reason_visualization(reason_summary_df, top_n=5):
-    """类别足够时用环形图，类别过少时回退到横向排名条。"""
+    """用横向排名条展示高频失败原因，避免图表在类别文本较长时挤压。"""
     top_df = reason_summary_df[["失败原因", "次数"]].head(top_n).copy()
     if top_df.empty:
         st.info("当前筛选范围内暂无可汇总的失败原因数据。")
         return
 
-    chart_df = top_df.copy()
-    chart_df["占比"] = chart_df["次数"] / chart_df["次数"].sum()
-
-    if len(chart_df) >= 3:
-        color_scale = alt.Scale(
-            range=["#0f766e", "#0ea5e9", "#6366f1", "#14b8a6", "#84cc16"]
-        )
-        donut_chart = (
-            alt.Chart(chart_df)
-            .mark_arc(innerRadius=68, outerRadius=115)
-            .encode(
-                theta=alt.Theta("次数:Q"),
-                color=alt.Color("失败原因:N", legend=alt.Legend(title="失败原因"), scale=color_scale),
-                tooltip=[
-                    alt.Tooltip("失败原因:N", title="失败原因"),
-                    alt.Tooltip("次数:Q", title="次数"),
-                    alt.Tooltip("占比:Q", title="占比", format=".1%"),
-                ],
-            )
-            .properties(height=280)
-        )
-
-        text_chart = (
-            alt.Chart(pd.DataFrame({"label": ["失败原因构成"]}))
-            .mark_text(fontSize=15, fontWeight="bold", color="#0f172a")
-            .encode(text="label:N")
-        )
-
-        st.altair_chart(donut_chart + text_chart, use_container_width=True)
-        st.dataframe(
-            chart_df.assign(占比=chart_df["占比"].map(lambda x: f"{x:.1%}")),
-            use_container_width=True,
-            hide_index=True,
-        )
-    else:
-        render_top_reason_rankings(reason_summary_df, top_n=top_n)
+    render_top_reason_rankings(reason_summary_df, top_n=top_n)
 
 
 def open_dashboard_card(min_height_rem):

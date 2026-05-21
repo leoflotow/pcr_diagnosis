@@ -2876,12 +2876,12 @@ def build_report_consistency_status(teacher_final_cause, ranked_results):
 def build_feedback_loop_summary_for_report(status_text):
     """生成报告中的闭环结论语句。"""
     if status_text == "一致":
-        return "系统首选判断与教师最终确认一致，可作为稳定的教学复盘案例。"
+        return "系统首选判断与教师最终确认一致，可作为后续讲解参考。"
     if status_text == "Top3命中但Top1不一致":
         return "系统候选结果已覆盖真实原因，但排序仍有优化空间，可作为纠偏案例参考。"
     if status_text == "未命中":
-        return "系统候选结果未覆盖教师最终确认原因，建议将该案例作为规则补充与误判复盘样例。"
-    return "该案例尚未完成有效教师确认，当前报告以系统诊断结果为主，暂不能形成完整闭环结论。"
+        return "系统候选结果未覆盖教师最终确认原因，建议后续补充相关规则。"
+    return "该案例尚未完成有效教师确认，当前报告以系统诊断结果为主。"
 
 
 def get_action_advice_by_reason(reason):
@@ -2917,7 +2917,7 @@ def build_review_suggestions(top1_reason, missing_items=None, top1_suggestion=""
         missing_text = "；".join(missing_items[:3])
         suggestions.append(f"当前仍建议优先补充以下信息后再复核：{missing_text}。")
     elif confidence_level == "高":
-        suggestions.append("当前关键信息相对完整，可将本案例作为课堂复盘示例进一步沉淀。")
+        suggestions.append("当前关键信息相对完整，可作为课堂讨论示例。")
 
     deduped = []
     for item in suggestions:
@@ -3019,7 +3019,7 @@ def build_case_review_report(payload):
         confidence_level=confidence_level,
     )
 
-    lines = ["《PCR-电泳异常复盘报告》"]
+    lines = ["《PCR-电泳异常记录报告》"]
 
     append_report_section(
         lines,
@@ -3087,12 +3087,12 @@ def build_case_review_report(payload):
         teacher_review_lines.append("该案例尚未完成教师确认。")
     else:
         teacher_review_lines.append(f"一致性状态：{consistency_status}")
-        teacher_review_lines.append(f"闭环结论：{feedback_summary}")
+        teacher_review_lines.append(f"对比说明：{feedback_summary}")
     append_report_section(lines, "五、教师复核结果", teacher_review_lines)
 
     append_report_section(
         lines,
-        "六、改进建议 / 复盘建议",
+        "六、改进建议 / 后续建议",
         [f"- {item}" for item in review_suggestions] if review_suggestions else ["- 建议结合更多实验记录继续复核当前案例。"],
     )
 
@@ -3100,7 +3100,7 @@ def build_case_review_report(payload):
         lines,
         "七、报告尾部说明",
         [
-            "本报告由系统自动生成，供实验教学复盘与教师复核参考。",
+            "本报告由系统自动生成，供实验教学和教师确认参考。",
             "最终结论以教师确认结果为准；若尚未确认，则当前结论仅供课堂分析使用。",
         ],
     )
