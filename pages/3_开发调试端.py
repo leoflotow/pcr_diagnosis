@@ -4,6 +4,7 @@
 """
 
 import os
+from html import escape
 
 import pandas as pd
 import streamlit as st
@@ -47,6 +48,11 @@ LEGACY_RULE_COLUMNS = {
     "score",
     "suggestion",
 }
+
+
+def html_text(value):
+    """将动态内容转为安全 HTML 文本，避免状态详情被当作标签解析。"""
+    return escape(str(value), quote=True)
 
 V2_RULE_COLUMNS = {
     "rule_id",
@@ -141,14 +147,85 @@ def render_self_check_items():
     cols = st.columns(2)
     for index, (level, title, detail) in enumerate(items):
         with cols[index % 2]:
-            with st.container(border=True):
-                st.markdown(f"**{title}**")
-                if level == "success":
-                    st.success(detail)
-                elif level == "warning":
-                    st.warning(detail)
-                else:
-                    st.error(detail)
+            st.markdown(
+                f"""
+                <div class="pcr-health-card {level}">
+                    <div class="pcr-health-status">{level.upper()}</div>
+                    <b>{html_text(title)}</b>
+                    <p>{html_text(detail)}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def inject_dev_console_styles():
+    """开发调试端专属控制台样式。"""
+    st.markdown(
+        """
+        <style>
+        .pcr-health-card {
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 14px;
+            padding: 0.92rem 0.95rem;
+            min-height: 7rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,252,253,0.92));
+            box-shadow: 0 12px 28px rgba(11, 31, 58, 0.06);
+            margin-bottom: 0.7rem;
+            border-left: 4px solid #64748b;
+        }
+
+        .pcr-health-card.success { border-left-color: #0ea5b7; }
+        .pcr-health-card.warning { border-left-color: #f59e0b; background: linear-gradient(180deg, #fff7ed, #ffffff); }
+        .pcr-health-card.error { border-left-color: #dc2626; background: linear-gradient(180deg, #fef2f2, #ffffff); }
+
+        .pcr-health-card b {
+            display: block;
+            color: #07172b;
+            margin: 0.25rem 0 0.3rem 0;
+            font-size: 0.98rem;
+        }
+
+        .pcr-health-card p {
+            margin: 0;
+            color: #475569;
+            line-height: 1.55;
+            font-size: 0.9rem;
+        }
+
+        .pcr-health-status {
+            display: inline-flex;
+            border-radius: 999px;
+            padding: 0.1rem 0.52rem;
+            font-size: 0.68rem;
+            font-weight: 850;
+            letter-spacing: 0.06em;
+            background: rgba(223, 248, 251, 0.82);
+            color: #075985;
+        }
+
+        .pcr-danger-zone {
+            border: 1px solid rgba(220, 38, 38, 0.14);
+            border-radius: 14px;
+            background: linear-gradient(180deg, rgba(254,242,242,0.7), rgba(255,255,255,0.96));
+            padding: 0.82rem 0.9rem;
+            margin-bottom: 0.85rem;
+        }
+
+        .pcr-danger-zone b {
+            display: block;
+            color: #991b1b;
+            margin-bottom: 0.2rem;
+        }
+
+        .pcr-danger-zone span {
+            color: #7f1d1d;
+            line-height: 1.55;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_api_debug_panel():
@@ -220,6 +297,7 @@ def main():
 
     init_database()
     apply_common_styles(theme="dev")
+    inject_dev_console_styles()
     st.session_state["current_role"] = "dev"
     render_page_hero(
         "开发调试端控制台",
@@ -267,6 +345,15 @@ def main():
 
     with st.container(border=True):
         render_card_title("测试环境管理", "清空历史数据与上传文件；不删除代码、rules.csv 或表结构。")
+        st.markdown(
+            """
+            <div class="pcr-danger-zone">
+                <b>危险操作区</b>
+                <span>以下操作会清空测试记录或上传图片，仅用于课堂演示环境复位；执行前必须勾选确认。</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         if "dev_confirm_cleanup" not in st.session_state:
             st.session_state["dev_confirm_cleanup"] = False

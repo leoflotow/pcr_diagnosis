@@ -123,6 +123,14 @@ def sync_val(key):
         st.session_state["student_data_storage"][key] = st.session_state[key]
 # ----------------------------
 
+
+def restore_widget_value_from_storage(key):
+    """渲染步骤前从持久区恢复控件值，避免步骤切换后表单与摘要不同步。"""
+    storage = st.session_state.get("student_data_storage", {})
+    if key in storage:
+        st.session_state[key] = storage[key]
+
+
 def init_student_wizard_state():
     """初始化学生端向导状态"""
     # 新增：建立独立于组件生命周期的持久化存储区
@@ -249,6 +257,57 @@ def collect_student_form_payload():
         "description": storage.get("student_form_description", ""),
         "gel_image_file": get_persisted_uploaded_file(),
     }
+
+
+def render_student_readiness_panel():
+    """渲染诊断准备度侧栏，帮助学生确认关键证据是否齐全。"""
+    form_data = collect_student_form_payload()
+    readiness_items = [
+        ("实验现象", form_data["abnormality"] or "未填写"),
+        ("对照结果", f"阳性{form_data['positive_control_normal']} / 阴性{form_data['negative_control_band']}"),
+        ("PCR 参数", f"{form_data['template_amount']} μL / {form_data['annealing_temp']} ℃ / {form_data['cycles']} cycles"),
+        ("补充描述", "已填写" if str(form_data["description"]).strip() else "可选补充"),
+        ("凝胶图片", "已暂存" if form_data["gel_image_file"] else "未上传"),
+        ("诊断触发", "最后一步"),
+    ]
+    cards = [
+        (
+            '<div class="pcr-readiness-item">'
+            f'<span>{html_text(label)}</span>'
+            f'<b>{html_text(value)}</b>'
+            "</div>"
+        )
+        for label, value in readiness_items
+    ]
+    st.markdown(
+        f"""
+        <div class="pcr-readiness-panel">
+            <div class="pcr-readiness-title">诊断准备度</div>
+            <div class="pcr-readiness-grid">{''.join(cards)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    payload = st.session_state.get("student_last_payload")
+    if payload and payload.get("results"):
+        top1 = payload["results"][0]
+        st.markdown(
+            f"""
+            <div class="pcr-readiness-panel">
+                <div class="pcr-readiness-title">最近诊断</div>
+                <div class="pcr-readiness-item">
+                    <span>Top1 原因</span>
+                    <b>{html_text(top1.get('原因', '-'))}</b>
+                </div>
+                <div class="pcr-readiness-item" style="margin-top:0.5rem;">
+                    <span>文本线索</span>
+                    <b>{html_text('、'.join(payload.get('text_clues', [])) if payload.get('text_clues') else '未抽取')}</b>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def go_to_next_step():
@@ -382,6 +441,13 @@ def render_step_1_basic_info():
 
 def render_step_2_pcr_params():
     """第 2 步：PCR 关键参数"""
+    for key in (
+        "student_form_template_amount",
+        "student_form_cycles",
+        "student_form_annealing_temp",
+    ):
+        restore_widget_value_from_storage(key)
+
     with st.container(border=True):
         render_card_title("PCR 关键参数", "填写会影响扩增结果的核心参数，用于匹配规则库。")
         col_left, col_right = st.columns(2)
@@ -424,7 +490,15 @@ def render_step_3_text_and_image():
                     clear_student_uploaded_image()
                     st.rerun()
             else:
-                st.info("当前未上传图片，也可以继续下一步。")
+                st.markdown(
+                    """
+                    <div class="pcr-gel-placeholder">
+                        <b>凝胶图可选上传</b>
+                        <span>上传后会随案例保存，教师端可用于复核；未上传也可继续诊断。</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 
 def render_step_4_review():
@@ -526,9 +600,13 @@ def render_student_results(payload):
             st.markdown(
                 f"""
                 <div class="pcr-top1-card">
-                    <b>Top1 原因：</b>{top1.get('原因', '-')}<br/>
-                    <b>总分：</b>{top1.get('总分', '-')}<br/>
-                    <b>建议：</b>{top1.get('建议', '-')}
+                    <div style="color:#075985;font-weight:800;font-size:0.78rem;margin-bottom:0.35rem;">TOP1 诊断结论</div>
+                    <div style="font-size:1.28rem;font-weight:900;color:#07172b;line-height:1.35;margin-bottom:0.35rem;">{html_text(top1.get('原因', '-'))}</div>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.55rem;">
+                        <span class="pcr-current-step-chip">总分 {html_text(top1.get('总分', '-'))}</span>
+                        <span class="pcr-current-step-chip">可解释规则命中</span>
+                    </div>
+                    <div style="color:#334155;line-height:1.65;"><b>建议：</b>{html_text(top1.get('建议', '-'))}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -551,15 +629,17 @@ def render_student_results(payload):
             )
 
             if len(results) > 1:
+                rows = []
                 for index, result_item in enumerate(results[1:], 2):
-                    st.markdown(
+                    rows.append(
                         f"""
-                        <div class="pcr-sub-card">
-                            <b>Top{index}：</b>{result_item.get('原因', '-')}（总分: {result_item.get('总分', '-')}）
+                        <div class="pcr-candidate-row">
+                            <b>Top{index}：{html_text(result_item.get('原因', '-'))}</b>
+                            <span>总分 {html_text(result_item.get('总分', '-'))}</span>
                         </div>
-                        """,
-                        unsafe_allow_html=True,
+                        """
                     )
+                st.markdown(f'<div class="pcr-candidate-list">{"".join(rows)}</div>', unsafe_allow_html=True)
 
             for index, result_item in enumerate(results, 1):
                 with st.expander(f"{index}. 诊断依据 / 打分明细"):
@@ -613,17 +693,22 @@ def main():
 
     render_student_wizard_header()
 
-    current_step = st.session_state["student_current_step"]
-    if current_step == 1:
-        render_step_1_basic_info()
-    elif current_step == 2:
-        render_step_2_pcr_params()
-    elif current_step == 3:
-        render_step_3_text_and_image()
-    else:
-        render_step_4_review()
+    main_col, side_col = st.columns([0.72, 0.28])
+    with main_col:
+        current_step = st.session_state["student_current_step"]
+        if current_step == 1:
+            render_step_1_basic_info()
+        elif current_step == 2:
+            render_step_2_pcr_params()
+        elif current_step == 3:
+            render_step_3_text_and_image()
+        else:
+            render_step_4_review()
 
-    render_student_step_navigation()
+        render_student_step_navigation()
+
+    with side_col:
+        render_student_readiness_panel()
 
     payload = st.session_state.get("student_last_payload")
     if payload is not None:

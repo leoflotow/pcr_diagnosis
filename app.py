@@ -155,46 +155,98 @@ def render_home_portal():
 
     st.markdown(
         """
-        <div class="pcr-hero">
-            <h1 style="text-align: center;">PCR电泳异常智能复盘助手</h1>
-            <p style="text-align: center; max-width: none; white-space: nowrap;">用于 PCR 电泳异常案例诊断、教师复核与教学复盘的实验教学辅助系统。</p>
+        <div class="pcr-home-hero">
+            <div>
+                <h1>PCR电泳异常智能复盘助手</h1>
+                <p>面向实验教学与计算机创新竞赛的智能诊断工作台，串联学生输入、规则推理、教师复核与案例沉淀。</p>
+                <div class="pcr-home-proof">
+                    <span>规则矩阵诊断</span>
+                    <span>文本线索抽取</span>
+                    <span>教师闭环复核</span>
+                    <span>课堂案例复盘</span>
+                </div>
+            </div>
+            <div class="pcr-gel-panel">
+                <div class="pcr-gel-title">Gel Electrophoresis Signal</div>
+                <div class="pcr-gel-grid">
+                    <div class="pcr-gel-lane" style="--band-a:22%;--band-b:66%;--a:.95;--b:.32;"></div>
+                    <div class="pcr-gel-lane" style="--band-a:42%;--band-b:72%;--a:.38;--b:.1;"></div>
+                    <div class="pcr-gel-lane" style="--band-a:29%;--band-b:54%;--a:.9;--b:.64;"></div>
+                    <div class="pcr-gel-lane" style="--band-a:60%;--band-b:60%;--a:.15;--b:.12;"></div>
+                    <div class="pcr-gel-lane" style="--band-a:25%;--band-b:48%;--a:.82;--b:.72;"></div>
+                    <div class="pcr-gel-lane" style="--band-a:36%;--band-b:69%;--a:.55;--b:.24;"></div>
+                    <div class="pcr-gel-lane" style="--band-a:18%;--band-b:58%;--a:.98;--b:.46;"></div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     with st.container(border=True):
-        render_card_title("角色入口")
-        col_student, col_teacher = st.columns(2)
+        render_card_title("工作台入口", "按课堂角色进入对应流程，学生诊断、教师复核和系统调试各自聚焦。")
+        col_student, col_teacher, col_dev = st.columns(3)
 
         with col_student:
-            with st.container(border=True):
-                st.markdown("**学生入口**")
-                st.caption("直接进入学生诊断工作台，无需访问码。")
-                render_home_entry_status("无需验证", "neutral")
-                st.markdown("<div style='height: 0.65rem;'></div>", unsafe_allow_html=True)
-                if st.button("进入学生端", key="home_enter_student", type="primary", use_container_width=True):
-                    enter_student_role()
-                    st.rerun()
+            st.markdown(
+                """
+                <div class="pcr-workbench-card">
+                    <h3>学生诊断工作台</h3>
+                    <p>按步骤录入实验现象、对照结果、PCR 参数和补充描述，生成可解释的诊断候选。</p>
+                    <div class="pcr-workbench-meta"><span>无需验证</span><span>课堂演示</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if st.button("进入学生端", key="home_enter_student", type="primary", use_container_width=True):
+                enter_student_role()
+                st.rerun()
 
         with col_teacher:
-            with st.container(border=True):
-                st.markdown("**教师入口**")
-                if st.session_state.get("teacher_verified"):
-                    st.caption("教师访问已验证，可直接进入教师端。")
-                else:
-                    st.caption("输入教师访问码后进入教师端。")
-                render_teacher_access_panel_inline()
+            st.markdown(
+                """
+                <div class="pcr-workbench-card">
+                    <h3>教师复核驾驶舱</h3>
+                    <p>查看学生历史案例，分析 Top1/Top3 命中情况，完成最终原因确认和教学备注沉淀。</p>
+                    <div class="pcr-workbench-meta"><span>访问码</span><span>复核闭环</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            render_teacher_access_panel_inline()
+
+        with col_dev:
+            st.markdown(
+                """
+                <div class="pcr-workbench-card">
+                    <h3>系统健康控制台</h3>
+                    <p>核验规则库、数据库、上传目录和模型配置，支持演示环境清理与规则在线维护。</p>
+                    <div class="pcr-workbench-meta"><span>调试入口</span><span>环境管理</span></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if st.session_state.get("dev_verified"):
+                if st.button("进入开发调试端", key="home_open_dev_card", use_container_width=True):
+                    enter_dev_role()
+                    st.rerun()
+            else:
+                if st.button("打开开发调试入口", key="home_show_dev_card", use_container_width=True):
+                    st.session_state["show_dev_access_panel"] = True
+                    st.rerun()
 
     with st.container(border=True):
         render_card_title("当前访问状态", "当前角色与访问权限仅在本次会话中生效。")
-        status_col1, status_col2, status_col3 = st.columns(3)
-        with status_col1:
-            st.metric("当前角色", get_current_role_label())
-        with status_col2:
-            st.metric("教师端访问", "已开启" if st.session_state.get("teacher_verified") else "未开启")
-        with status_col3:
-            st.metric("开发调试访问", "已开启" if st.session_state.get("dev_verified") else "未开启")
+        st.markdown(
+            f"""
+            <div class="pcr-status-strip">
+                <div><span>当前角色</span><b>{get_current_role_label()}</b></div>
+                <div><span>教师端访问</span><b>{'已开启' if st.session_state.get('teacher_verified') else '未开启'}</b></div>
+                <div><span>开发调试访问</span><b>{'已开启' if st.session_state.get('dev_verified') else '未开启'}</b></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         col_home, col_reset = st.columns(2)
         with col_home:

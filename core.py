@@ -85,7 +85,7 @@ def ensure_page_config(page_title, page_icon="🧪"):
             page_title=page_title,
             page_icon=page_icon,
             layout="wide",
-            initial_sidebar_state="expanded",
+            initial_sidebar_state="auto",
         )
     except Exception:
         pass
@@ -244,28 +244,28 @@ def apply_common_styles(theme="student"):
     # 三个角色页的主色区分：学生蓝、教师青、开发灰黑
     palette_map = {
         "home": {
-            "primary": "#3657d6",
-            "primary_2": "#5b46c5",
-            "accent": "#7c8df7",
-            "bg": "#f3f6ff",
+            "primary": "#0b1f3a",
+            "primary_2": "#123a63",
+            "accent": "#0ea5b7",
+            "bg": "#eef7fb",
         },
         "student": {
-            "primary": "#1d4ed8",
-            "primary_2": "#4338ca",
-            "accent": "#0ea5e9",
-            "bg": "#f4f7ff",
+            "primary": "#0b1f3a",
+            "primary_2": "#1d4ed8",
+            "accent": "#0ea5b7",
+            "bg": "#eef7fb",
         },
         "teacher": {
-            "primary": "#0f766e",
-            "primary_2": "#14532d",
-            "accent": "#14b8a6",
-            "bg": "#f2f8f7",
+            "primary": "#0b1f3a",
+            "primary_2": "#0f766e",
+            "accent": "#0ea5b7",
+            "bg": "#edf8f7",
         },
         "dev": {
-            "primary": "#1f2937",
-            "primary_2": "#111827",
-            "accent": "#334155",
-            "bg": "#f4f5f7",
+            "primary": "#0b1f3a",
+            "primary_2": "#334155",
+            "accent": "#0ea5b7",
+            "bg": "#f2f6f8",
         },
     }
     palette = palette_map.get(theme, palette_map["student"])
@@ -872,6 +872,454 @@ def apply_common_styles(theme="student"):
             border-radius: 10px;
             font-weight: 600;
             border: 1px solid #c9d6ef;
+        }}
+
+        /* Competition polish layer: unified lab brand system */
+        :root {{
+            --pcr-ink: #07172b;
+            --pcr-lab-blue: #0b1f3a;
+            --pcr-diagnostic-blue: #2563eb;
+            --pcr-gel-cyan: #0ea5b7;
+            --pcr-cyan-soft: #dff8fb;
+            --pcr-amber: #f59e0b;
+            --pcr-surface: rgba(255, 255, 255, 0.88);
+            --pcr-surface-strong: #ffffff;
+            --pcr-shadow-sm: 0 8px 20px rgba(11, 31, 58, 0.07);
+            --pcr-shadow-md: 0 18px 44px rgba(11, 31, 58, 0.12);
+            --pcr-shadow-lg: 0 26px 70px rgba(11, 31, 58, 0.16);
+        }}
+
+        .stApp {{
+            background:
+                linear-gradient(rgba(14, 165, 183, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(14, 165, 183, 0.03) 1px, transparent 1px),
+                radial-gradient(circle at 18% 8%, rgba(14, 165, 183, 0.16), transparent 28%),
+                radial-gradient(circle at 92% 2%, rgba(37, 99, 235, 0.12), transparent 26%),
+                linear-gradient(180deg, var(--pcr-bg) 0%, #f8fbfd 48%, #ffffff 100%);
+            background-size: 34px 34px, 34px 34px, auto, auto, auto;
+            color: var(--pcr-ink);
+        }}
+
+        .main .block-container {{
+            padding-top: clamp(0.75rem, 1.7vw, 1.4rem);
+            max-width: min(1480px, 95vw);
+        }}
+
+        section[data-testid="stSidebar"] {{
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 249, 251, 0.98) 100%);
+            border-right: 1px solid rgba(11, 31, 58, 0.08);
+            box-shadow: 12px 0 34px rgba(11, 31, 58, 0.045);
+        }}
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {{
+            border-radius: 14px;
+            min-height: 2.95rem;
+            font-weight: 750;
+            letter-spacing: 0;
+        }}
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {{
+            background: linear-gradient(90deg, rgba(14, 165, 183, 0.13), rgba(37, 99, 235, 0.08));
+            border-color: rgba(14, 165, 183, 0.28);
+            box-shadow: inset 4px 0 0 var(--pcr-gel-cyan), 0 12px 24px rgba(11, 31, 58, 0.08);
+        }}
+
+        .pcr-hero {{
+            border-radius: 22px;
+            padding: clamp(1.25rem, 2.2vw, 2rem);
+            margin-bottom: 1.1rem;
+            background:
+                linear-gradient(135deg, rgba(11, 31, 58, 0.98) 0%, rgba(18, 58, 99, 0.96) 54%, rgba(14, 165, 183, 0.88) 100%);
+            box-shadow: var(--pcr-shadow-lg);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            min-height: 10.8rem;
+        }}
+
+        .pcr-hero::after {{
+            content: "";
+            position: absolute;
+            inset: auto 2rem 1.2rem auto;
+            width: min(30vw, 360px);
+            height: 74%;
+            border-radius: 18px;
+            background:
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(255,255,255,0.08) 0 14px,
+                    rgba(14,165,183,0.26) 14px 18px,
+                    rgba(255,255,255,0.05) 18px 40px
+                ),
+                linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
+            opacity: 0.78;
+            transform: skewX(-7deg);
+        }}
+
+        .pcr-hero h1 {{
+            max-width: 13em;
+            font-size: clamp(2rem, 3vw, 3.15rem);
+            font-weight: 850;
+            letter-spacing: 0;
+            line-height: 1.12;
+        }}
+
+        .pcr-hero p {{
+            max-width: 46rem;
+            font-size: clamp(0.98rem, 1.1vw, 1.1rem);
+            color: rgba(255, 255, 255, 0.9);
+            white-space: normal !important;
+        }}
+
+        .pcr-role-badge {{
+            background: rgba(223, 248, 251, 0.12);
+            border-color: rgba(223, 248, 251, 0.38);
+            color: #e7fdff;
+        }}
+
+        div[data-testid="stVerticalBlockBorderWrapper"] {{
+            border-color: rgba(11, 31, 58, 0.1) !important;
+            border-radius: 14px !important;
+            background: var(--pcr-surface);
+            box-shadow: var(--pcr-shadow-sm);
+            backdrop-filter: blur(10px);
+        }}
+
+        .pcr-card-title {{
+            font-size: 1.08rem;
+            font-weight: 850;
+            color: var(--pcr-ink);
+        }}
+
+        .pcr-home-hero {{
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: clamp(1.35rem, 2.5vw, 2.4rem);
+            margin-bottom: 1rem;
+            color: #ffffff;
+            background:
+                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 58%, rgba(14, 165, 183, 0.88) 100%);
+            box-shadow: var(--pcr-shadow-lg);
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+            gap: clamp(1.2rem, 3vw, 3rem);
+            align-items: center;
+        }}
+
+        .pcr-home-hero h1 {{
+            margin: 0;
+            font-size: clamp(2.15rem, 3.5vw, 4rem);
+            line-height: 1.08;
+            font-weight: 900;
+            letter-spacing: 0;
+        }}
+
+        .pcr-home-hero p {{
+            max-width: 52rem;
+            margin: 0.85rem 0 1.1rem 0;
+            color: rgba(255, 255, 255, 0.88);
+            line-height: 1.75;
+            font-size: 1.04rem;
+        }}
+
+        .pcr-home-proof {{
+            display: flex;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+            margin-top: 0.9rem;
+        }}
+
+        .pcr-home-proof span {{
+            border: 1px solid rgba(223, 248, 251, 0.32);
+            background: rgba(223, 248, 251, 0.1);
+            color: #e7fdff;
+            border-radius: 999px;
+            padding: 0.28rem 0.7rem;
+            font-size: 0.8rem;
+            font-weight: 750;
+        }}
+
+        .pcr-gel-panel {{
+            position: relative;
+            min-height: 15.5rem;
+            border-radius: 22px;
+            padding: 1.05rem;
+            background: rgba(255, 255, 255, 0.09);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+        }}
+
+        .pcr-gel-title {{
+            color: rgba(255,255,255,0.76);
+            font-size: 0.78rem;
+            font-weight: 750;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }}
+
+        .pcr-gel-grid {{
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 0.58rem;
+            height: 10.8rem;
+        }}
+
+        .pcr-gel-lane {{
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+            background: linear-gradient(180deg, rgba(7,23,43,0.64), rgba(11,31,58,0.36));
+            border: 1px solid rgba(223, 248, 251, 0.14);
+        }}
+
+        .pcr-gel-lane::before,
+        .pcr-gel-lane::after {{
+            content: "";
+            position: absolute;
+            left: 18%;
+            right: 18%;
+            height: 0.52rem;
+            border-radius: 999px;
+            background: rgba(103, 232, 249, 0.78);
+            box-shadow: 0 0 18px rgba(103, 232, 249, 0.7);
+        }}
+
+        .pcr-gel-lane::before {{ top: var(--band-a, 26%); opacity: var(--a, .92); }}
+        .pcr-gel-lane::after {{ top: var(--band-b, 62%); opacity: var(--b, .5); }}
+
+        .pcr-workbench-card {{
+            border: 1px solid rgba(11, 31, 58, 0.1);
+            border-radius: 14px;
+            padding: 1rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,251,253,0.92));
+            min-height: 13rem;
+            box-shadow: var(--pcr-shadow-sm);
+        }}
+
+        .pcr-workbench-card h3 {{
+            margin: 0 0 0.45rem 0;
+            font-size: 1.05rem;
+            color: var(--pcr-ink);
+        }}
+
+        .pcr-workbench-card p {{
+            margin: 0 0 0.8rem 0;
+            color: var(--pcr-muted);
+            line-height: 1.6;
+            min-height: 3.1rem;
+        }}
+
+        .pcr-workbench-meta {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.42rem;
+            margin-bottom: 0.8rem;
+        }}
+
+        .pcr-workbench-meta span,
+        .pcr-status-strip span,
+        .pcr-current-step-chip {{
+            border-radius: 999px;
+            border: 1px solid rgba(14, 165, 183, 0.22);
+            background: rgba(223, 248, 251, 0.58);
+            color: #075985;
+            font-size: 0.76rem;
+            font-weight: 800;
+            padding: 0.18rem 0.58rem;
+        }}
+
+        .pcr-status-strip {{
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.7rem;
+        }}
+
+        .pcr-status-strip > div {{
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 12px;
+            padding: 0.74rem 0.82rem;
+            background: rgba(255,255,255,0.72);
+        }}
+
+        .pcr-status-strip b {{
+            display: block;
+            margin-top: 0.32rem;
+            color: var(--pcr-ink);
+            font-size: 1.05rem;
+        }}
+
+        .pcr-student-toolbar {{
+            border-radius: 14px;
+            background: linear-gradient(90deg, #ffffff 0%, rgba(223,248,251,0.7) 100%);
+            border-color: rgba(14, 165, 183, 0.16);
+        }}
+
+        .pcr-stepper-item {{
+            border-radius: 13px;
+        }}
+
+        .pcr-stepper-item.active {{
+            border-color: rgba(14, 165, 183, 0.55);
+            background: linear-gradient(180deg, rgba(223,248,251,0.78), #ffffff);
+            box-shadow: 0 12px 28px rgba(14, 165, 183, 0.13);
+        }}
+
+        .pcr-stepper-item.active .pcr-stepper-index {{
+            background: var(--pcr-gel-cyan);
+        }}
+
+        .pcr-readiness-panel {{
+            border: 1px solid rgba(14, 165, 183, 0.2);
+            border-radius: 14px;
+            padding: 0.95rem;
+            background: linear-gradient(180deg, rgba(223,248,251,0.68), rgba(255,255,255,0.94));
+            box-shadow: var(--pcr-shadow-sm);
+            margin-bottom: 0.8rem;
+        }}
+
+        .pcr-readiness-title {{
+            margin: 0 0 0.6rem 0;
+            font-size: 0.95rem;
+            font-weight: 850;
+            color: var(--pcr-ink);
+        }}
+
+        .pcr-readiness-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+        }}
+
+        .pcr-readiness-item {{
+            border-radius: 11px;
+            padding: 0.58rem 0.62rem;
+            background: rgba(255,255,255,0.76);
+            border: 1px solid rgba(11,31,58,0.07);
+        }}
+
+        .pcr-readiness-item span {{
+            color: var(--pcr-muted);
+            font-size: 0.74rem;
+            font-weight: 750;
+        }}
+
+        .pcr-readiness-item b {{
+            display: block;
+            margin-top: 0.15rem;
+            color: var(--pcr-ink);
+            font-size: 0.95rem;
+        }}
+
+        .pcr-gel-placeholder {{
+            border: 1px dashed rgba(14, 165, 183, 0.45);
+            border-radius: 14px;
+            min-height: 9.5rem;
+            padding: 0.95rem;
+            background:
+                repeating-linear-gradient(90deg, rgba(14,165,183,0.1) 0 10px, transparent 10px 32px),
+                linear-gradient(180deg, rgba(223,248,251,0.72), rgba(255,255,255,0.86));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            color: #075985;
+        }}
+
+        .pcr-gel-placeholder b {{
+            color: var(--pcr-ink);
+            margin-bottom: 0.28rem;
+        }}
+
+        .pcr-top1-card {{
+            border-color: rgba(14, 165, 183, 0.28);
+            background:
+                linear-gradient(135deg, rgba(223,248,251,0.9), rgba(255,255,255,0.98));
+            border-radius: 16px;
+            box-shadow: var(--pcr-shadow-md);
+        }}
+
+        .pcr-candidate-list {{
+            display: grid;
+            gap: 0.55rem;
+            margin: 0.7rem 0;
+        }}
+
+        .pcr-candidate-row {{
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            align-items: center;
+            border: 1px solid rgba(11,31,58,0.08);
+            border-radius: 12px;
+            padding: 0.62rem 0.75rem;
+            background: rgba(255,255,255,0.8);
+        }}
+
+        .pcr-candidate-row b {{
+            color: var(--pcr-ink);
+        }}
+
+        .pcr-candidate-row span {{
+            color: var(--pcr-muted);
+            font-weight: 750;
+            white-space: nowrap;
+        }}
+
+        div.stButton > button, div.stDownloadButton > button {{
+            border-radius: 11px;
+            border-color: rgba(14, 165, 183, 0.32);
+            min-height: 2.8rem;
+        }}
+
+        div.stButton > button[kind="primary"],
+        div.stButton > button[data-testid="baseButton-primary"] {{
+            background: linear-gradient(90deg, var(--pcr-lab-blue), var(--pcr-diagnostic-blue));
+            border: 0;
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+        }}
+
+        @media (max-width: 768px) {{
+            .main .block-container {{
+                max-width: 100vw;
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
+            }}
+
+            .pcr-home-hero {{
+                grid-template-columns: 1fr;
+                padding: 1.05rem;
+            }}
+
+            .pcr-home-hero h1 {{
+                font-size: 2rem;
+            }}
+
+            .pcr-gel-panel {{
+                min-height: 10rem;
+            }}
+
+            .pcr-gel-grid {{
+                height: 6.5rem;
+            }}
+
+            .pcr-hero {{
+                min-height: 8.8rem;
+                padding: 1.1rem;
+            }}
+
+            .pcr-hero::after {{
+                width: 52%;
+                opacity: 0.34;
+            }}
+
+            .pcr-status-strip,
+            .pcr-readiness-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .pcr-stepper-grid {{
+                display: none;
+            }}
         }}
         </style>
         """,

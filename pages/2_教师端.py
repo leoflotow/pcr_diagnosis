@@ -282,6 +282,70 @@ def inject_teacher_dashboard_layout_styles():
                 justify-content: flex-start;
             }
         }
+
+        .pcr-teacher-header {
+            border-radius: 20px;
+            background:
+                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 58%, rgba(14, 165, 183, 0.9) 100%);
+            box-shadow: 0 24px 64px rgba(11, 31, 58, 0.16);
+        }
+
+        .pcr-teacher-header::after {
+            content: "";
+            display: block;
+            height: 0.62rem;
+            margin-top: 1rem;
+            border-radius: 999px;
+            background: repeating-linear-gradient(90deg, rgba(103,232,249,0.72) 0 36px, rgba(255,255,255,0.18) 36px 54px, transparent 54px 78px);
+            opacity: 0.72;
+        }
+
+        .pcr-section-kicker {
+            background: rgba(223, 248, 251, 0.72);
+            color: #075985;
+            border: 1px solid rgba(14, 165, 183, 0.18);
+        }
+
+        [data-testid="stMetric"] {
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,251,253,0.92));
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-left: 4px solid #0ea5b7;
+        }
+
+        .pcr-record-row {
+            border-radius: 14px;
+            border-color: rgba(11, 31, 58, 0.09);
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,252,253,0.92));
+            box-shadow: 0 12px 28px rgba(11, 31, 58, 0.06);
+        }
+
+        .pcr-record-title {
+            color: #07172b;
+            font-size: 1rem;
+        }
+
+        .pcr-tag.info {
+            background: #dff8fb;
+            color: #075985;
+            border-color: rgba(14, 165, 183, 0.32);
+        }
+
+        .pcr-tag.warn {
+            background: #fff7ed;
+            color: #9a3412;
+            border-color: rgba(245, 158, 11, 0.34);
+        }
+
+        @media (max-width: 768px) {
+            .pcr-teacher-header {
+                padding: 1rem;
+            }
+
+            .pcr-teacher-header h1 {
+                font-size: 1.75rem;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
