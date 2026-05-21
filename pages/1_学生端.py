@@ -5,6 +5,7 @@
 
 import os
 from datetime import datetime
+from html import escape
 
 import streamlit as st
 
@@ -17,7 +18,6 @@ from core import (
     init_database,
     render_diagnosis_quality_block,
     render_card_title,
-    render_info_tiles,
     render_page_hero,
     save_diagnosis_record,
     save_uploaded_image,
@@ -63,6 +63,11 @@ class SessionUploadedFile:
 
     def getbuffer(self):
         return memoryview(self._data)
+
+
+def html_text(value):
+    """把动态值转成安全的 HTML 文本，避免页面把用户输入当成标签解析。"""
+    return escape(str(value), quote=True)
 
 
 def render_scoring_detail(detail, fallback_score):
@@ -187,6 +192,32 @@ def load_student_demo_data():
     )
 
 
+def render_student_quick_actions():
+    """渲染学生端轻量操作区，保留课堂演示入口。"""
+    with st.container():
+        left_col, right_col = st.columns([0.72, 0.28])
+        with left_col:
+            st.markdown(
+                """
+                <div class="pcr-student-toolbar">
+                    <div>
+                        <div class="pcr-student-toolbar-title">按步骤完成诊断输入</div>
+                        <p class="pcr-student-toolbar-desc">
+                            当前页面只在最后一步触发诊断；前面步骤可随时返回修改。
+                        </p>
+                    </div>
+                    <span class="pcr-current-step-chip">课堂演示模式</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with right_col:
+            if st.button("加载演示数据", key="student_load_demo", use_container_width=True):
+                load_student_demo_data()
+                st.success("已加载演示数据，可按步骤继续演示。")
+                st.rerun()
+
+
 def persist_uploaded_file(uploaded_file):
     """把上传文件保存到 session_state，避免切步后丢失"""
     if uploaded_file is None:
@@ -287,16 +318,47 @@ def run_student_diagnosis():
 
 
 def render_student_wizard_header():
-    """渲染更清晰的当前步骤提示。"""
+    """渲染聚焦式步骤条和当前步骤提示。"""
     current_step = st.session_state["student_current_step"]
     total_steps = len(STUDENT_STEP_TITLES)
-    with st.container(border=True):
+    step_items = []
+    for index, title in enumerate(STUDENT_STEP_TITLES, 1):
+        if index < current_step:
+            state_class = "done"
+            status_text = "已完成"
+            index_text = "✓"
+        elif index == current_step:
+            state_class = "active"
+            status_text = "正在填写"
+            index_text = str(index)
+        else:
+            state_class = ""
+            status_text = "待填写"
+            index_text = str(index)
+
+        step_items.append(
+            f"""
+            <div class="pcr-stepper-item {state_class}">
+                <div class="pcr-stepper-index">{index_text}</div>
+                <div class="pcr-stepper-title">{title}</div>
+                <div class="pcr-stepper-status">{status_text}</div>
+            </div>
+            """
+        )
+
+    with st.container():
         st.markdown(
             f"""
-            <div class="pcr-step-header">
-                <div class="pcr-step-kicker">当前步骤</div>
-                <div class="pcr-step-title">第 {current_step} / {total_steps} 步：{STUDENT_STEP_TITLES[current_step - 1]}</div>
-                <div class="pcr-step-desc">请按步骤完成输入；可随时返回上一步调整信息，诊断只会在最后一步触发。</div>
+            <div class="pcr-current-step-summary">
+                <div>
+                    <div class="pcr-step-kicker">当前步骤</div>
+                    <div class="pcr-step-title">第 {current_step} / {total_steps} 步：{STUDENT_STEP_TITLES[current_step - 1]}</div>
+                    <div class="pcr-step-desc">聚焦完成当前输入；诊断会在最后一步统一生成并保存。</div>
+                </div>
+                <span class="pcr-current-step-chip">{round(current_step / total_steps * 100)}% 完成</span>
+            </div>
+            <div class="pcr-stepper-grid">
+                {''.join(step_items)}
             </div>
             """,
             unsafe_allow_html=True,
@@ -307,7 +369,7 @@ def render_student_wizard_header():
 def render_step_1_basic_info():
     """第 1 步：实验现象与对照情况"""
     with st.container(border=True):
-        render_card_title("第 1 步：实验现象与对照情况", "先确认当前看到的异常现象与对照表现。")
+        render_card_title("实验现象与对照情况", "先记录凝胶上看到的主要异常，再确认阳性/阴性对照表现。")
         col_left, col_right = st.columns(2)
         with col_left:
             # 增加 on_change=sync_val 和 args 使得修改能即时保存
@@ -321,7 +383,7 @@ def render_step_1_basic_info():
 def render_step_2_pcr_params():
     """第 2 步：PCR 关键参数"""
     with st.container(border=True):
-        render_card_title("第 2 步：PCR 关键参数", "填写当前实验中最关键的 PCR 参数信息。")
+        render_card_title("PCR 关键参数", "填写会影响扩增结果的核心参数，用于匹配规则库。")
         col_left, col_right = st.columns(2)
         with col_left:
             st.number_input("模板量 (μL)", min_value=0.0, step=0.5, key="student_form_template_amount", on_change=sync_val, args=("student_form_template_amount",))
@@ -334,52 +396,68 @@ def render_step_2_pcr_params():
 def render_step_3_text_and_image():
     """第 3 步：补充描述与图片上传"""
     with st.container(border=True):
-        render_card_title("第 3 步：补充描述与图片上传", "补充文字线索，并上传凝胶图用于案例留存。")
-        st.text_area(
-            "学生补充描述",
-            height=100,
-            placeholder="请补充任何其他可能的信息，例如模板情况、体系怀疑点、异常观察等...",
-            key="student_form_description",
-            on_change=sync_val,
-            args=("student_form_description",)
-        )
-        uploaded_file = st.file_uploader(
-            "上传凝胶图片（可选）",
-            type=["png", "jpg", "jpeg"],
-            accept_multiple_files=False,
-            key="student_form_gel_image_file",
-        )
-        persist_uploaded_file(uploaded_file)
+        render_card_title("补充描述与图片上传", "补充文字线索；凝胶图片可选上传，用于案例留存和教师复核。")
+        desc_col, image_col = st.columns([0.58, 0.42])
+        with desc_col:
+            st.text_area(
+                "学生补充描述",
+                height=150,
+                placeholder="请补充任何其他可能的信息，例如模板情况、体系怀疑点、异常观察等...",
+                key="student_form_description",
+                on_change=sync_val,
+                args=("student_form_description",)
+            )
+        with image_col:
+            uploaded_file = st.file_uploader(
+                "上传凝胶图片（可选）",
+                type=["png", "jpg", "jpeg"],
+                accept_multiple_files=False,
+                key="student_form_gel_image_file",
+            )
+            persist_uploaded_file(uploaded_file)
 
-        image_bytes = st.session_state.get("student_uploaded_image_bytes")
-        image_name = st.session_state.get("student_uploaded_image_name", "")
-        if image_bytes:
-            st.image(image_bytes, caption=f"当前暂存图片：{image_name}", use_container_width=True)
-            if st.button("清除当前图片", key="student_clear_uploaded_image"):
-                clear_student_uploaded_image()
-                st.rerun()
-        else:
-            st.info("当前未上传图片，也可以继续下一步。")
+            image_bytes = st.session_state.get("student_uploaded_image_bytes")
+            image_name = st.session_state.get("student_uploaded_image_name", "")
+            if image_bytes:
+                st.image(image_bytes, caption=f"当前暂存图片：{image_name}", use_container_width=True)
+                if st.button("清除当前图片", key="student_clear_uploaded_image", use_container_width=True):
+                    clear_student_uploaded_image()
+                    st.rerun()
+            else:
+                st.info("当前未上传图片，也可以继续下一步。")
 
 
 def render_step_4_review():
     """第 4 步：确认并开始诊断"""
     form_data = collect_student_form_payload()
     with st.container(border=True):
-        render_card_title("第 4 步：确认并开始诊断", "请先确认输入摘要，再开始诊断。")
-        col_left, col_right = st.columns(2)
-        with col_left:
-            st.markdown(f"- 实验现象：{form_data['abnormality']}")
-            st.markdown(f"- 阳性对照是否正常：{form_data['positive_control_normal']}")
-            st.markdown(f"- 阴性对照是否有带：{form_data['negative_control_band']}")
-            st.markdown(f"- 模板量：{form_data['template_amount']}")
-        with col_right:
-            st.markdown(f"- 退火温度：{form_data['annealing_temp']}")
-            st.markdown(f"- 循环数：{form_data['cycles']}")
-            st.markdown(f"- 是否已上传图片：{'是' if form_data['gel_image_file'] else '否'}")
-
-        st.markdown(f"- 学生补充描述：{form_data['description'] if form_data['description'] else '未填写'}")
-        st.caption("确认无误后点击“开始诊断”；如需修改，可返回前面步骤继续调整。")
+        render_card_title("确认并开始诊断", "请核对输入摘要；确认无误后点击“开始诊断”。")
+        image_status = "是" if form_data["gel_image_file"] else "否"
+        description_text = form_data["description"] if form_data["description"] else "未填写"
+        review_items = [
+            ("实验现象", form_data["abnormality"]),
+            ("阳性对照是否正常", form_data["positive_control_normal"]),
+            ("阴性对照是否有带", form_data["negative_control_band"]),
+            ("模板量", form_data["template_amount"]),
+            ("退火温度", form_data["annealing_temp"]),
+            ("循环数", form_data["cycles"]),
+            ("是否已上传图片", image_status),
+            ("学生补充描述", description_text),
+        ]
+        cards = [
+            (
+                '<div class="pcr-review-item">'
+                f'<div class="pcr-review-label">{html_text(label)}</div>'
+                f'<div class="pcr-review-value">{html_text(value)}</div>'
+                "</div>"
+            )
+            for label, value in review_items
+        ]
+        st.markdown(
+            f'<div class="pcr-review-grid">{"".join(cards)}</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption("如需修改，可返回前面步骤继续调整；诊断结果会保存到教师端可查看的记录中。")
 
 
 def render_student_step_navigation():
@@ -417,8 +495,22 @@ def render_student_results(payload):
     with st.container(border=True):
         render_card_title("诊断结果", "Top1 高亮展示，Top2/Top3 作为候选补充。")
 
-        st.markdown(f"**文本线索来源：{clue_source}**")
-        st.markdown(f"**抽取线索：{('、'.join(text_clues)) if text_clues else '未抽取到明显线索'}**")
+        clue_text = "、".join(text_clues) if text_clues else "未抽取到明显线索"
+        st.markdown(
+            (
+                '<div class="pcr-result-meta-grid">'
+                '<div class="pcr-review-item">'
+                '<div class="pcr-review-label">文本线索来源</div>'
+                f'<div class="pcr-review-value">{html_text(clue_source)}</div>'
+                "</div>"
+                '<div class="pcr-review-item">'
+                '<div class="pcr-review-label">抽取线索</div>'
+                f'<div class="pcr-review-value">{html_text(clue_text)}</div>'
+                "</div>"
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
 
         if image_save_error:
             st.warning(f"图片保存失败，但不影响诊断：{image_save_error}")
@@ -517,21 +609,7 @@ def main():
         "学生端",
     )
 
-    with st.container(border=True):
-        render_card_title("操作步骤", "分步完成输入，再统一进入诊断结果区。")
-        render_info_tiles(
-            [
-                {"tag": "步骤 1", "title": "实验现象与对照", "desc": "先确认异常现象、阳性对照与阴性对照状态。"},
-                {"tag": "步骤 2", "title": "PCR 关键参数", "desc": "填写模板量、退火温度和循环数等关键参数。"},
-                {"tag": "步骤 3", "title": "补充描述与图片", "desc": "补充自由文本线索，并按需上传凝胶图片。"},
-                {"tag": "步骤 4", "title": "确认并诊断", "desc": "预览输入摘要后再启动诊断，并导出复盘报告。"},
-            ],
-            columns=4,
-        )
-        if st.button("加载演示数据", key="student_load_demo"):
-            load_student_demo_data()
-            st.success("已加载演示数据，可按步骤继续演示。")
-            st.rerun()
+    render_student_quick_actions()
 
     render_student_wizard_header()
 
