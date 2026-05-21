@@ -35,16 +35,22 @@ LEGACY_RULES_PATH = "rules_v2.csv"
 # 上传图片保存目录
 UPLOAD_DIR = "uploads"
 # 页面里使用的实验现象选项（也用于规则校验）
-ABNORMALITY_OPTIONS = ["无条带", "条带弱", "多条带", "条带拖尾", "阴性对照有带", "阳性对照无带", "条带畸形"]
-# 规则库必要字段
-# 规则库必要字段 (匹配最新的 rules.csv 完整结构)
+ABNORMALITY_OPTIONS = [
+    "无条带",
+    "条带弱",
+    "多条带或非特异扩增",
+    "条带大小不对",
+    "条带拖尾或弥散",
+    "阴性对照有带",
+    "阳性对照无带",
+    "条带畸形",
+]
+# 规则库必要字段（匹配新版 rules.csv 规则矩阵结构）
 REQUIRED_RULE_COLUMNS = [
     "rule_id", "abnormality", "band_pattern", "cause", "priority",
     "positive_control", "negative_control", "template_condition",
     "annealing_temp_condition", "text_hint", "required_fields",
-    "base_score", "evidence_text", "suggestion", "enabled",
-    "positive_control_normal", "negative_control_band", "min_template",
-    "max_template", "min_temp", "max_temp", "score"
+    "base_score", "evidence_text", "suggestion", "enabled"
 ]
 
 # BigModel API 配置（后续如果要切换地址，只改这里）
@@ -617,6 +623,171 @@ def apply_common_styles(theme="student"):
             line-height: 1.6;
         }}
 
+        .pcr-student-toolbar {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            border: 1px solid var(--pcr-border);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.92);
+            padding: 0.95rem 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }}
+
+        .pcr-student-toolbar-title {{
+            margin: 0 0 0.18rem 0;
+            color: var(--pcr-text);
+            font-weight: 700;
+            font-size: 1rem;
+            line-height: 1.35;
+        }}
+
+        .pcr-student-toolbar-desc {{
+            margin: 0;
+            color: var(--pcr-muted);
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }}
+
+        .pcr-stepper-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin: 0.85rem 0 0.85rem 0;
+        }}
+
+        .pcr-stepper-item {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 14px;
+            background: #ffffff;
+            padding: 0.78rem 0.85rem;
+            min-height: 5.25rem;
+        }}
+
+        .pcr-stepper-item.active {{
+            border-color: rgba(29, 78, 216, 0.42);
+            background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+            box-shadow: 0 10px 24px rgba(29, 78, 216, 0.1);
+        }}
+
+        .pcr-stepper-item.done {{
+            border-color: rgba(22, 163, 74, 0.28);
+            background: #f0fdf4;
+        }}
+
+        .pcr-stepper-index {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.55rem;
+            height: 1.55rem;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--pcr-primary);
+            font-size: 0.78rem;
+            font-weight: 800;
+            margin-bottom: 0.46rem;
+        }}
+
+        .pcr-stepper-item.done .pcr-stepper-index {{
+            background: #dcfce7;
+            color: #166534;
+        }}
+
+        .pcr-stepper-item.active .pcr-stepper-index {{
+            background: var(--pcr-primary);
+            color: #ffffff;
+        }}
+
+        .pcr-stepper-title {{
+            color: var(--pcr-text);
+            font-weight: 700;
+            font-size: 0.92rem;
+            line-height: 1.35;
+            margin-bottom: 0.25rem;
+        }}
+
+        .pcr-stepper-status {{
+            color: var(--pcr-muted);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }}
+
+        .pcr-current-step-summary {{
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.25rem;
+        }}
+
+        .pcr-current-step-chip {{
+            flex: 0 0 auto;
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--pcr-primary);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 0.2rem 0.7rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }}
+
+        .pcr-review-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin: 0.75rem 0;
+        }}
+
+        .pcr-review-item {{
+            border: 1px solid var(--pcr-border);
+            border-radius: 14px;
+            background: #ffffff;
+            padding: 0.75rem 0.85rem;
+        }}
+
+        .pcr-review-label {{
+            color: var(--pcr-muted);
+            font-size: 0.78rem;
+            font-weight: 700;
+            margin-bottom: 0.24rem;
+        }}
+
+        .pcr-review-value {{
+            color: var(--pcr-text);
+            font-size: 0.98rem;
+            font-weight: 700;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }}
+
+        .pcr-result-meta-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin: 0.65rem 0 0.85rem 0;
+        }}
+
+        @media (max-width: 900px) {{
+            .pcr-student-toolbar,
+            .pcr-current-step-summary {{
+                display: block;
+            }}
+
+            .pcr-stepper-grid,
+            .pcr-review-grid,
+            .pcr-result-meta-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .pcr-current-step-chip {{
+                display: inline-flex;
+                margin-top: 0.55rem;
+            }}
+        }}
+
         [data-testid="stMetric"] {{
             background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,249,255,0.94) 100%);
             border: 1px solid var(--pcr-border);
@@ -792,7 +963,7 @@ def run_system_self_check():
         if not os.path.exists(RULES_PATH):
             checks["rules_csv"] = {"level": "warning", "status": "未检测到", "detail": f"{RULES_PATH} 不存在"}
         else:
-            pd.read_csv(RULES_PATH)
+            read_csv_with_fallback(RULES_PATH)
             checks["rules_csv"] = {"level": "success", "status": "正常", "detail": "rules.csv 读取成功"}
     except Exception as e:
         checks["rules_csv"] = {"level": "error", "status": "失败", "detail": str(e)[:120]}
@@ -919,7 +1090,7 @@ def run_rules_library_check():
         return {"ok": False, "issues": issues, "warnings": warnings}
 
     try:
-        df = pd.read_csv(RULES_PATH)
+        df = read_csv_with_fallback(RULES_PATH)
     except Exception as e:
         issues.append(f"rules.csv 读取失败：{str(e)[:120]}")
         return {"ok": False, "issues": issues, "warnings": warnings}
@@ -948,22 +1119,29 @@ def run_rules_library_check():
         if empty_suggestion > 0:
             issues.append(f"suggestion 有空值：{empty_suggestion} 行")
 
-    # 4) score 数字检查
-    if "score" in df.columns:
-        score_num = pd.to_numeric(df["score"], errors="coerce")
+    # 4) 分数字段检查：新版使用 base_score，旧版兼容 score
+    score_column = "base_score" if "base_score" in df.columns else "score" if "score" in df.columns else None
+    if score_column:
+        score_num = pd.to_numeric(df[score_column], errors="coerce")
         invalid_score = int(score_num.isna().sum())
         if invalid_score > 0:
-            issues.append(f"score 存在不可转数字值：{invalid_score} 行")
+            issues.append(f"{score_column} 存在不可转数字值：{invalid_score} 行")
 
     # 5) 每种 abnormality 至少 1 条规则（按页面选项检查）
     if "abnormality" in df.columns:
         abn_series = df["abnormality"].astype(str).str.strip()
+        normalized_options = {
+            build_normalized_case({"abnormality": abn}).get("abnormality")
+            for abn in ABNORMALITY_OPTIONS
+        }
+        allowed_values = set(ABNORMALITY_OPTIONS) | {value for value in normalized_options if value}
         for abn in ABNORMALITY_OPTIONS:
-            if int((abn_series == abn).sum()) == 0:
+            normalized_abn = build_normalized_case({"abnormality": abn}).get("abnormality")
+            if int(((abn_series == abn) | (abn_series == normalized_abn)).sum()) == 0:
                 issues.append(f"实验现象“{abn}”缺少规则")
 
         # 可选提示：发现页面之外的 abnormality 值（不算硬错误）
-        extra_values = sorted(set([x for x in abn_series if x and x not in ABNORMALITY_OPTIONS]))
+        extra_values = sorted(set([x for x in abn_series if x and x not in allowed_values]))
         if extra_values:
             warnings.append(f"发现未在页面选项中的 abnormality：{', '.join(extra_values)}")
 
@@ -1416,12 +1594,6 @@ def extract_text_clues_with_fallback(description):
     # 没有 key，直接本地兜底
     if not api_key:
         debug_info["fail_reason"] = "未读取到 BIGMODEL_API_KEY"
-        local_clues = extract_text_clues(description)
-        return local_clues, "本地规则抽取", debug_info
-
-    # 没有 base_url，按要求也走本地兜底
-    if not base_url_env:
-        debug_info["fail_reason"] = "未读取到 BIGMODEL_BASE_URL"
         local_clues = extract_text_clues(description)
         return local_clues, "本地规则抽取", debug_info
 
@@ -2643,19 +2815,19 @@ def append_rule_to_csv(new_rule_dict, rules_path=RULES_PATH):
     返回：(是否成功, 消息)
     """
     try:
-        # 读取原有数据以保留列顺序
+        # 读取原有数据以保留列顺序；rules.csv 可能由 Excel 以 GBK/GB18030 保存
         if os.path.exists(rules_path):
-            df_existing = pd.read_csv(rules_path, encoding="utf-8-sig")
+            df_existing = read_csv_with_fallback(rules_path)
+            target_columns = list(df_existing.columns) if len(df_existing.columns) else list(REQUIRED_RULE_COLUMNS)
         else:
             df_existing = pd.DataFrame(columns=REQUIRED_RULE_COLUMNS)
+            target_columns = list(REQUIRED_RULE_COLUMNS)
 
-        # 构造新行 DataFrame 并拼接
-        new_row_df = pd.DataFrame([new_rule_dict])
-        # 确保列顺序一致
-        new_row_df = new_row_df[REQUIRED_RULE_COLUMNS]
+        normalized_rule = {column: new_rule_dict.get(column, "") for column in target_columns}
+        new_row_df = pd.DataFrame([normalized_rule], columns=target_columns)
         updated_df = pd.concat([df_existing, new_row_df], ignore_index=True)
 
-        # 写回文件（保留 utf-8-sig 编码，便于 Excel 打开）
+        # 写回文件（统一为 utf-8-sig，便于 Excel 打开）
         updated_df.to_csv(rules_path, index=False, encoding="utf-8-sig")
         return True, "新规则已成功添加。"
     except Exception as e:

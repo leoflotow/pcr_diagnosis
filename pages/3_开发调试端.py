@@ -16,6 +16,9 @@ from core import (
     UPLOAD_DIR,
     ABNORMALITY_OPTIONS,
     apply_common_styles,
+    append_rule_to_csv,
+    check_rule_conflict,
+    check_rule_duplicate,
     clear_history_records,
     clear_uploaded_images,
     ensure_page_config,
@@ -377,7 +380,7 @@ def main():
                     else:
                         # 自动生成新的 rule_id
                         try:
-                            df_existing = pd.read_csv(RULES_PATH, encoding="utf-8-sig")
+                            df_existing = read_csv_with_fallback(RULES_PATH)
                             if not df_existing.empty and "rule_id" in df_existing.columns:
                                 rule_ids = df_existing["rule_id"].dropna().astype(str)
                                 max_id = 0
