@@ -26,7 +26,7 @@ streamlit run app.py
 默认访问地址：
 
 ```text
-http://localhost:8501
+https://pcr-diagnosis.streamlit.app/
 ```
 
 ## 主要文件
@@ -36,11 +36,11 @@ http://localhost:8501
 - `pages/1_学生端.py`：学生端
 - `pages/2_教师端.py`：教师端
 - `pages/3_开发调试端.py`：开发调试端
-- `rules.csv`：规则库
+- `rules.csv`和`rule_combos.csv`：规则库
 
 ## 环境变量
 
-- `BIGMODEL_API_KEY`
+- `BIGMODEL_API_KEY`：自由配置
 - `BIGMODEL_BASE_URL`，默认 `https://open.bigmodel.cn/api/paas/v4`
 - `BIGMODEL_MODEL`，默认 `glm-5`
 

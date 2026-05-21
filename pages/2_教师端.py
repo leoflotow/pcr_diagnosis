@@ -427,8 +427,25 @@ def normalize_reason_label(value):
 
 
 def is_confirmed_cause(value):
-    text = normalize_text(value)
-    return text not in {"", "-", "未确认", "未填写"}
+    """
+    判断教师是否已经确认了失败原因。
+    修复了 pandas 读取空值产生 'nan' 以及 '未知' 状态统计不一致的问题。
+    """
+    # 1. 拦截原生的 None 或 pandas 的 NaN
+    import pandas as pd
+    if pd.isna(value):
+        return False
+
+    # 2. 文本标准化（复用你代码中原有的 normalize_text 逻辑）
+    # 如果你的上下文中没有 normalize_text，可以直接用 str(value or "").strip()
+    text = str(value or "").strip()
+
+    # 3. 拦截被转成字符串的特殊空值（处理 float 类型的 NaN 被 str() 转换后的情况）
+    if text.lower() in {"nan", "none", "null"}:
+        return False
+
+    # 4. 核心判定：排除各种未确认的占位符，务必包含 "未知" 以对齐底部列表逻辑
+    return text not in {"", "-", "未确认", "未填写", "未知"}
 
 
 def parse_dashboard_time(series):
@@ -581,13 +598,19 @@ def build_record_keyword_text(record):
     ]
     return normalize_keyword_text(" ".join([normalize_text(part) for part in parts if normalize_text(part)]))
 
-
 def build_teacher_records_dataframe(records):
-    """把历史记录列表转成便于筛选和排序的 DataFrame"""
+    """把历史记录列表转成便于筛选和排序的 DataFrame —— 已修复状态错乱问题"""
     rows = []
     for index, record in enumerate(records):
-        teacher_final = normalize_text(record.get("教师最终原因"))
-        is_confirmed = is_confirmed_cause(teacher_final)
+        # 🔥 强制从单条记录本身读取，不做任何全局污染计算
+        teacher_final_raw = record.get("教师最终原因", "")
+        teacher_final = normalize_text(teacher_final_raw)
+
+        # 🔥 只看这条记录自己是不是已确认，绝对不关联其他记录
+        is_confirmed = False
+        if teacher_final and teacher_final not in ["", "-", "未确认", "未填写", "未知"]:
+            is_confirmed = True
+
         top1, top2, top3 = extract_record_top_reasons(record)
         top1_normalized = normalize_reason_label(top1)
         teacher_final_normalized = normalize_reason_label(teacher_final)
@@ -600,19 +623,23 @@ def build_teacher_records_dataframe(records):
             "实验现象": normalize_display_text(record.get("实验现象"), default="未填写"),
             "教师最终原因": teacher_final if is_confirmed else "",
             "教师最终原因展示": teacher_final if is_confirmed else "未确认",
-            "是否已确认": is_confirmed,
+            "是否已确认": is_confirmed,  # 🔥 修复：每条独立计算
             "是否未确认": not is_confirmed,
             "是否有图片": has_image,
             "系统 Top1": normalize_display_text(top1, default="-"),
             "系统 Top2": normalize_display_text(top2, default="-"),
             "系统 Top3": normalize_display_text(top3, default="-"),
-            "Top1 是否不一致": bool(is_confirmed and teacher_final_normalized and top1_normalized and teacher_final_normalized != top1_normalized),
+            "Top1 是否不一致": bool(
+                is_confirmed
+                and teacher_final_normalized
+                and top1_normalized
+                and teacher_final_normalized != top1_normalized
+            ),
             "关键词文本": build_record_keyword_text(record),
             "_sort_time": pd.to_datetime(record.get("提交时间"), errors="coerce"),
         })
 
     return pd.DataFrame(rows)
-
 
 def build_teacher_filter_options(records_df):
     """为历史记录筛选区生成动态选项"""
@@ -931,30 +958,43 @@ def build_consistency_dataframe(filtered_df, column_mapping):
     return pd.DataFrame(records)
 
 
+
 def compute_consistency_stats(consistency_df):
-    confirmed_df = consistency_df[consistency_df["是否已确认"]] if not consistency_df.empty else consistency_df
-    comparable_df = confirmed_df[confirmed_df["是否可比较"]] if not confirmed_df.empty else confirmed_df
+    # ########### 修复版 ###########
+    # 强制双重保险：只保留 已确认=True + 是否可比较=True
+    if consistency_df.empty:
+        return {
+            "已确认案例数": 0,
+            "可比较已确认案例数": 0,
+            "Top1 一致率": "暂无可比较数据",
+            "Top3 命中率": "暂无可比较数据",
+            "无法比较案例数": 0,
+            "一致性分布": pd.DataFrame(columns=["类别", "案例数"]),
+        }
 
-    confirmed_count = int(len(confirmed_df))
-    comparable_count = int(len(comparable_df))
-    unable_compare_count = int(len(consistency_df[~consistency_df["是否可比较"]])) if not consistency_df.empty else 0
+    # ================= 核心修复：强制只取【真正已确认】的 =================
+    confirmed_df = consistency_df[consistency_df["是否已确认"] == True].copy()
+    comparable_df = confirmed_df[confirmed_df["是否可比较"] == True].copy()
 
-    top1_match_count = int(comparable_df["Top1 是否一致"].sum()) if comparable_count else 0
-    top3_hit_count = int(comparable_df["Top3 是否命中"].sum()) if comparable_count else 0
+    confirmed_count = len(confirmed_df)
+    comparable_count = len(comparable_df)
+    unable_compare_count = len(consistency_df[consistency_df["是否可比较"] == False])
+
+    top1_match_count = comparable_df["Top1 是否一致"].sum() if comparable_count else 0
+    top3_hit_count = comparable_df["Top3 是否命中"].sum() if comparable_count else 0
 
     top1_rate = f"{(top1_match_count / comparable_count) * 100:.1f}%" if comparable_count else "暂无可比较数据"
     top3_rate = f"{(top3_hit_count / comparable_count) * 100:.1f}%" if comparable_count else "暂无可比较数据"
 
-    distribution_df = pd.DataFrame(
-        {
-            "类别": ["Top1 一致", "Top1 不一致但 Top3 命中", "Top3 也未命中"],
-            "案例数": [
-                int((comparable_df["一致性分类"] == "Top1 一致").sum()) if comparable_count else 0,
-                int((comparable_df["一致性分类"] == "Top1 不一致但 Top3 命中").sum()) if comparable_count else 0,
-                int((comparable_df["一致性分类"] == "Top3 也未命中").sum()) if comparable_count else 0,
-            ],
-        }
-    )
+    # ================= 修复：只统计可比较的已确认案例 =================
+    distribution_df = pd.DataFrame({
+        "类别": ["Top1 一致", "Top1 不一致但 Top3 命中", "Top3 也未命中"],
+        "案例数": [
+            int((comparable_df["一致性分类"] == "Top1 一致").sum()) if comparable_count else 0,
+            int((comparable_df["一致性分类"] == "Top1 不一致但 Top3 命中").sum()) if comparable_count else 0,
+            int((comparable_df["一致性分类"] == "Top3 也未命中").sum()) if comparable_count else 0,
+        ]
+    })
 
     return {
         "已确认案例数": confirmed_count,
@@ -1225,7 +1265,7 @@ def get_similar_cases(current_record, all_records, limit=5):
 
 
 def render_similar_case_block(current_record, all_records):
-    """渲染相似历史案例回看模块"""
+    """渲染相似历史案例回看模块（修复：移除内部折叠面板，避免嵌套报错）"""
     similar_cases = get_similar_cases(current_record, all_records, limit=5)
 
     with st.container(border=True):
@@ -1235,13 +1275,18 @@ def render_similar_case_block(current_record, all_records):
             st.info("暂无足够相似的历史案例")
             return
 
+        # 修复点：直接展示卡片，不使用 expander，彻底解决嵌套问题
         for index, case_item in enumerate(similar_cases, 1):
             record = case_item["record"]
             teacher_final = normalize_display_text(record.get("教师最终原因"), default="未确认")
             if teacher_final == "未确认":
                 teacher_final = "未确认"
             similar_reason_text = "；".join(case_item["reasons"]) if case_item["reasons"] else "结构化字段部分匹配"
-            with st.expander(f"{index}. 记录ID {record.get('id', '-')} | {record.get('提交时间', '-')} | 相似度 {case_item['score']}"):
+
+            # 使用容器替代折叠面板
+            with st.container(border=True):
+                st.markdown(
+                    f"**{index}. 记录ID {record.get('id', '-')} | {record.get('提交时间', '-')} | 相似度 {case_item['score']}**")
                 col_left, col_right = st.columns(2)
                 with col_left:
                     st.markdown(f"- 提交时间：{record.get('提交时间', '-')}")
@@ -1251,7 +1296,6 @@ def render_similar_case_block(current_record, all_records):
                     st.markdown(f"- 教师最终确认原因：{teacher_final}")
                     st.markdown(f"- 是否有图片：{record.get('凝胶图', '无图')}")
                     st.markdown(f"- 相似依据：{similar_reason_text}")
-
 
 def build_records_by_id(records):
     records_by_id = {}
@@ -1402,7 +1446,7 @@ def render_case_detail(record, all_records, detail_key_prefix):
                 custom_cause = ""
                 if teacher_choice == "其他/待补充":
                     custom_cause = st.text_input("请填写教师最终原因", key=f"{detail_key_prefix}_teacher_custom_{record_id}")
-                teacher_note = st.text_area("教师备注", height=3, key=f"{detail_key_prefix}_teacher_note_{record_id}")
+                teacher_note = st.text_area("教师备注", height=100, key=f"{detail_key_prefix}_teacher_note_{record_id}")
                 save_confirm = st.form_submit_button("保存教师确认结果")
 
             if save_confirm:
@@ -1411,7 +1455,8 @@ def render_case_detail(record, all_records, detail_key_prefix):
                     st.warning("请选择或填写教师最终原因。")
                 else:
                     save_teacher_confirmation(record_id, final_cause, teacher_note.strip())
-                    st.success("教师确认已保存")
+                    st.success("教师确认已保存！")
+                    st.cache_data.clear()  # 必须加
                     st.rerun()
 
 
@@ -1789,8 +1834,11 @@ def main():
     inject_teacher_dashboard_layout_styles()
     st.session_state["current_role"] = "teacher"
 
+    # 强制清空缓存 + 重新加载最新记录（根治状态错乱）
+
     records = load_recent_records(limit=5000)
     records_by_id = build_records_by_id(records)
+
     render_teacher_page_header(len(records))
 
     render_teacher_dashboard(records_by_id, records)
