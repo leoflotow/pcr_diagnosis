@@ -168,15 +168,99 @@ def render_home_refined_styles():
             font-family: var(--pcr-home-font);
         }
 
+        header[data-testid="stHeader"],
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"] {
+            display: none !important;
+            height: 0 !important;
+        }
+
+        .stAppViewContainer,
+        .stMain,
+        .stMainBlockContainer {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+
         .main .block-container {
             max-width: 100%;
-            padding-left: clamp(1rem, 3vw, 2rem);
-            padding-right: clamp(1rem, 3vw, 2rem);
+            padding-left: 0;
+            padding-right: 0;
             padding-top: 0;
         }
 
+        .pcr-ref-topbar {
+            position: relative;
+            top: 0;
+            z-index: 50;
+            height: 3.5rem;
+            width: 100%;
+            margin: 0;
+            background: rgba(30, 52, 76, 0.96);
+            color: #F4F4F4;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(14px);
+        }
+
+        .pcr-ref-topbar-inner {
+            width: min(1240px, calc(100vw - 64px));
+            height: 100%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+        }
+
+        .pcr-ref-brand {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 0.75rem;
+        }
+
+        .pcr-ref-brand-mark {
+            width: 1.75rem;
+            height: 1.75rem;
+            border: 1px solid rgba(223, 247, 251, 0.5);
+            background:
+                linear-gradient(90deg, transparent 0 0.32rem, rgba(14, 165, 183, 0.82) 0.32rem 0.5rem, transparent 0.5rem 0.82rem, rgba(37, 99, 235, 0.92) 0.82rem 1.05rem, transparent 1.05rem),
+                rgba(255, 255, 255, 0.06);
+        }
+
+        .pcr-ref-brand-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.88rem;
+            letter-spacing: 0;
+        }
+
+        .pcr-ref-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: #D8E3EA;
+            font-size: 0.88rem;
+        }
+
+        .pcr-ref-nav a {
+            display: flex;
+            align-items: center;
+            height: 3.5rem;
+            padding: 0 0.9rem;
+            color: inherit;
+            text-decoration: none;
+            border-bottom: 2px solid transparent;
+        }
+
+        .pcr-ref-nav a:hover {
+            color: #FFFFFF;
+            border-bottom-color: rgba(255,255,255,0.42);
+        }
+
         .pcr-sidebar-expand-hint {
-            top: 0.55rem !important;
+            top: 0.65rem !important;
             left: 2.35rem !important;
             border-radius: 999px !important;
             border: 1px solid rgba(216, 227, 234, 0.85) !important;
@@ -200,7 +284,8 @@ def render_home_refined_styles():
             position: relative;
             overflow: hidden;
             min-height: clamp(620px, 78vh, 760px);
-            margin: 0 calc(-1 * clamp(1rem, 3vw, 2rem)) 0 calc(-1 * clamp(1rem, 3vw, 2rem));
+            width: 100%;
+            margin: 0;
             color: #F6FAFC;
             background:
                 linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
@@ -264,10 +349,15 @@ def render_home_refined_styles():
             max-width: 760px;
             margin: 1.5rem 0 1.45rem 0;
             color: #FFFFFF;
-            font-size: clamp(2.95rem, 5.2vw, 4.5rem);
-            line-height: 1.08;
+            font-size: clamp(2.35rem, 3.55vw, 3.2rem);
+            line-height: 1.18;
             font-weight: 300;
             letter-spacing: 0;
+        }
+
+        .pcr-home-hero-refined h1 span {
+            display: block;
+            white-space: nowrap;
         }
 
         .pcr-home-hero-refined p {
@@ -545,8 +635,9 @@ def render_home_refined_styles():
         }
 
         .pcr-problem-band {
-            margin-left: calc(-1 * clamp(1rem, 3vw, 2rem));
-            margin-right: calc(-1 * clamp(1rem, 3vw, 2rem));
+            width: 100%;
+            margin-left: 0;
+            margin-right: 0;
             background:
                 radial-gradient(circle at 20% 0%, rgba(14, 165, 183, 0.16), transparent 28rem),
                 linear-gradient(180deg, #0B1F3A 0%, #0D2747 100%);
@@ -767,8 +858,9 @@ def render_home_refined_styles():
         }
 
         .pcr-status-footer-wrap {
-            margin-left: calc(-1 * clamp(1rem, 3vw, 2rem));
-            margin-right: calc(-1 * clamp(1rem, 3vw, 2rem));
+            width: 100%;
+            margin-left: 0;
+            margin-right: 0;
             padding: 4.8rem 0 5.1rem 0;
             color: #F4F4F4;
             background:
@@ -919,6 +1011,7 @@ def render_home_refined_styles():
         }
 
         @media (max-width: 760px) {
+            .pcr-ref-topbar-inner,
             .pcr-hero-content,
             .pcr-hero-action-row,
             .st-key-pcr_hero_action_row,
@@ -927,6 +1020,10 @@ def render_home_refined_styles():
             .pcr-status-footer,
             .pcr-footer-action-row {
                 width: min(100%, calc(100vw - 32px));
+            }
+
+            .pcr-ref-nav {
+                display: none;
             }
 
             .pcr-home-hero-refined,
@@ -1087,7 +1184,7 @@ def render_bottom_status_area():
     dev_dot = "" if st.session_state.get("dev_verified") else " warn"
     st.html(
         f"""
-        <div class="pcr-status-footer-wrap">
+        <div class="pcr-status-footer-wrap" id="status">
             <div class="pcr-status-footer">
                 <div class="pcr-status-intro">
                     <div class="pcr-section-kicker">Entry summary</div>
@@ -1142,6 +1239,24 @@ def render_home_portal():
     render_home_refined_styles()
 
     st.html('<div class="pcr-sidebar-expand-hint">点此展开侧边栏</div>')
+    st.html(
+        """
+        <header class="pcr-ref-topbar">
+            <div class="pcr-ref-topbar-inner">
+                <div class="pcr-ref-brand">
+                    <div class="pcr-ref-brand-mark" aria-hidden="true"></div>
+                    <div class="pcr-ref-brand-title">PCR-电泳异常智能复盘助手</div>
+                </div>
+                <nav class="pcr-ref-nav" aria-label="首页导航">
+                    <a href="#problems">问题</a>
+                    <a href="#workflow">流程</a>
+                    <a href="#capabilities">能力</a>
+                    <a href="#status">入口</a>
+                </nav>
+            </div>
+        </header>
+        """
+    )
 
     st.html(
         """
@@ -1149,7 +1264,7 @@ def render_home_portal():
             <div class="pcr-hero-content">
                 <div class="pcr-hero-copy">
                     <div class="pcr-home-kicker">Teaching diagnostic system</div>
-                    <h1>分子生物学实验 PCR-电泳异常智能复盘助手</h1>
+                    <h1><span>分子生物学实验</span><span>PCR电泳异常智能复盘助手</span></h1>
                     <p>面向分子生物学实验教学场景，帮助学生结构化记录异常现象，辅助系统生成候选原因，并支持教师复核确认与案例沉淀。</p>
                     <div class="pcr-hero-metrics">
                         <div class="pcr-hero-metric"><strong>Top 1/2/3</strong><span>候选原因排序</span></div>
@@ -1190,11 +1305,6 @@ def render_home_portal():
                             </div>
                             <div class="pcr-gel-scanline"></div>
                         </div>
-                        <div class="pcr-gel-float">
-                            <span>Evidence</span>
-                            <b>Top1 / Top2</b>
-                            <p>规则矩阵 · 组合加权</p>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1220,7 +1330,7 @@ def render_home_portal():
 
     st.html(
         f"""
-        <div class="pcr-problem-band">
+        <div class="pcr-problem-band" id="problems">
             <section class="pcr-section-dark">
                 {build_home_section_title_html("把实验异常从口头排查变成可复盘的教学线索", "Problems：学生、教师和课程建设共同面对的三个问题。")}
                 {build_problem_cards_html()}
@@ -1231,7 +1341,7 @@ def render_home_portal():
 
     st.html(
         f"""
-        <section class="pcr-section">
+        <section class="pcr-section" id="workflow">
             {build_home_section_title_html("从异常记录到教师确认，形成一条可解释的诊断路径", "Workflow：六步流程覆盖学生记录、信息标准化、规则判断、教师确认与案例沉淀。")}
             {build_workflow_section_html()}
         </section>
@@ -1240,7 +1350,7 @@ def render_home_portal():
 
     st.html(
         f"""
-        <section class="pcr-section">
+        <section class="pcr-section" id="capabilities">
             {build_home_section_title_html("围绕采集、诊断、解释、闭环展开的能力矩阵", "Capabilities：让实验失败记录能够被解释、复核和持续积累。")}
             {build_capability_cards_html()}
         </section>
