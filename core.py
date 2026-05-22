@@ -85,7 +85,7 @@ def ensure_page_config(page_title, page_icon="🧪"):
             page_title=page_title,
             page_icon=page_icon,
             layout="wide",
-            initial_sidebar_state="auto",
+            initial_sidebar_state="collapsed",
         )
     except Exception:
         pass
@@ -929,6 +929,57 @@ def apply_common_styles(theme="student"):
             box-shadow: inset 4px 0 0 var(--pcr-gel-cyan), 0 12px 24px rgba(11, 31, 58, 0.08);
         }}
 
+        [data-testid="collapsedControl"] {{
+            position: relative;
+        }}
+
+        [data-testid="collapsedControl"]::after {{
+            content: "点此展开侧边栏";
+            position: absolute;
+            left: 2.15rem;
+            top: 50%;
+            transform: translateY(-50%);
+            white-space: nowrap;
+            pointer-events: none;
+            border: 1px solid rgba(14, 165, 183, 0.2);
+            border-radius: 999px;
+            padding: 0.18rem 0.56rem;
+            background: rgba(255, 255, 255, 0.82);
+            color: #075985;
+            font-size: 0.76rem;
+            font-weight: 750;
+            box-shadow: 0 6px 16px rgba(11, 31, 58, 0.06);
+        }}
+
+        .pcr-sidebar-expand-hint {{
+            position: fixed;
+            top: 0.72rem;
+            left: 2.45rem;
+            z-index: 999999;
+            display: none;
+            pointer-events: none;
+            border: 1px solid rgba(14, 165, 183, 0.22);
+            border-radius: 999px;
+            padding: 0.18rem 0.62rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: #075985;
+            font-size: 0.76rem;
+            font-weight: 800;
+            line-height: 1.2;
+            box-shadow: 0 8px 18px rgba(11, 31, 58, 0.07);
+            backdrop-filter: blur(8px);
+        }}
+
+        body:has([data-testid="collapsedControl"]) .pcr-sidebar-expand-hint {{
+            display: block;
+        }}
+
+        @media (max-width: 640px) {{
+            .pcr-sidebar-expand-hint {{
+                display: none;
+            }}
+        }}
+
         .pcr-hero {{
             border-radius: 22px;
             padding: clamp(1.25rem, 2.2vw, 2rem);
@@ -1401,28 +1452,544 @@ def apply_common_styles(theme="student"):
             box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
         }}
 
+        /* Open Design / IBM Carbon inspired homepage layer */
+        :root {{
+            --pcr-bg: #F6FAFC;
+            --pcr-surface: #FFFFFF;
+            --pcr-ink: #161616;
+            --pcr-muted: #525252;
+            --pcr-border: #D8E3EA;
+            --pcr-lab-blue: #0B1F3A;
+            --pcr-diagnostic-blue: #2563EB;
+            --pcr-diagnostic-blue-hover: #1D4ED8;
+            --pcr-gel-cyan: #0EA5B7;
+            --pcr-domain-muted: #E0F7FA;
+            --pcr-accent-tint: #EFF6FF;
+        }}
+
+        .stApp {{
+            background: var(--pcr-bg);
+            color: var(--pcr-ink);
+        }}
+
+        .main .block-container {{
+            max-width: min(1200px, calc(100vw - 64px));
+            padding-top: 0;
+            padding-left: 0;
+            padding-right: 0;
+            padding-bottom: 0;
+        }}
+
+        .pcr-home-hero {{
+            min-height: clamp(560px, 72vh, 720px);
+            width: 100%;
+            margin: 0 0 4rem 0;
+            padding: clamp(4rem, 8vw, 6rem) clamp(2rem, 4vw, 4rem);
+            border-radius: 0;
+            border: 0;
+            box-shadow: none;
+            color: #F6FAFC;
+            background: var(--pcr-lab-blue);
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+            gap: clamp(2rem, 5vw, 5rem);
+            align-items: center;
+            overflow: hidden;
+        }}
+
+        .pcr-home-hero::before {{
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: rgba(216, 227, 234, 0.16);
+        }}
+
+        .pcr-home-hero-content {{
+            padding-left: 2rem;
+        }}
+
+        .pcr-home-kicker {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--pcr-gel-cyan);
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.02rem;
+        }}
+
+        .pcr-home-kicker i {{
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            background: var(--pcr-gel-cyan);
+        }}
+
+        .pcr-home-hero h1 {{
+            max-width: 11.5em;
+            margin: 0 0 1.25rem 0;
+            font-size: clamp(2.25rem, 4vw, 3.25rem);
+            line-height: 1.15;
+            font-weight: 300;
+            letter-spacing: 0;
+            color: #F6FAFC;
+        }}
+
+        .pcr-home-hero p {{
+            max-width: 34rem;
+            margin: 0;
+            color: rgba(246, 250, 252, 0.8);
+            font-size: 1rem;
+            line-height: 1.6;
+        }}
+
+        .pcr-gel-panel {{
+            min-height: 32rem;
+            border-radius: 4px;
+            padding: 0;
+            border: 1px solid rgba(14, 165, 183, 0.24);
+            background: rgba(14, 165, 183, 0.08);
+            box-shadow: none;
+            overflow: hidden;
+        }}
+
+        .pcr-gel-header {{
+            display: grid;
+            grid-template-columns: 4.6rem repeat(7, 1fr);
+            gap: 0;
+            padding: 0.9rem 1.1rem 0.55rem 1.1rem;
+            color: rgba(103, 197, 221, 0.72);
+            font-family: "IBM Plex Mono", Consolas, monospace;
+            font-size: 0.8rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(14, 165, 183, 0.13);
+            background: rgba(3, 16, 32, 0.18);
+        }}
+
+        .pcr-gel-body {{
+            position: relative;
+            display: grid;
+            grid-template-columns: 4.6rem 1fr;
+            gap: 0.75rem;
+            height: 27.4rem;
+            padding: 1.2rem 1.2rem 1.4rem 1.2rem;
+        }}
+
+        .pcr-gel-scale {{
+            display: grid;
+            grid-template-rows: repeat(7, 1fr);
+            color: rgba(103, 197, 221, 0.72);
+            font-family: "IBM Plex Mono", Consolas, monospace;
+            font-size: 0.76rem;
+            align-items: center;
+            text-align: right;
+        }}
+
+        .pcr-gel-grid {{
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 0.75rem;
+            height: 100%;
+        }}
+
+        .pcr-gel-lane {{
+            position: relative;
+            overflow: hidden;
+            border-radius: 4px;
+            border: 1px solid rgba(14, 165, 183, 0.14);
+            background: rgba(2, 16, 32, 0.24);
+        }}
+
+        .pcr-gel-lane::before,
+        .pcr-gel-lane::after {{
+            left: 20%;
+            right: 20%;
+            height: 0.2rem;
+            border-radius: 2px;
+            background: var(--pcr-gel-cyan);
+            box-shadow: none;
+        }}
+
+        .pcr-gel-lane.marker::before {{
+            top: 10%;
+            box-shadow:
+                0 2.7rem 0 var(--pcr-gel-cyan),
+                0 5.4rem 0 var(--pcr-gel-cyan),
+                0 8.1rem 0 var(--pcr-gel-cyan),
+                0 10.8rem 0 var(--pcr-gel-cyan),
+                0 13.5rem 0 var(--pcr-gel-cyan),
+                0 16.2rem 0 var(--pcr-gel-cyan),
+                0 18.9rem 0 var(--pcr-gel-cyan);
+        }}
+
+        .pcr-gel-lane.marker::after {{
+            display: none;
+        }}
+
+        .pcr-gel-lane.weak::before,
+        .pcr-gel-lane.weak::after {{
+            opacity: 0.35;
+        }}
+
+        .pcr-gel-lane.smear::after {{
+            left: 28%;
+            right: 28%;
+            height: 3rem;
+            border-radius: 4px;
+            opacity: 0.22;
+        }}
+
+        .pcr-diagnosis-note {{
+            position: absolute;
+            right: 1.2rem;
+            bottom: 1.4rem;
+            width: 12rem;
+            border: 1px solid rgba(37, 99, 235, 0.32);
+            border-radius: 4px;
+            padding: 0.9rem;
+            background: rgba(11, 31, 58, 0.72);
+        }}
+
+        .pcr-diagnosis-note span {{
+            display: block;
+            margin-bottom: 0.35rem;
+            color: var(--pcr-gel-cyan);
+            font-family: "IBM Plex Mono", Consolas, monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.08rem;
+        }}
+
+        .pcr-diagnosis-note b {{
+            display: block;
+            margin-bottom: 0.35rem;
+            color: #F6FAFC;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }}
+
+        .pcr-diagnosis-note p {{
+            margin: 0;
+            color: rgba(246, 250, 252, 0.62);
+            font-size: 0.78rem;
+            line-height: 1.5;
+        }}
+
+        div.stButton > button,
+        div.stDownloadButton > button {{
+            border-radius: 0;
+            min-height: 3rem;
+            border: 1px solid var(--pcr-border);
+            box-shadow: none;
+            font-size: 0.88rem;
+            font-weight: 600;
+            letter-spacing: 0;
+        }}
+
+        div.stButton > button[kind="primary"],
+        div.stButton > button[data-testid="baseButton-primary"] {{
+            background: var(--pcr-diagnostic-blue) !important;
+            border-color: var(--pcr-diagnostic-blue) !important;
+            box-shadow: none !important;
+            color: #ffffff !important;
+        }}
+
+        div.stButton > button[kind="primary"]:hover,
+        div.stButton > button[data-testid="baseButton-primary"]:hover {{
+            background: var(--pcr-diagnostic-blue-hover) !important;
+            border-color: var(--pcr-diagnostic-blue-hover) !important;
+        }}
+
+        .pcr-home-section-title {{
+            margin: 0 auto 3rem auto;
+            padding-top: 4.5rem;
+            text-align: center;
+            max-width: 56rem;
+        }}
+
+        .pcr-home-section-title span {{
+            display: inline-flex;
+            margin-bottom: 1rem;
+            border-radius: 999px;
+            padding: 0.3rem 0.8rem;
+            background: var(--pcr-accent-tint);
+            color: var(--pcr-diagnostic-blue);
+            font-size: 0.78rem;
+            font-weight: 600;
+        }}
+
+        .pcr-home-section-title span:empty {{
+            display: none;
+        }}
+
+        .pcr-home-section-title h2 {{
+            margin: 0;
+            color: var(--pcr-ink);
+            font-size: clamp(1.9rem, 3vw, 2.25rem);
+            line-height: 1.22;
+            font-weight: 300;
+        }}
+
+        .pcr-home-section-title p {{
+            margin: 1rem 0 0 0;
+            color: var(--pcr-muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }}
+
+        .pcr-problem-grid {{
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }}
+
+        .pcr-problem-card {{
+            min-height: 12.6rem;
+            border-radius: 4px;
+            padding: 2rem;
+            background: var(--pcr-lab-blue);
+            color: #F6FAFC;
+        }}
+
+        .pcr-problem-number {{
+            margin-bottom: 1rem;
+            color: var(--pcr-gel-cyan);
+            font-family: "IBM Plex Mono", Consolas, monospace;
+            font-size: 0.9rem;
+        }}
+
+        .pcr-problem-card h3 {{
+            margin: 0 0 0.75rem 0;
+            color: #F6FAFC;
+            font-size: 1.1rem;
+            line-height: 1.35;
+            font-weight: 600;
+        }}
+
+        .pcr-problem-card p {{
+            margin: 0;
+            color: rgba(246, 250, 252, 0.72);
+            font-size: 0.92rem;
+            line-height: 1.58;
+        }}
+
+        .pcr-flow-grid {{
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0;
+            margin: 1rem 0 2rem 0;
+        }}
+
+        .pcr-flow-card {{
+            position: relative;
+            min-height: 15rem;
+            border: 1px solid var(--pcr-border);
+            border-radius: 4px;
+            padding: 2rem 1.25rem;
+            background: #FFFFFF;
+            box-shadow: none;
+            text-align: center;
+        }}
+
+        .pcr-flow-card:hover {{
+            border-color: var(--pcr-diagnostic-blue);
+        }}
+
+        .pcr-flow-index {{
+            width: 2.5rem;
+            height: 2.5rem;
+            margin: 0 auto 1rem auto;
+            border: 0;
+            border-radius: 50%;
+            background: var(--pcr-accent-tint);
+            color: var(--pcr-diagnostic-blue);
+            font-family: "IBM Plex Mono", Consolas, monospace;
+            font-size: 0.9rem;
+            font-weight: 400;
+        }}
+
+        .pcr-flow-card h3 {{
+            margin: 0 0 0.55rem 0;
+            color: var(--pcr-ink);
+            font-size: 1rem;
+            line-height: 1.35;
+            font-weight: 600;
+        }}
+
+        .pcr-flow-card p {{
+            margin: 0;
+            color: var(--pcr-muted);
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }}
+
+        .pcr-flow-connector {{
+            position: absolute;
+            right: -1px;
+            top: 50%;
+            width: 2px;
+            height: 2rem;
+            background: var(--pcr-border);
+            transform: translateY(-50%);
+        }}
+
+        .pcr-flow-connector::after {{
+            content: "";
+            position: absolute;
+            right: -5px;
+            top: 50%;
+            width: 0;
+            height: 0;
+            border-left: 6px solid var(--pcr-border);
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            transform: translateY(-50%);
+        }}
+
+        .pcr-capability-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 5rem;
+        }}
+
+        .pcr-capability-card {{
+            min-height: 17rem;
+            border: 1px solid var(--pcr-border);
+            border-radius: 4px;
+            padding: 2rem;
+            background: #FFFFFF;
+        }}
+
+        .pcr-capability-card:hover {{
+            border-color: var(--pcr-diagnostic-blue);
+        }}
+
+        .pcr-capability-icon {{
+            width: 3rem;
+            height: 3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+            border-radius: 4px;
+            font-family: "IBM Plex Mono", Consolas, monospace;
+            font-size: 0.9rem;
+        }}
+
+        .pcr-capability-icon.blue {{
+            background: var(--pcr-accent-tint);
+            color: var(--pcr-diagnostic-blue);
+        }}
+
+        .pcr-capability-icon.cyan {{
+            background: var(--pcr-domain-muted);
+            color: var(--pcr-gel-cyan);
+        }}
+
+        .pcr-capability-card h3 {{
+            margin: 0 0 0.75rem 0;
+            color: var(--pcr-ink);
+            font-size: 1.12rem;
+            font-weight: 600;
+        }}
+
+        .pcr-capability-card p {{
+            margin: 0;
+            color: var(--pcr-muted);
+            font-size: 0.92rem;
+            line-height: 1.6;
+        }}
+
+        .pcr-home-footer {{
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1.2fr;
+            gap: 3rem;
+            margin-top: 3.5rem;
+            padding: 3rem 2rem;
+            border-radius: 0;
+            background: var(--pcr-lab-blue);
+            color: #F6FAFC;
+        }}
+
+        .pcr-home-footer h3 {{
+            margin: 0 0 0.5rem 0;
+            color: #F6FAFC;
+            font-size: 1rem;
+            font-weight: 600;
+        }}
+
+        .pcr-home-footer p {{
+            margin: 0;
+            color: rgba(246, 250, 252, 0.58);
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }}
+
+        .pcr-footer-label {{
+            display: block;
+            margin-bottom: 1rem;
+            color: rgba(246, 250, 252, 0.48);
+            font-size: 0.76rem;
+            font-weight: 600;
+        }}
+
+        .pcr-footer-status {{
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.55rem;
+            color: rgba(246, 250, 252, 0.78);
+            font-size: 0.88rem;
+        }}
+
+        .pcr-footer-status i {{
+            width: 0.38rem;
+            height: 0.38rem;
+            border-radius: 50%;
+            background: #6F6F6F;
+        }}
+
+        .pcr-footer-status i.open {{
+            background: #24A148;
+        }}
+
+        .pcr-footer-status i.current {{
+            background: var(--pcr-gel-cyan);
+            box-shadow: 0 0 0 3px rgba(14, 165, 183, 0.18);
+        }}
+
         @media (max-width: 768px) {{
             .main .block-container {{
                 max-width: 100vw;
-                padding-left: 0.85rem;
-                padding-right: 0.85rem;
+                padding-left: 0;
+                padding-right: 0;
             }}
 
             .pcr-home-hero {{
                 grid-template-columns: 1fr;
-                padding: 1.05rem;
+                min-height: auto;
+                padding: 4rem 1rem 3rem 1rem;
             }}
 
             .pcr-home-hero h1 {{
-                font-size: 2rem;
+                font-size: 2.15rem;
+            }}
+
+            .pcr-home-hero-content {{
+                padding-left: 0;
             }}
 
             .pcr-gel-panel {{
-                min-height: 10rem;
+                min-height: 20rem;
             }}
 
             .pcr-gel-grid {{
-                height: 6.5rem;
+                height: 100%;
             }}
 
             .pcr-hero {{
@@ -1441,18 +2008,26 @@ def apply_common_styles(theme="student"):
                 grid-template-columns: 1fr;
             }}
 
+            .pcr-problem-grid,
+            .pcr-capability-grid,
+            .pcr-home-footer {{
+                grid-template-columns: 1fr;
+            }}
+
             .pcr-stepper-grid {{
                 display: none;
             }}
 
             .pcr-flow-grid {{
                 grid-template-columns: 1fr;
+                gap: 1rem;
             }}
 
             .pcr-flow-card {{
                 min-height: auto;
             }}
 
+            .pcr-flow-connector,
             .pcr-flow-arrow {{
                 display: none;
             }}

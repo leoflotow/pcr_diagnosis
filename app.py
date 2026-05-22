@@ -19,7 +19,6 @@ from core import (
     init_database,
     logout_dev_access,
     logout_teacher_access,
-    render_info_tiles,
     verify_access_code,
 )
 
@@ -143,12 +142,45 @@ def render_home_section_title(title, desc=""):
     st.markdown(
         f"""
         <div class="pcr-home-section-title">
+            <span>{desc.split("：", 1)[0] if desc and "：" in desc else ""}</span>
             <h2>{title}</h2>
-            {f"<p>{desc}</p>" if desc else ""}
+            {f"<p>{desc.split('：', 1)[1] if desc and '：' in desc else desc}</p>" if desc else ""}
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_problem_cards():
+    items = [
+        (
+            "01",
+            "学生不知道从哪里排查失败原因",
+            "PCR-电泳实验出现无条带、弱带、多条带、拖尾等异常后，学生往往难以判断问题来自模板、引物、体系、程序还是电泳条件。",
+        ),
+        (
+            "02",
+            "教师重复解释相似异常",
+            "教师需要反复处理相似实验失败案例，但很多排错经验停留在口头解释中，难以沉淀为可复用案例。",
+        ),
+        (
+            "03",
+            "课程缺少结构化失败案例",
+            "实验失败本身具有教学价值，但如果没有记录、复核和统计机制，就难以支撑后续教学改进。",
+        ),
+    ]
+    cards = []
+    for number, title, desc in items:
+        cards.append(
+            (
+                '<div class="pcr-problem-card">'
+                f'<div class="pcr-problem-number">{number}</div>'
+                f"<h3>{title}</h3>"
+                f"<p>{desc}</p>"
+                "</div>"
+            )
+        )
+    st.markdown(f'<div class="pcr-problem-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
 def render_workflow_section():
@@ -162,26 +194,40 @@ def render_workflow_section():
     ]
     cards = []
     for index, (number, title, desc) in enumerate(steps):
-        connector = "" if index == len(steps) - 1 else '<span class="pcr-flow-arrow">→</span>'
+        connector = "" if index == len(steps) - 1 else '<span class="pcr-flow-connector"></span>'
         cards.append(
-            f"""
-            <div class="pcr-flow-card">
-                <div class="pcr-flow-index">{number}</div>
-                <h3>{title}</h3>
-                <p>{desc}</p>
-                {connector}
-            </div>
-            """
+            (
+                '<div class="pcr-flow-card">'
+                f'<div class="pcr-flow-index">{number}</div>'
+                f"<h3>{title}</h3>"
+                f"<p>{desc}</p>"
+                f"{connector}"
+                "</div>"
+            )
         )
 
-    st.markdown(
-        f"""
-        <div class="pcr-flow-grid">
-            {''.join(cards)}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<div class="pcr-flow-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+
+def render_capability_cards():
+    items = [
+        ("01", "结构化采集", "支持记录异常现象、阳性/阴性对照、PCR 参数、学生补充描述和凝胶图片。", "blue"),
+        ("02", "规则诊断", "基于基础规则与组合规则生成 Top1 / Top2 / Top3 候选原因。", "cyan"),
+        ("03", "证据解释", "展示诊断依据、置信度、证据摘要和缺失信息提示，避免只给结论。", "blue"),
+        ("04", "教师闭环", "教师可确认最终原因、填写备注，并通过统计看板追踪系统判断与教师确认的一致性。", "cyan"),
+    ]
+    cards = []
+    for number, title, desc, tone in items:
+        cards.append(
+            (
+                '<div class="pcr-capability-card">'
+                f'<div class="pcr-capability-icon {tone}">{number}</div>'
+                f"<h3>{title}</h3>"
+                f"<p>{desc}</p>"
+                "</div>"
+            )
+        )
+    st.markdown(f'<div class="pcr-capability-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
 def render_bottom_status_area():
@@ -189,12 +235,25 @@ def render_bottom_status_area():
     dev_status = "已验证" if st.session_state.get("dev_verified") else "未验证"
     st.markdown(
         f"""
-        <div class="pcr-home-status-panel">
-            <div class="pcr-home-status-grid">
-                <div><span>学生端</span><b>开放</b></div>
-                <div><span>教师端</span><b>{teacher_status}</b></div>
-                <div><span>开发调试端</span><b>{dev_status}</b></div>
-                <div><span>当前角色</span><b>{get_current_role_label()}</b></div>
+        <div class="pcr-home-footer">
+            <div>
+                <h3>PCR-电泳异常智能复盘助手</h3>
+                <p>面向分子生物学实验教学场景的诊断与复盘工具。</p>
+            </div>
+            <div>
+                <span class="pcr-footer-label">端口状态</span>
+                <div class="pcr-footer-status"><i class="open"></i>学生端：开放</div>
+                <div class="pcr-footer-status"><i class="{ 'open' if st.session_state.get('teacher_verified') else 'closed' }"></i>教师端：{teacher_status}</div>
+                <div class="pcr-footer-status"><i class="{ 'open' if st.session_state.get('dev_verified') else 'closed' }"></i>开发调试端：{dev_status}</div>
+            </div>
+            <div>
+                <span class="pcr-footer-label">当前角色</span>
+                <div class="pcr-footer-status"><i class="current"></i>{get_current_role_label()}</div>
+                <div class="pcr-footer-status"><i class="closed"></i>学生 / 教师 / 开发调试</div>
+            </div>
+            <div>
+                <span class="pcr-footer-label">技术栈</span>
+                <p>Streamlit · Python · Pandas</p>
             </div>
         </div>
         """,
@@ -217,29 +276,38 @@ def render_home_portal():
     st.session_state["current_role"] = "home"
     apply_common_styles(theme="home")
 
+    st.markdown('<div class="pcr-sidebar-expand-hint">点此展开侧边栏</div>', unsafe_allow_html=True)
+
     st.markdown(
         """
         <div class="pcr-home-hero">
-            <div>
+            <div class="pcr-home-hero-content">
+                <div class="pcr-home-kicker"><i></i><span>实验教学智能诊断工具</span></div>
                 <h1>分子生物学实验 PCR-电泳异常智能复盘助手</h1>
                 <p>面向分子生物学实验教学场景，帮助学生结构化记录异常现象，辅助系统生成候选原因，并支持教师复核确认与案例沉淀。</p>
-                <div class="pcr-home-proof">
-                    <span>结构化记录</span>
-                    <span>规则矩阵诊断</span>
-                    <span>组合规则加权</span>
-                    <span>教师闭环复核</span>
-                </div>
             </div>
             <div class="pcr-gel-panel">
-                <div class="pcr-gel-title">Gel Electrophoresis Signal</div>
-                <div class="pcr-gel-grid">
-                    <div class="pcr-gel-lane" style="--band-a:22%;--band-b:66%;--a:.95;--b:.32;"></div>
-                    <div class="pcr-gel-lane" style="--band-a:42%;--band-b:72%;--a:.38;--b:.1;"></div>
-                    <div class="pcr-gel-lane" style="--band-a:29%;--band-b:54%;--a:.9;--b:.64;"></div>
-                    <div class="pcr-gel-lane" style="--band-a:60%;--band-b:60%;--a:.15;--b:.12;"></div>
-                    <div class="pcr-gel-lane" style="--band-a:25%;--band-b:48%;--a:.82;--b:.72;"></div>
-                    <div class="pcr-gel-lane" style="--band-a:36%;--band-b:69%;--a:.55;--b:.24;"></div>
-                    <div class="pcr-gel-lane" style="--band-a:18%;--band-b:58%;--a:.98;--b:.46;"></div>
+                <div class="pcr-gel-header">
+                    <span></span><span>M</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span>
+                </div>
+                <div class="pcr-gel-body">
+                    <div class="pcr-gel-scale">
+                        <span>2kb</span><span>1.5kb</span><span>1kb</span><span>750bp</span><span>500bp</span><span>250bp</span><span>100bp</span>
+                    </div>
+                    <div class="pcr-gel-grid">
+                        <div class="pcr-gel-lane marker"></div>
+                        <div class="pcr-gel-lane" style="--band-a:32%;--band-b:58%;--a:.85;--b:.62;"></div>
+                        <div class="pcr-gel-lane weak" style="--band-a:32%;--band-b:58%;--a:.38;--b:.3;"></div>
+                        <div class="pcr-gel-lane" style="--band-a:24%;--band-b:56%;--a:.9;--b:.72;"></div>
+                        <div class="pcr-gel-lane smear" style="--band-a:48%;--band-b:70%;--a:.32;--b:.18;"></div>
+                        <div class="pcr-gel-lane" style="--band-a:24%;--band-b:58%;--a:.88;--b:.68;"></div>
+                        <div class="pcr-gel-lane" style="--band-a:32%;--band-b:56%;--a:.76;--b:.58;"></div>
+                    </div>
+                    <div class="pcr-diagnosis-note">
+                        <span>DIAGNOSIS</span>
+                        <b>检测到拖尾</b>
+                        <p>Top1: 退火温度<br>Top2: Mg²⁺ 浓度</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -264,60 +332,17 @@ def render_home_portal():
     render_access_fallback_panel("teacher")
     render_access_fallback_panel("dev")
 
-    render_home_section_title("项目解决的问题")
-    render_info_tiles(
-        [
-            {
-                "tag": "学生端痛点",
-                "title": "学生不知道从哪里排查失败原因",
-                "desc": "PCR-电泳实验出现无条带、弱带、多条带、拖尾等异常后，学生往往难以判断问题来自模板、引物、体系、程序还是电泳条件。",
-            },
-            {
-                "tag": "教师端痛点",
-                "title": "教师重复解释相似异常",
-                "desc": "教师需要反复处理相似实验失败案例，但很多排错经验停留在口头解释中，难以沉淀为可复用案例。",
-            },
-            {
-                "tag": "课程端痛点",
-                "title": "课程缺少结构化失败案例",
-                "desc": "实验失败本身具有教学价值，但如果没有记录、复核和统计机制，就难以支撑后续教学改进。",
-            },
-        ],
-        columns=3,
-    )
+    render_home_section_title("项目解决的三个核心问题", "项目背景：实验失败为何值得被记录、复核和沉淀。")
+    render_problem_cards()
 
     render_home_section_title(
-        "系统工作流",
-        "从学生提交到教师确认，再到案例统计，形成可复盘、可积累的教学闭环。",
+        "从异常提交到案例沉淀的完整闭环",
+        "系统流程：六步诊断路径，覆盖学生记录、系统推理、教师确认与数据沉淀全链路。",
     )
     render_workflow_section()
 
-    render_home_section_title("核心能力")
-    render_info_tiles(
-        [
-            {
-                "tag": "结构化采集",
-                "title": "记录关键实验信息",
-                "desc": "支持记录异常现象、阳性/阴性对照、PCR 参数、学生补充描述和凝胶图片。",
-            },
-            {
-                "tag": "规则诊断",
-                "title": "生成候选原因排序",
-                "desc": "基于基础规则与组合规则生成 Top1 / Top2 / Top3 候选原因。",
-            },
-            {
-                "tag": "证据解释",
-                "title": "展示依据而不只给结论",
-                "desc": "展示诊断依据、置信度、证据摘要和缺失信息提示，避免只给结论。",
-            },
-            {
-                "tag": "教师闭环",
-                "title": "复核确认并沉淀案例",
-                "desc": "教师可确认最终原因、填写备注，并通过统计看板追踪系统判断与教师确认的一致性。",
-            },
-        ],
-        columns=4,
-    )
+    render_home_section_title("四大模块，覆盖诊断与教学全场景", "核心能力：不是普通表单，而是可解释、可复核、可积累的教学工具。")
+    render_capability_cards()
 
     render_home_section_title("入口与状态", "会话状态仅在本次访问中生效，作为底部辅助信息保留。")
     render_bottom_status_area()
