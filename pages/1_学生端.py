@@ -19,6 +19,7 @@ from core import (
     render_diagnosis_quality_block,
     render_card_title,
     render_page_hero,
+    return_to_home,
     save_diagnosis_record,
     save_uploaded_image,
 )
@@ -52,6 +53,213 @@ STUDENT_STEP_TITLES = [
     "补充描述与图片上传",
     "确认并开始诊断",
 ]
+
+
+def render_student_refined_styles():
+    """学生端专属样式：隐藏侧边栏，并与首页深蓝视觉保持一致。"""
+    st.markdown(
+        """
+        <style>
+        :root {
+            --pcr-primary: #0B1F3A;
+            --pcr-primary-2: #2563EB;
+            --pcr-accent: #0EA5B7;
+            --pcr-bg: #07172B;
+            --pcr-card: rgba(223, 247, 251, 0.13);
+            --pcr-text: #F6FAFC;
+            --pcr-muted: #D8E3EA;
+            --pcr-border: rgba(216, 227, 234, 0.20);
+        }
+
+        .stApp {
+            background:
+                linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+                radial-gradient(circle at 14% 0%, rgba(14, 165, 183, 0.18), transparent 28rem),
+                radial-gradient(circle at 88% 4%, rgba(37, 99, 235, 0.18), transparent 30rem),
+                linear-gradient(135deg, #06172B 0%, #0B1F3A 48%, #12345C 100%) !important;
+            background-size: 40px 40px, 40px 40px, auto, auto, auto;
+            color: #F6FAFC;
+            font-family: "IBM Plex Sans", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        header[data-testid="stHeader"],
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"],
+        section[data-testid="stSidebar"],
+        [data-testid="collapsedControl"],
+        .pcr-sidebar-expand-hint {
+            display: none !important;
+            width: 0 !important;
+            min-width: 0 !important;
+        }
+
+        .main .block-container {
+            max-width: min(1240px, calc(100vw - 48px)) !important;
+            padding-top: 1.2rem !important;
+            padding-bottom: 3rem !important;
+        }
+
+        .pcr-student-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.85rem;
+            color: #D8E3EA;
+            font-size: 0.88rem;
+        }
+
+        .pcr-student-page-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.7rem;
+            color: #DFF7FB;
+            font-size: 0.78rem;
+            letter-spacing: 0.04rem;
+            text-transform: uppercase;
+        }
+
+        .pcr-student-page-label::before {
+            content: "";
+            width: 2.35rem;
+            height: 1px;
+            background: #0EA5B7;
+            box-shadow: 0 0 16px rgba(14, 165, 183, 0.85);
+        }
+
+        .pcr-hero {
+            border-radius: 0 !important;
+            border: 1px solid rgba(216, 227, 234, 0.20) !important;
+            background:
+                linear-gradient(135deg, rgba(255,255,255,0.09), rgba(223,247,251,0.035)),
+                linear-gradient(135deg, rgba(6,23,43,0.98), rgba(18,52,92,0.92)) !important;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24) !important;
+            padding: clamp(1.35rem, 2.6vw, 2rem) !important;
+            margin-bottom: 1rem !important;
+            min-height: auto !important;
+        }
+
+        .pcr-hero::after {
+            opacity: 0.48 !important;
+        }
+
+        .pcr-hero h1 {
+            color: #FFFFFF !important;
+            font-weight: 550 !important;
+            font-size: clamp(2rem, 3vw, 3.05rem) !important;
+            line-height: 1.16 !important;
+            max-width: 16em !important;
+            margin-top: 0.6rem !important;
+        }
+
+        .pcr-hero p {
+            color: #D8E3EA !important;
+            max-width: 42rem !important;
+        }
+
+        .pcr-role-badge,
+        .pcr-current-step-chip {
+            border-radius: 999px !important;
+            border: 1px solid rgba(223, 247, 251, 0.34) !important;
+            background: rgba(223, 247, 251, 0.10) !important;
+            color: #DFF7FB !important;
+        }
+
+        div[data-testid="stVerticalBlockBorderWrapper"],
+        .pcr-student-toolbar,
+        .pcr-readiness-panel,
+        .pcr-stepper-item,
+        .pcr-review-item,
+        .pcr-sub-card,
+        .pcr-top1-card,
+        [data-testid="stExpander"],
+        [data-testid="stMetric"] {
+            border-color: rgba(216, 227, 234, 0.20) !important;
+            background: rgba(223, 247, 251, 0.12) !important;
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16) !important;
+            backdrop-filter: blur(14px);
+        }
+
+        .pcr-stepper-item.active {
+            border-color: rgba(109, 234, 243, 0.56) !important;
+            background: rgba(14, 165, 183, 0.20) !important;
+        }
+
+        .pcr-stepper-item.done {
+            border-color: rgba(109, 234, 243, 0.34) !important;
+            background: rgba(14, 165, 183, 0.12) !important;
+        }
+
+        .pcr-card-title,
+        .pcr-step-title,
+        .pcr-stepper-title,
+        .pcr-review-value,
+        .pcr-readiness-item b,
+        .pcr-student-toolbar-title,
+        .pcr-candidate-row b,
+        .pcr-top1-card * {
+            color: #FFFFFF !important;
+        }
+
+        .pcr-muted,
+        .pcr-step-desc,
+        .pcr-stepper-status,
+        .pcr-review-label,
+        .pcr-readiness-item span,
+        .pcr-student-toolbar-desc,
+        .stCaptionContainer,
+        .stMarkdown p,
+        label {
+            color: #D8E3EA !important;
+        }
+
+        .pcr-step-kicker,
+        .pcr-readiness-title {
+            color: #6DEAF3 !important;
+        }
+
+        div.stButton > button,
+        div.stDownloadButton > button {
+            border-radius: 0.25rem !important;
+            min-height: 2.8rem;
+        }
+
+        div.stButton > button:not([kind="primary"]),
+        div.stDownloadButton > button {
+            background: rgba(223, 247, 251, 0.08) !important;
+            color: #DFF7FB !important;
+            border: 1px solid rgba(223, 247, 251, 0.32) !important;
+        }
+
+        button[kind="primary"] {
+            background: #2563EB !important;
+            border-color: #2563EB !important;
+            color: #FFFFFF !important;
+        }
+
+        .stProgress > div > div > div > div {
+            background: linear-gradient(90deg, #2563EB, #0EA5B7) !important;
+        }
+
+        input, textarea, [data-baseweb="select"] > div {
+            background-color: rgba(255,255,255,0.92) !important;
+        }
+
+        @media (max-width: 768px) {
+            .main .block-container {
+                max-width: calc(100vw - 28px) !important;
+                padding-top: 0.85rem !important;
+            }
+
+            .pcr-student-topbar {
+                display: block;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 class SessionUploadedFile:
@@ -224,6 +432,23 @@ def render_student_quick_actions():
                 load_student_demo_data()
                 st.success("已加载演示数据，可按步骤继续演示。")
                 st.rerun()
+
+
+def render_student_topbar():
+    """渲染页面内顶部导航。"""
+    left_col, right_col = st.columns([0.78, 0.22])
+    with left_col:
+        st.markdown(
+            """
+            <div class="pcr-student-topbar">
+                <span class="pcr-student-page-label">实验记录流程</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right_col:
+        if st.button("返回首页", key="student_return_home", use_container_width=True):
+            return_to_home(clear_entries=False)
 
 
 def persist_uploaded_file(uploaded_file):
@@ -677,15 +902,18 @@ def render_student_results(payload):
 
 def main():
     """学生端主流程。"""
-    ensure_page_config("学生端：实验情况填写")
+    ensure_page_config("实验记录与诊断输入")
     init_database()
     apply_common_styles(theme="student")
+    render_student_refined_styles()
     st.session_state["current_role"] = "student"
     init_student_wizard_state()
 
+    render_student_topbar()
+
     render_page_hero(
-        "学生端：实验情况填写",
-        "填写实验观察、PCR 条件和补充说明，查看可能原因和处理建议。",
+        "实验记录与诊断输入",
+        "按步骤填写实验观察与 PCR 条件，生成可解释的诊断结果。",
         "学生端",
     )
 

@@ -5,6 +5,8 @@
 
 import streamlit as st
 
+from navigation_state import register_home_page
+
 from core import (
     apply_common_styles,
     enter_dev_role,
@@ -1342,7 +1344,7 @@ def render_home_portal():
     render_access_dialog_if_needed()
 
 
-HOME_PAGE = st.Page(render_home_portal, title="首页", icon="🏠", default=True)
+HOME_PAGE = register_home_page(st.Page(render_home_portal, title="首页", icon="🏠", default=True))
 STUDENT_PAGE = st.Page("pages/1_学生端.py", title="学生端", icon="🎓")
 TEACHER_PAGE = st.Page("pages/2_教师端.py", title="教师端", icon="🧑‍🏫")
 DEV_PAGE = st.Page("pages/3_开发调试端.py", title="开发调试端", icon="🛠️")
