@@ -44,4 +44,4 @@ https://pcr-diagnosis.streamlit.app/
 - `BIGMODEL_BASE_URL`，默认 `https://open.bigmodel.cn/api/paas/v4`
 - `BIGMODEL_MODEL`，默认 `glm-5`
 
-如果未配置 `BIGMODEL_API_KEY`，系统会自动回退到本地关键词规则抽取。
+文本线索抽取优先调用 BigModel / GLM 接口，失败时回退本地关键词规则。未配置 `BIGMODEL_API_KEY` 时，系统会直接使用本地关键词规则抽取。

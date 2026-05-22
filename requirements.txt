@@ -1,5 +1,6 @@
 streamlit
 pandas
+altair
 openai
 python-dotenv
 pillow

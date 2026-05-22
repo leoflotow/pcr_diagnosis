@@ -21,7 +21,7 @@ from diagnosis_rule_engine_v2 import evaluate_rules_v2
 from navigation_state import get_home_page
 
 try:
-    # 使用兼容 OpenAI SDK 的方式调用 MiniMax
+    # 使用兼容 OpenAI SDK 的方式调用 BigModel / GLM
     from openai import OpenAI
 except:
     OpenAI = None
@@ -101,6 +101,7 @@ def init_access_state():
         "dev_verified": False,
         "show_teacher_access_panel": False,
         "show_dev_access_panel": False,
+        "active_access_dialog": None,
         "navigation_target": None,
     }
     for key, value in defaults.items():
@@ -137,6 +138,7 @@ def enter_dev_role():
 def go_home(clear_entries=False):
     """返回首页；可选清空教师端/开发端入口状态。"""
     st.session_state["current_role"] = "home"
+    st.session_state["active_access_dialog"] = None
     if clear_entries:
         st.session_state["teacher_entered"] = False
         st.session_state["dev_entered"] = False
@@ -208,6 +210,7 @@ def logout_teacher_access():
     st.session_state["teacher_verified"] = False
     st.session_state["teacher_entered"] = False
     st.session_state["show_teacher_access_panel"] = False
+    st.session_state["active_access_dialog"] = None
     if st.session_state.get("current_role") == "teacher":
         st.session_state["current_role"] = "home"
     request_navigation("home")
@@ -217,6 +220,7 @@ def logout_dev_access():
     st.session_state["dev_verified"] = False
     st.session_state["dev_entered"] = False
     st.session_state["show_dev_access_panel"] = False
+    st.session_state["active_access_dialog"] = None
     if st.session_state.get("current_role") == "dev":
         st.session_state["current_role"] = "home"
     request_navigation("home")
@@ -1039,6 +1043,30 @@ def apply_common_styles(theme="student"):
             font-weight: 750;
         }}
 
+        .pcr-hero-actions {{
+            margin: 0.2rem 0 1.6rem 0;
+        }}
+
+        .pcr-home-section-title {{
+            margin: clamp(1.55rem, 2.4vw, 2.2rem) 0 0.82rem 0;
+        }}
+
+        .pcr-home-section-title h2 {{
+            margin: 0;
+            color: var(--pcr-ink);
+            font-size: clamp(1.3rem, 1.6vw, 1.75rem);
+            line-height: 1.28;
+            font-weight: 880;
+            letter-spacing: 0;
+        }}
+
+        .pcr-home-section-title p {{
+            margin: 0.35rem 0 0 0;
+            color: var(--pcr-muted);
+            font-size: 0.96rem;
+            line-height: 1.7;
+        }}
+
         .pcr-gel-panel {{
             position: relative;
             min-height: 15.5rem;
@@ -1119,6 +1147,7 @@ def apply_common_styles(theme="student"):
 
         .pcr-workbench-meta span,
         .pcr-status-strip span,
+        .pcr-home-status-grid span,
         .pcr-current-step-chip {{
             border-radius: 999px;
             border: 1px solid rgba(14, 165, 183, 0.22);
@@ -1147,6 +1176,100 @@ def apply_common_styles(theme="student"):
             margin-top: 0.32rem;
             color: var(--pcr-ink);
             font-size: 1.05rem;
+        }}
+
+        .pcr-flow-grid {{
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 0.72rem;
+            margin-bottom: 0.65rem;
+        }}
+
+        .pcr-flow-card {{
+            position: relative;
+            min-height: 12.4rem;
+            border: 1px solid rgba(11, 31, 58, 0.1);
+            border-radius: 14px;
+            padding: 0.9rem 0.85rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(246,251,253,0.9));
+            box-shadow: var(--pcr-shadow-sm);
+        }}
+
+        .pcr-flow-index {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 999px;
+            background: rgba(14, 165, 183, 0.12);
+            border: 1px solid rgba(14, 165, 183, 0.22);
+            color: #075985;
+            font-size: 0.8rem;
+            font-weight: 850;
+            margin-bottom: 0.62rem;
+        }}
+
+        .pcr-flow-card h3 {{
+            margin: 0 0 0.45rem 0;
+            color: var(--pcr-ink);
+            font-size: 0.98rem;
+            line-height: 1.38;
+            font-weight: 850;
+        }}
+
+        .pcr-flow-card p {{
+            margin: 0;
+            color: var(--pcr-muted);
+            font-size: 0.86rem;
+            line-height: 1.58;
+        }}
+
+        .pcr-flow-arrow {{
+            position: absolute;
+            top: 1rem;
+            right: -0.62rem;
+            z-index: 2;
+            width: 1.28rem;
+            height: 1.28rem;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #075985;
+            background: #e0f7fb;
+            border: 1px solid rgba(14, 165, 183, 0.24);
+            font-weight: 850;
+            font-size: 0.78rem;
+        }}
+
+        .pcr-home-status-panel {{
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 14px;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.66);
+            box-shadow: 0 8px 18px rgba(11, 31, 58, 0.04);
+            margin-bottom: 0.58rem;
+        }}
+
+        .pcr-home-status-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.58rem;
+        }}
+
+        .pcr-home-status-grid > div {{
+            border: 1px solid rgba(11, 31, 58, 0.07);
+            border-radius: 12px;
+            padding: 0.58rem 0.68rem;
+            background: rgba(248, 252, 253, 0.78);
+        }}
+
+        .pcr-home-status-grid b {{
+            display: block;
+            margin-top: 0.25rem;
+            color: var(--pcr-ink);
+            font-size: 0.96rem;
         }}
 
         .pcr-student-toolbar {{
@@ -1313,11 +1436,24 @@ def apply_common_styles(theme="student"):
             }}
 
             .pcr-status-strip,
-            .pcr-readiness-grid {{
+            .pcr-readiness-grid,
+            .pcr-home-status-grid {{
                 grid-template-columns: 1fr;
             }}
 
             .pcr-stepper-grid {{
+                display: none;
+            }}
+
+            .pcr-flow-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .pcr-flow-card {{
+                min-height: auto;
+            }}
+
+            .pcr-flow-arrow {{
                 display: none;
             }}
         }}
@@ -1456,7 +1592,7 @@ def run_system_self_check():
     checks["extractor_strategy"] = {
         "level": "success",
         "status": "正常",
-        "detail": "优先 AI（BigModel），失败时回退本地规则"
+        "detail": "优先调用 BigModel / GLM 接口，失败时回退本地关键词规则"
     }
 
     return checks
@@ -2160,7 +2296,7 @@ def diagnose(abnormality, template_amount, annealing_temp, cycles,
     """
     诊断函数：根据输入的实验参数，返回可能的异常原因
     """
-    # 从学生描述中抽取文本线索：优先 MiniMax，失败回退本地规则
+    # 从学生描述中抽取文本线索：优先 BigModel / GLM，失败回退本地关键词规则
     text_clues, clue_source, api_debug = extract_text_clues_with_fallback(description)
     api_debug["normalized_case"] = build_normalized_case({
         "abnormality": abnormality,
