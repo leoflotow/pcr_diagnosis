@@ -207,7 +207,7 @@ def render_home_refined_styles():
         .pcr-home-hero-refined,
         .pcr-problem-band,
         .pcr-status-footer-wrap,
-        .st-key-pcr_footer_action_row {
+        .st-key-pcr_status_reset_row {
             width: 100vw !important;
             margin-left: calc(50% - 50vw) !important;
             margin-right: calc(50% - 50vw) !important;
@@ -367,33 +367,43 @@ def render_home_refined_styles():
             line-height: 1.68;
         }
 
-        .pcr-hero-metrics {
+        .pcr-hero-value-strip {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1px;
-            max-width: 650px;
-            margin-top: 2.5rem;
+            max-width: 690px;
+            margin-top: 2.15rem;
             border: 1px solid rgba(216, 227, 234, 0.18);
-            background: rgba(216, 227, 234, 0.18);
+            background: rgba(255, 255, 255, 0.052);
+            box-shadow: 0 18px 46px rgba(0, 0, 0, 0.14);
+            backdrop-filter: blur(14px);
         }
 
-        .pcr-hero-metric {
-            padding: 1rem;
-            background: rgba(11, 31, 58, 0.54);
+        .pcr-hero-value-item {
+            min-height: 4.45rem;
+            padding: 0.95rem 1.1rem;
+            border-right: 1px solid rgba(255, 255, 255, 0.12);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
-        .pcr-hero-metric strong {
-            display: block;
-            margin-bottom: 0.35rem;
+        .pcr-hero-value-item:last-child {
+            border-right: 0;
+        }
+
+        .pcr-hero-value-title {
             color: #FFFFFF;
-            font-size: 1.2rem;
-            font-weight: 400;
+            font-size: 1.08rem;
+            line-height: 1.3;
+            font-weight: 650;
+            letter-spacing: 0;
         }
 
-        .pcr-hero-metric span {
-            color: #C6C6C6;
-            font-size: 0.76rem;
-            letter-spacing: 0.02rem;
+        .pcr-hero-value-desc {
+            margin-top: 0.34rem;
+            color: rgba(246, 250, 252, 0.58);
+            font-size: 0.78rem;
+            line-height: 1.4;
         }
 
         .pcr-hero-visual {
@@ -575,17 +585,18 @@ def render_home_refined_styles():
 
         .pcr-section-head {
             display: block;
-            max-width: 860px;
+            max-width: 1120px;
             margin: 0 0 2.75rem 0;
         }
 
         .pcr-section-head h2 {
             margin: 0;
             color: var(--pcr-home-dark);
-            font-size: clamp(2rem, 3vw, 2.85rem);
+            font-size: clamp(1.9rem, 2.35vw, 2.35rem);
             line-height: 1.16;
             font-weight: 300;
             letter-spacing: 0;
+            white-space: nowrap;
         }
 
         .pcr-section-note {
@@ -844,6 +855,10 @@ def render_home_refined_styles():
             padding: 2rem;
         }
 
+        .pcr-status-intro {
+            padding-bottom: 5rem;
+        }
+
         .pcr-status-intro h2 {
             margin: 1rem 0 1rem 0;
             color: #FFFFFF;
@@ -857,21 +872,6 @@ def render_home_refined_styles():
             color: #C6C6C6;
             font-size: 0.95rem;
             line-height: 1.68;
-        }
-
-        .pcr-tech-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-top: 1.5rem;
-        }
-
-        .pcr-tech-row span {
-            border: 1px solid rgba(14,165,183,0.32);
-            background: rgba(14,165,183,0.12);
-            color: #DFF7FB;
-            padding: 0.32rem 0.7rem;
-            font-size: 0.78rem;
         }
 
         .pcr-status-grid {
@@ -920,33 +920,33 @@ def render_home_refined_styles():
             font-weight: 400;
         }
 
-        .pcr-footer-action-row {
-            width: min(1240px, calc(100vw - 64px));
-            margin: 1rem auto 0 auto;
-        }
-
-        .st-key-pcr_footer_action_row {
+        .st-key-pcr_status_reset_row {
             width: 100%;
             margin: 0;
-            padding: 1rem 0 1.25rem 0;
+            padding: 0 0 1.6rem 0;
             position: relative;
             z-index: 2;
-            background: #071C31;
+            background: transparent;
+            margin-top: -4.15rem;
         }
 
-        .st-key-pcr_footer_action_row > div {
+        .st-key-pcr_status_reset_row > div {
             width: min(1240px, calc(100vw - 64px));
             margin: 0 auto;
         }
 
-        .pcr-footer-action-row button,
-        .st-key-pcr_footer_action_row button {
+        .st-key-pcr_status_reset_row [data-testid="column"]:first-child {
+            padding-left: 1px;
+        }
+
+        .st-key-pcr_status_reset_row button {
             min-height: 2.5rem;
             border-radius: 0 !important;
-            background: rgba(255,255,255,0.04) !important;
+            background: rgba(255,255,255,0.06) !important;
             color: #D8E3EA !important;
-            border-color: rgba(216,227,234,0.22) !important;
+            border-color: rgba(216,227,234,0.26) !important;
             box-shadow: none !important;
+            max-width: 24rem;
         }
 
         @media (max-width: 1180px) {
@@ -982,8 +982,7 @@ def render_home_refined_styles():
             .st-key-pcr_hero_action_row,
             .pcr-section,
             .pcr-section-dark,
-            .pcr-status-footer,
-            .pcr-footer-action-row {
+            .pcr-status-footer {
                 width: min(100%, calc(100vw - 32px));
             }
 
@@ -1004,7 +1003,7 @@ def render_home_refined_styles():
                 margin-top: -2.2rem;
             }
 
-            .pcr-hero-metrics,
+            .pcr-hero-value-strip,
             .pcr-problem-grid,
             .pcr-flow-grid,
             .pcr-capability-grid,
@@ -1012,6 +1011,15 @@ def render_home_refined_styles():
             .pcr-status-grid,
             .pcr-section-head {
                 grid-template-columns: 1fr;
+            }
+
+            .pcr-hero-value-item {
+                border-right: 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+            }
+
+            .pcr-hero-value-item:last-child {
+                border-bottom: 0;
             }
 
             .pcr-problem-card,
@@ -1022,8 +1030,17 @@ def render_home_refined_styles():
 
             .pcr-problem-card h3,
             .pcr-flow-card h3,
-            .pcr-capability-card h3 {
+            .pcr-capability-card h3,
+            .pcr-section-head h2 {
                 white-space: normal;
+            }
+
+            .pcr-status-intro {
+                padding-bottom: 4rem;
+            }
+
+            .st-key-pcr_status_reset_row {
+                margin-top: -3.2rem;
             }
 
         }
@@ -1156,13 +1173,6 @@ def render_bottom_status_area():
                 <div class="pcr-status-intro">
                     <div class="pcr-section-kicker">Entry summary</div>
                     <h2>产品状态与角色入口摘要</h2>
-                    <p>这里展示当前会话可进入的角色状态，让首页保持展示感，也让进入工作台时路径清晰。</p>
-                    <div class="pcr-tech-row">
-                        <span>Streamlit</span>
-                        <span>rules.csv</span>
-                        <span>rule_combos.csv</span>
-                        <span>教师复核</span>
-                    </div>
                 </div>
                 <div class="pcr-status-grid">
                     <div class="pcr-status-card">
@@ -1187,13 +1197,9 @@ def render_bottom_status_area():
         """,
     )
 
-    with st.container(key="pcr_footer_action_row"):
-        col_home, col_reset = st.columns([1, 1])
-        with col_home:
-            if st.button("返回首页", key="home_keep_home", use_container_width=True):
-                go_home(clear_entries=False)
-                st.rerun()
-        with col_reset:
+    with st.container(key="pcr_status_reset_row"):
+        left_col, _ = st.columns([0.9, 1.25])
+        with left_col:
             if st.button("重置访问状态", key="home_reset_access", use_container_width=True):
                 go_home(clear_entries=True)
                 st.rerun()
@@ -1232,10 +1238,19 @@ def render_home_portal():
                     <div class="pcr-home-kicker">Teaching diagnostic system</div>
                     <h1><span>分子生物学实验</span><span>PCR电泳异常智能复盘助手</span></h1>
                     <p>面向分子生物学实验教学场景，帮助学生结构化记录异常现象，辅助系统生成候选原因，并支持教师复核确认与案例沉淀。</p>
-                    <div class="pcr-hero-metrics">
-                        <div class="pcr-hero-metric"><strong>Top 1/2/3</strong><span>候选原因排序</span></div>
-                        <div class="pcr-hero-metric"><strong>rules.csv</strong><span>基础规则矩阵</span></div>
-                        <div class="pcr-hero-metric"><strong>教师确认</strong><span>复盘闭环沉淀</span></div>
+                    <div class="pcr-hero-value-strip">
+                        <div class="pcr-hero-value-item">
+                            <div class="pcr-hero-value-title">结构化记录</div>
+                            <div class="pcr-hero-value-desc">实验异常有据可查</div>
+                        </div>
+                        <div class="pcr-hero-value-item">
+                            <div class="pcr-hero-value-title">可解释诊断</div>
+                            <div class="pcr-hero-value-desc">判断依据清晰呈现</div>
+                        </div>
+                        <div class="pcr-hero-value-item">
+                            <div class="pcr-hero-value-title">教师复盘闭环</div>
+                            <div class="pcr-hero-value-desc">经验沉淀为案例</div>
+                        </div>
                     </div>
                 </div>
                 <div class="pcr-hero-visual" aria-label="抽象凝胶电泳品牌符号">
