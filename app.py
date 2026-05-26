@@ -719,7 +719,8 @@ def render_home_refined_styles():
 
         .pcr-flow-card {
             position: relative;
-            min-height: 11.5rem;
+            height: 11.5rem;
+            box-sizing: border-box;
             padding: 1.2rem 1rem;
             border: 1px solid var(--pcr-home-border);
             background: rgba(255, 255, 255, 0.92);
@@ -935,10 +936,12 @@ def render_home_refined_styles():
         .st-key-pcr_status_reset_row > div {
             width: min(1240px, calc(100vw - 64px));
             margin: 0 auto;
+            padding: 0 0.85rem;
+            box-sizing: border-box;
         }
 
         .st-key-pcr_status_reset_row [data-testid="column"]:first-child {
-            padding-left: 1px;
+            padding-left: 0.55rem;
         }
 
         .st-key-pcr_status_reset_row button {
@@ -1073,17 +1076,17 @@ def build_problem_cards_html():
     items = [
         (
             "01",
-            "学生不知道从哪里排查失败原因",
+            "学生排查失败原因缺少依据",
             "PCR-电泳实验出现无条带、弱带、多条带、拖尾等异常后，学生往往难以判断问题来自模板、引物、体系、程序还是电泳条件。",
         ),
         (
             "02",
-            "教师重复解释相似异常",
-            "教师需要反复处理相似实验失败案例，但很多排错经验停留在口头解释中，难以沉淀为可复用案例。",
+            "教师需反复说明相似异常",
+            "教师需要多次处理相似实验失败案例，但很多排错经验停留在口头说明中，难以整理为可供教学使用的案例。",
         ),
         (
             "03",
-            "课程缺少结构化失败案例",
+            "课程缺少结构化异常案例",
             "实验失败本身具有教学价值，但如果没有记录、复核和统计机制，就难以支撑后续教学改进。",
         ),
     ]
@@ -1110,12 +1113,12 @@ def render_problem_cards():
 
 def build_workflow_section_html():
     steps = [
-        ("01", "学生提交异常", "记录异常现象、对照结果、PCR 参数、文字描述和凝胶图片。"),
-        ("02", "信息标准化", "将学生输入归一化为诊断规则可识别的结构化字段。"),
-        ("03", "规则矩阵诊断", "基于 rules.csv 基础规则生成候选原因排序。"),
-        ("04", "组合规则加权", "结合 rule_combos.csv 对关键证据组合进行加权修正。"),
+        ("01", "学生记录异常", "记录异常现象、对照结果、PCR 参数、文字描述和凝胶图片。"),
+        ("02", "信息规范整理", "将学生输入整理为诊断规则可识别的结构化字段。"),
+        ("03", "规则诊断", "依据基础诊断规则生成候选原因排序。"),
+        ("04", "组合证据判断", "结合关键证据组合对候选原因进行修正。"),
         ("05", "教师确认", "教师查看系统判断并确认最终原因。"),
-        ("06", "案例沉淀与统计", "历史记录进入教师端看板，用于复盘、筛选和教学分析。"),
+        ("06", "案例整理与统计", "历史记录汇总到教师端看板，用于筛选、复核和教学分析。"),
     ]
     cards = []
     for index, (number, title, desc) in enumerate(steps):
@@ -1140,10 +1143,10 @@ def render_workflow_section():
 
 def build_capability_cards_html():
     items = [
-        ("01", "结构化采集", "支持记录异常现象、阳性/阴性对照、PCR 参数、学生补充描述和凝胶图片。", "blue"),
-        ("02", "规则诊断", "基于基础规则与组合规则生成 Top1 / Top2 / Top3 候选原因。", "cyan"),
-        ("03", "证据解释", "展示诊断依据、置信度、证据摘要和缺失信息提示，避免只给结论。", "blue"),
-        ("04", "教师闭环", "教师可确认最终原因、填写备注，并通过统计看板追踪系统判断与教师确认的一致性。", "cyan"),
+        ("01", "异常信息记录", "支持记录异常现象、阳性/阴性对照、PCR 参数、学生补充描述和凝胶图片。", "blue"),
+        ("02", "规则诊断", "基于基础规则与组合规则生成前三项候选原因。", "cyan"),
+        ("03", "诊断依据说明", "展示诊断依据、置信度、证据摘要和缺失信息提示，避免只给结论。", "blue"),
+        ("04", "教师复核确认", "教师可确认最终原因、填写备注，并通过统计看板查看系统判断与教师确认的一致性。", "cyan"),
     ]
     cards = []
     for number, title, desc, tone in items:
@@ -1173,8 +1176,8 @@ def render_bottom_status_area():
         <div class="pcr-status-footer-wrap" id="status">
             <div class="pcr-status-footer">
                 <div class="pcr-status-intro">
-                    <div class="pcr-section-kicker">Entry summary</div>
-                    <h2>产品状态与角色入口摘要</h2>
+                    <div class="pcr-section-kicker">入口状态</div>
+                    <h2>页面状态与角色入口</h2>
                 </div>
                 <div class="pcr-status-grid">
                     <div class="pcr-status-card">
@@ -1224,7 +1227,7 @@ def render_home_portal():
                 <nav class="pcr-ref-nav" aria-label="首页导航">
                     <a href="#problems">问题</a>
                     <a href="#workflow">流程</a>
-                    <a href="#capabilities">能力</a>
+                    <a href="#capabilities">功能</a>
                     <a href="#status">入口</a>
                 </nav>
             </div>
@@ -1237,21 +1240,21 @@ def render_home_portal():
         <div class="pcr-home-hero-refined">
             <div class="pcr-hero-content">
                 <div class="pcr-hero-copy">
-                    <div class="pcr-home-kicker">Teaching diagnostic system</div>
-                    <h1><span>分子生物学实验</span><span>PCR电泳异常智能复盘助手</span></h1>
-                    <p>面向分子生物学实验教学场景，帮助学生结构化记录异常现象，辅助系统生成候选原因，并支持教师复核确认与案例沉淀。</p>
+                    <div class="pcr-home-kicker">实验教学诊断</div>
+                    <h1><span>分子生物学实验</span><span>PCR-电泳异常智能复盘助手</span></h1>
+                    <p>面向分子生物学实验教学场景，帮助学生结构化记录异常现象，生成候选原因，并支持教师复核确认与案例整理。</p>
                     <div class="pcr-hero-value-strip">
                         <div class="pcr-hero-value-item">
                             <div class="pcr-hero-value-title">结构化记录</div>
                             <div class="pcr-hero-value-desc">实验异常有据可查</div>
                         </div>
                         <div class="pcr-hero-value-item">
-                            <div class="pcr-hero-value-title">可解释诊断</div>
+                            <div class="pcr-hero-value-title">诊断依据说明</div>
                             <div class="pcr-hero-value-desc">判断依据清晰呈现</div>
                         </div>
                         <div class="pcr-hero-value-item">
-                            <div class="pcr-hero-value-title">教师复盘闭环</div>
-                            <div class="pcr-hero-value-desc">经验沉淀为案例</div>
+                            <div class="pcr-hero-value-title">教师复核确认</div>
+                            <div class="pcr-hero-value-desc">记录整理为案例</div>
                         </div>
                     </div>
                 </div>
@@ -1298,7 +1301,7 @@ def render_home_portal():
     with st.container(key="pcr_hero_action_row"):
         col_student, col_teacher, col_dev = st.columns([1.28, 1, 0.9])
         with col_student:
-            if st.button("开始学生诊断", key="home_enter_student", type="primary", use_container_width=True):
+            if st.button("实验诊断入口", key="home_enter_student", type="primary", use_container_width=True):
                 enter_student_role()
                 st.rerun()
         with col_teacher:
@@ -1315,7 +1318,7 @@ def render_home_portal():
         f"""
         <div class="pcr-problem-band" id="problems">
             <section class="pcr-section-dark">
-                {build_home_section_title_html("把实验异常从口头排查变成可复盘的教学线索", "Problems：学生、教师和课程建设共同面对的三个问题。")}
+                {build_home_section_title_html("实验异常诊断中的常见教学难点", "教学问题：学生、教师和课程建设共同面对的三个问题。")}
                 {build_problem_cards_html()}
             </section>
         </div>
@@ -1325,7 +1328,7 @@ def render_home_portal():
     st.html(
         f"""
         <section class="pcr-section" id="workflow">
-            {build_home_section_title_html("从异常记录到教师确认，形成一条可解释的诊断路径", "Workflow：六步流程覆盖学生记录、信息标准化、规则判断、教师确认与案例沉淀。")}
+            {build_home_section_title_html("PCR电泳异常诊断流程", "流程说明：六步流程覆盖学生记录、信息整理、规则判断、教师确认与案例整理。")}
             {build_workflow_section_html()}
         </section>
         """,
@@ -1334,7 +1337,7 @@ def render_home_portal():
     st.html(
         f"""
         <section class="pcr-section" id="capabilities">
-            {build_home_section_title_html("围绕采集、诊断、解释、闭环展开的能力矩阵", "Capabilities：让实验失败记录能够被解释、复核和持续积累。")}
+            {build_home_section_title_html("系统主要功能", "功能说明：支持实验失败记录的诊断说明、教师复核和持续积累。")}
             {build_capability_cards_html()}
         </section>
         """,

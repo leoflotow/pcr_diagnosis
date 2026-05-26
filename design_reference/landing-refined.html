@@ -546,7 +546,8 @@
     }
 
     .step {
-      min-height: 238px;
+      height: 238px;
+      box-sizing: border-box;
       padding: 18px 16px 20px;
       background: rgba(255,255,255,0.88);
       border: 1px solid var(--border);
@@ -786,7 +787,7 @@
         <nav class="nav" aria-label="页面导航">
           <a href="#problems">问题</a>
           <a href="#workflow">流程</a>
-          <a href="#capabilities">能力</a>
+          <a href="#capabilities">功能</a>
           <a href="#status">入口</a>
         </nav>
       </div>
@@ -796,18 +797,18 @@
       <section class="hero" id="hero">
         <div class="hero-inner">
           <div>
-            <div class="eyebrow">Teaching diagnostic system</div>
+            <div class="eyebrow">实验教学诊断</div>
             <h1>分子生物学实验 PCR-电泳异常智能复盘助手</h1>
-            <p class="hero-copy">面向分子生物学实验教学场景，帮助学生结构化记录异常现象，辅助系统生成候选原因，并支持教师复核确认与案例沉淀。</p>
+            <p class="hero-copy">面向分子生物学实验教学场景，帮助学生结构化记录异常现象，生成候选原因，并支持教师复核确认与案例整理。</p>
             <div class="hero-actions" aria-label="主要入口">
-              <a class="btn btn-primary" href="#"><span>开始学生诊断</span><span>→</span></a>
+              <a class="btn btn-primary" href="#"><span>实验诊断入口</span><span>→</span></a>
               <a class="btn btn-secondary" href="#"><span>教师复核入口</span><span>↗</span></a>
               <a class="btn btn-ghost" href="#"><span>开发调试入口</span><span>·</span></a>
             </div>
             <div class="hero-metrics" aria-label="系统能力摘要">
-              <div class="metric"><strong>Top 1/2/3</strong><span>候选原因排序</span></div>
-              <div class="metric"><strong>rules.csv</strong><span>基础规则矩阵</span></div>
-              <div class="metric"><strong>教师确认</strong><span>复盘闭环沉淀</span></div>
+              <div class="metric"><strong>前三项</strong><span>候选原因排序</span></div>
+              <div class="metric"><strong>基础规则</strong><span>诊断依据整理</span></div>
+              <div class="metric"><strong>教师确认</strong><span>复核结果记录</span></div>
             </div>
           </div>
 
@@ -849,9 +850,9 @@
                 <span class="particle" style="left:61%; top:74%"></span>
               </div>
               <div class="float-card">
-                <small>EVIDENCE</small>
-                <strong>Top1 / Top2</strong>
-                <span>规则矩阵 · 组合加权</span>
+                <small>诊断依据</small>
+                <strong>候选原因</strong>
+                <span>基础规则 · 组合证据</span>
               </div>
             </div>
           </div>
@@ -862,10 +863,10 @@
         <div class="container">
           <div class="section-head">
             <div>
-              <div class="kicker">Problems</div>
-              <h2>把实验失败从“口头排错”变成可复盘的教学资产</h2>
+              <div class="kicker">教学问题</div>
+              <h2>实验异常诊断中的常见教学难点</h2>
             </div>
-            <p class="section-note">首页不承担后台管理任务，而是解释项目为什么成立：学生、教师和课程建设各自面临的真实痛点。</p>
+            <p class="section-note">学生、教师和课程建设共同面对的三个问题。</p>
           </div>
 
           <div class="problem-grid">
@@ -876,7 +877,7 @@
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 5h12M4 10h9M4 15h6" stroke="currentColor" stroke-width="1.5"/><path d="M15 12l2 2-2 2" stroke="currentColor" stroke-width="1.5"/></svg>
                 </span>
               </div>
-              <h3>学生不知道从哪里排查失败原因</h3>
+              <h3>学生排查失败原因缺少依据</h3>
               <p>PCR-电泳实验出现无条带、弱带、多条带、拖尾等异常后，学生往往难以判断问题来自模板、引物、体系、程序还是电泳条件。</p>
             </article>
             <article class="problem-card">
@@ -886,8 +887,8 @@
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 4h10v8H8l-3 3V4Z" stroke="currentColor" stroke-width="1.5"/><path d="M8 7h6M8 10h4" stroke="currentColor" stroke-width="1.5"/></svg>
                 </span>
               </div>
-              <h3>教师重复解释相似异常</h3>
-              <p>教师需要反复处理相似实验失败案例，但很多排错经验停留在口头解释中，难以沉淀为可复用案例。</p>
+              <h3>教师需反复说明相似异常</h3>
+              <p>教师需要多次处理相似实验失败案例，但很多排错经验停留在口头说明中，难以整理为可供教学使用的案例。</p>
             </article>
             <article class="problem-card">
               <div class="card-top">
@@ -896,7 +897,7 @@
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 4h12v12H4z" stroke="currentColor" stroke-width="1.5"/><path d="M7 13V9M10 13V6M13 13v-3" stroke="currentColor" stroke-width="1.5"/></svg>
                 </span>
               </div>
-              <h3>课程缺少结构化失败案例</h3>
+              <h3>课程缺少结构化异常案例</h3>
               <p>实验失败本身具有教学价值，但如果没有记录、复核和统计机制，就难以支撑后续教学改进。</p>
             </article>
           </div>
@@ -907,21 +908,21 @@
         <div class="container">
           <div class="section-head">
             <div>
-              <div class="kicker">Workflow</div>
-              <h2>从异常记录到教师确认，形成一条可解释的诊断路径</h2>
+              <div class="kicker">流程说明</div>
+              <h2>PCR电泳异常诊断流程</h2>
             </div>
-            <p class="section-note">六步流程保持竞赛展示所需的完整叙事，同时避免后台看板式的信息堆叠。</p>
+            <p class="section-note">六步流程覆盖学生记录、信息整理、规则判断、教师确认与案例整理。</p>
           </div>
 
           <div class="workflow-wrap">
             <div class="workflow-line" aria-hidden="true"></div>
             <div class="workflow">
-              <article class="step"><div class="step-index">01</div><h3>学生提交异常</h3><p>记录异常现象、对照结果、PCR 参数、文字描述和凝胶图片。</p></article>
-              <article class="step"><div class="step-index">02</div><h3>信息标准化</h3><p>将学生输入归一化为诊断规则可识别的结构化字段。</p></article>
-              <article class="step"><div class="step-index">03</div><h3>规则矩阵诊断</h3><p>基于 rules.csv 基础规则生成候选原因排序。</p></article>
-              <article class="step"><div class="step-index">04</div><h3>组合规则加权</h3><p>结合 rule_combos.csv 对关键证据组合进行加权修正。</p></article>
+              <article class="step"><div class="step-index">01</div><h3>学生记录异常</h3><p>记录异常现象、对照结果、PCR 参数、文字描述和凝胶图片。</p></article>
+              <article class="step"><div class="step-index">02</div><h3>信息规范整理</h3><p>将学生输入整理为诊断规则可识别的结构化字段。</p></article>
+              <article class="step"><div class="step-index">03</div><h3>规则诊断</h3><p>依据基础诊断规则生成候选原因排序。</p></article>
+              <article class="step"><div class="step-index">04</div><h3>组合证据判断</h3><p>结合关键证据组合对候选原因进行修正。</p></article>
               <article class="step"><div class="step-index">05</div><h3>教师确认</h3><p>教师查看系统判断并确认最终原因。</p></article>
-              <article class="step"><div class="step-index">06</div><h3>案例沉淀与统计</h3><p>历史记录进入教师端看板，用于复盘、筛选和教学分析。</p></article>
+              <article class="step"><div class="step-index">06</div><h3>案例整理与统计</h3><p>历史记录汇总到教师端看板，用于筛选、复核和教学分析。</p></article>
             </div>
           </div>
         </div>
@@ -931,32 +932,32 @@
         <div class="container">
           <div class="section-head">
             <div>
-              <div class="kicker">Capabilities</div>
-              <h2>核心能力围绕“采集、诊断、解释、闭环”展开</h2>
+              <div class="kicker">功能说明</div>
+              <h2>系统主要功能</h2>
             </div>
-            <p class="section-note">能力模块保持产品化表达，用浅色矩阵承接深色问题区，形成更清爽的中段节奏。</p>
+            <p class="section-note">支持实验失败记录的诊断说明、教师复核和持续积累。</p>
           </div>
 
           <div class="cap-grid">
             <article class="cap-card">
               <div class="cap-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 3h12v18H6z" stroke="currentColor" stroke-width="1.5"/><path d="M9 8h6M9 12h6M9 16h3" stroke="currentColor" stroke-width="1.5"/></svg></div>
-              <h3>结构化采集</h3>
+              <h3>异常信息记录</h3>
               <p>支持记录异常现象、阳性/阴性对照、PCR 参数、学生补充描述和凝胶图片。</p>
             </article>
             <article class="cap-card featured">
               <div class="cap-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 12h16M4 19h16" stroke="currentColor" stroke-width="1.5"/><path d="M8 3v18M16 3v18" stroke="currentColor" stroke-width="1.5"/></svg></div>
               <h3>规则诊断</h3>
-              <p>基于基础规则与组合规则生成 Top1 / Top2 / Top3 候选原因。</p>
+              <p>基于基础规则与组合规则生成前三项候选原因。</p>
             </article>
             <article class="cap-card">
               <div class="cap-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h3v3H7zM14 14h3v3h-3z" stroke="currentColor" stroke-width="1.5"/></svg></div>
-              <h3>证据解释</h3>
+              <h3>诊断依据说明</h3>
               <p>展示诊断依据、置信度、证据摘要和缺失信息提示，避免只给结论。</p>
             </article>
             <article class="cap-card">
               <div class="cap-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 6" stroke="currentColor" stroke-width="1.5"/><path d="M4 4h16v16H4z" stroke="currentColor" stroke-width="1.5"/></svg></div>
-              <h3>教师闭环</h3>
-              <p>教师可确认最终原因、填写备注，并通过统计看板追踪系统判断与教师确认的一致性。</p>
+              <h3>教师复核确认</h3>
+              <p>教师可确认最终原因、填写备注，并通过统计看板查看系统判断与教师确认的一致性。</p>
             </article>
           </div>
         </div>
@@ -967,13 +968,13 @@
       <div class="container">
         <div class="status-panel">
           <div class="status-intro">
-            <div class="kicker">Entry summary</div>
-            <h2>产品状态与角色入口摘要</h2>
+            <div class="kicker">入口状态</div>
+            <h2>页面状态与角色入口</h2>
             <p>底部信息用于展示系统可进入状态，不喧宾夺主，也不把首页变成后台工作台。</p>
             <div class="tech-row">
               <span class="tag">Streamlit</span>
-              <span class="tag">rules.csv</span>
-              <span class="tag">rule_combos.csv</span>
+              <span class="tag">基础规则</span>
+              <span class="tag">组合证据</span>
               <span class="tag">教师复核</span>
             </div>
           </div>
