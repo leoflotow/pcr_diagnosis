@@ -35,6 +35,10 @@ def inject_teacher_dashboard_layout_styles():
     st.markdown(
         """
         <style>
+        :root {
+            --pcr-teacher-content-width: min(1320px, calc(100vw - 96px));
+        }
+
         .main .block-container {
             max-width: min(1500px, 96vw);
             padding-top: 0.85rem;
@@ -513,8 +517,8 @@ def inject_teacher_dashboard_layout_styles():
         .stMainBlockContainer,
         div[data-testid="stMainBlockContainer"],
         section[data-testid="stMain"] > div {
-            max-width: min(1480px, calc(100vw - 64px)) !important;
-            width: min(1480px, calc(100vw - 64px)) !important;
+            max-width: var(--pcr-teacher-content-width) !important;
+            width: var(--pcr-teacher-content-width) !important;
             margin-left: auto !important;
             margin-right: auto !important;
             padding-top: 0 !important;
@@ -569,7 +573,7 @@ def inject_teacher_dashboard_layout_styles():
         .pcr-teacher-section,
         .pcr-teacher-filter-panel,
         .pcr-teacher-case-list {
-            max-width: min(1480px, calc(100vw - 64px));
+            max-width: var(--pcr-teacher-content-width);
             margin-left: auto;
             margin-right: auto;
         }
@@ -592,9 +596,10 @@ def inject_teacher_dashboard_layout_styles():
         }
 
         .st-key-pcr_teacher_hero_inner {
-            max-width: min(1240px, calc(100vw - 48px));
-            width: 100%;
+            max-width: var(--pcr-teacher-content-width) !important;
+            width: var(--pcr-teacher-content-width) !important;
             margin: 0 auto !important;
+            box-sizing: border-box;
             overflow: visible !important;
         }
 
@@ -604,6 +609,11 @@ def inject_teacher_dashboard_layout_styles():
 
         .st-key-pcr_teacher_hero_card {
             position: relative;
+            width: calc(100% - 30px) !important;
+            max-width: calc(100% - 30px) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            box-sizing: border-box;
             overflow: hidden !important;
             min-height: 10.6rem;
             padding: 1.35rem 1.55rem 1.45rem 1.55rem;
@@ -1148,6 +1158,10 @@ def inject_teacher_dashboard_layout_styles():
         }
 
         @media (max-width: 768px) {
+            :root {
+                --pcr-teacher-content-width: calc(100vw - 28px);
+            }
+
             .pcr-teacher-header {
                 padding: 1rem;
             }
@@ -1161,8 +1175,13 @@ def inject_teacher_dashboard_layout_styles():
             .stMainBlockContainer,
             div[data-testid="stMainBlockContainer"],
             section[data-testid="stMain"] > div {
-                max-width: calc(100vw - 28px) !important;
-                width: calc(100vw - 28px) !important;
+                max-width: var(--pcr-teacher-content-width) !important;
+                width: var(--pcr-teacher-content-width) !important;
+            }
+
+            .st-key-pcr_teacher_hero_inner {
+                max-width: var(--pcr-teacher-content-width) !important;
+                width: var(--pcr-teacher-content-width) !important;
             }
 
             .pcr-teacher-kpi-grid,
