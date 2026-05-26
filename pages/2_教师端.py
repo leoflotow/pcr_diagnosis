@@ -841,6 +841,8 @@ def inject_teacher_dashboard_layout_styles():
             grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 0.88rem;
             margin-top: 0.35rem;
+            margin-bottom: 0.85rem;
+            align-items: stretch;
         }
 
         .pcr-teacher-kpi-card {
@@ -875,6 +877,15 @@ def inject_teacher_dashboard_layout_styles():
             color: #64748b;
             font-size: 0.82rem;
             line-height: 1.55;
+        }
+
+        .st-key-pcr_teacher_overview_section div[data-testid="stVerticalBlockBorderWrapper"] {
+            overflow: visible !important;
+        }
+
+        .pcr-teacher-overview-bottom-spacer {
+            height: 1rem;
+            min-height: 1rem;
         }
 
         .pcr-teacher-insight-grid {
@@ -2837,7 +2848,7 @@ def render_teacher_dashboard(records_by_id, all_records):
     consistency_df = pd.DataFrame()
     reason_summary_df = pd.DataFrame(columns=["失败原因", "次数", "已确认数", "未确认数"])
 
-    with st.container(border=True):
+    with st.container(border=True, key="pcr_teacher_overview_section"):
         render_teacher_section_header(
             "班级实验记录概览",
             "按当前范围汇总学生诊断记录、复核进度和近期提交情况。",
@@ -2883,6 +2894,7 @@ def render_teacher_dashboard(records_by_id, all_records):
 
         metrics = compute_dashboard_stats(filtered_df, class_scoped_df, column_mapping)
         render_teacher_kpi_cards(metrics)
+        st.markdown('<div class="pcr-teacher-overview-bottom-spacer"></div>', unsafe_allow_html=True)
 
     if dashboard_df.empty:
         with st.container(border=True):
