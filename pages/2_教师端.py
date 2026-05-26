@@ -25,6 +25,7 @@ from core import (
     render_entry_guard,
     render_card_title,
     render_page_hero,
+    return_to_home,
     save_teacher_confirmation,
 )
 
@@ -507,6 +508,634 @@ def inject_teacher_dashboard_layout_styles():
             border-bottom: 0;
         }
 
+        .main .block-container,
+        .block-container,
+        .stMainBlockContainer,
+        div[data-testid="stMainBlockContainer"],
+        section[data-testid="stMain"] > div {
+            max-width: min(1480px, calc(100vw - 64px)) !important;
+            width: min(1480px, calc(100vw - 64px)) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            padding-top: 0 !important;
+            padding-bottom: 3rem !important;
+            overflow: visible !important;
+        }
+
+        header[data-testid="stHeader"] {
+            display: none !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            background: transparent !important;
+            border: 0 !important;
+        }
+
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"],
+        div[data-testid="stStatusWidget"],
+        #MainMenu {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            min-height: 0 !important;
+        }
+
+        .stApp,
+        [data-testid="stAppViewContainer"] {
+            background:
+                radial-gradient(circle at 10% 2%, rgba(14, 165, 183, 0.10), transparent 28%),
+                radial-gradient(circle at 88% 0%, rgba(37, 99, 235, 0.08), transparent 30%),
+                linear-gradient(180deg, #f3f9fc 0%, #eef6fb 42%, #f7fbfd 100%) !important;
+        }
+
+        [data-testid="stMain"] {
+            background:
+                radial-gradient(circle at 10% 2%, rgba(14, 165, 183, 0.10), transparent 28%),
+                radial-gradient(circle at 88% 0%, rgba(37, 99, 235, 0.08), transparent 30%),
+                linear-gradient(180deg, #f3f9fc 0%, #eef6fb 42%, #f7fbfd 100%) !important;
+        }
+
+        body,
+        html {
+            background: #eef6fb !important;
+        }
+
+        section[data-testid="stSidebar"] {
+            background: rgba(7, 23, 43, 0.98) !important;
+        }
+
+        .pcr-teacher-page,
+        .pcr-teacher-inner,
+        .pcr-teacher-section,
+        .pcr-teacher-filter-panel,
+        .pcr-teacher-case-list {
+            max-width: min(1480px, calc(100vw - 64px));
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .st-key-pcr_teacher_hero_shell {
+            max-width: 100vw !important;
+            width: 100vw !important;
+            position: relative !important;
+            left: 50% !important;
+            right: 50% !important;
+            margin-left: -50vw !important;
+            margin-right: -50vw !important;
+            margin-top: 0 !important;
+            margin-bottom: 1.35rem !important;
+            padding: 1.55rem 0 1.55rem 0 !important;
+            background:
+                radial-gradient(circle at 78% 2%, rgba(14, 165, 183, 0.28), transparent 28%),
+                linear-gradient(180deg, #07172b 0%, #0b1f3a 100%);
+            overflow: visible !important;
+        }
+
+        .st-key-pcr_teacher_hero_inner {
+            max-width: min(1240px, calc(100vw - 48px));
+            width: 100%;
+            margin: 0 auto !important;
+            overflow: visible !important;
+        }
+
+        .st-key-pcr_teacher_hero_inner div[data-testid="stVerticalBlock"] {
+            gap: 0.85rem;
+        }
+
+        .st-key-pcr_teacher_hero_card {
+            position: relative;
+            overflow: hidden !important;
+            min-height: 10.6rem;
+            padding: 1.35rem 1.55rem 1.45rem 1.55rem;
+            border: 1px solid rgba(216, 227, 234, 0.18);
+            border-radius: 18px;
+            background:
+                radial-gradient(circle at 86% 25%, rgba(109, 234, 243, 0.28), transparent 30%),
+                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 62%, rgba(14, 165, 183, 0.82) 100%);
+            box-shadow: 0 26px 68px rgba(0, 0, 0, 0.24);
+        }
+
+        .st-key-pcr_teacher_hero_card::after {
+            content: "";
+            position: absolute;
+            right: 1.4rem;
+            top: 1.2rem;
+            width: min(18rem, 32%);
+            height: 7.4rem;
+            border-radius: 14px;
+            opacity: 0.36;
+            background:
+                repeating-linear-gradient(90deg, rgba(109, 234, 243, 0.22) 0 10px, transparent 10px 30px),
+                linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
+            border: 1px solid rgba(223, 247, 251, 0.18);
+            transform: skewX(-8deg);
+            pointer-events: none;
+        }
+
+        .st-key-pcr_teacher_hero_card > div {
+            position: relative;
+            z-index: 1;
+        }
+
+        .st-key-pcr_teacher_hero_card div[data-testid="stVerticalBlock"] {
+            gap: 0.9rem;
+        }
+
+        .pcr-teacher-topbar {
+            min-height: 2.45rem;
+            display: flex;
+            align-items: center;
+            color: #dff7fb;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+        }
+
+        .pcr-teacher-topbar::before {
+            content: "";
+            width: 2.35rem;
+            height: 1px;
+            margin-right: 0.65rem;
+            background: #6deaf3;
+        }
+
+        .pcr-teacher-hero-copy h1 {
+            margin: 0.52rem 0 0.42rem 0;
+            color: #ffffff;
+            font-size: clamp(1.86rem, 2.6vw, 2.65rem);
+            line-height: 1.18;
+            font-weight: 780;
+            letter-spacing: -0.03em;
+        }
+
+        .pcr-teacher-hero-copy p {
+            max-width: 48rem;
+            margin: 0;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
+            line-height: 1.72;
+        }
+
+        .st-key-pcr_teacher_return button,
+        .st-key-teacher_history_reset_filters button {
+            background: rgba(223, 247, 251, 0.06) !important;
+            border: 1px solid rgba(223, 247, 251, 0.42) !important;
+            color: #eafbff !important;
+            font-weight: 780 !important;
+            border-radius: 0 !important;
+            min-height: 2.45rem !important;
+        }
+
+        .st-key-teacher_history_reset_filters button {
+            background: rgba(11, 31, 58, 0.05) !important;
+            border-color: rgba(11, 31, 58, 0.18) !important;
+            color: #0b1f3a !important;
+        }
+
+        .pcr-teacher-hero {
+            position: relative;
+            overflow: hidden;
+            min-height: 10.5rem;
+            padding: 1.35rem 1.55rem;
+            border: 1px solid rgba(216, 227, 234, 0.18);
+            border-radius: 18px;
+            background:
+                radial-gradient(circle at 86% 25%, rgba(109, 234, 243, 0.28), transparent 30%),
+                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 62%, rgba(14, 165, 183, 0.82) 100%);
+            box-shadow: 0 26px 68px rgba(0, 0, 0, 0.24);
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .pcr-teacher-hero::after {
+            content: "";
+            position: absolute;
+            right: 1.4rem;
+            top: 1.1rem;
+            width: min(18rem, 32%);
+            height: 7.6rem;
+            border-radius: 14px;
+            opacity: 0.38;
+            background:
+                repeating-linear-gradient(90deg, rgba(109, 234, 243, 0.22) 0 10px, transparent 10px 30px),
+                linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
+            border: 1px solid rgba(223, 247, 251, 0.18);
+            transform: skewX(-8deg);
+        }
+
+        .pcr-teacher-hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .pcr-teacher-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            color: #dff7fb;
+            font-size: 0.78rem;
+            font-weight: 820;
+            letter-spacing: 0.04em;
+        }
+
+        .pcr-teacher-label::before {
+            content: "";
+            width: 2.35rem;
+            height: 1px;
+            background: #6deaf3;
+        }
+
+        .pcr-teacher-hero h1 {
+            margin: 0.62rem 0 0.42rem 0;
+            color: #ffffff;
+            font-size: clamp(1.86rem, 2.6vw, 2.65rem);
+            line-height: 1.18;
+            font-weight: 780;
+            letter-spacing: -0.03em;
+        }
+
+        .pcr-teacher-hero p {
+            max-width: 48rem;
+            margin: 0;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
+            line-height: 1.72;
+        }
+
+        .pcr-teacher-hero-meta {
+            display: flex;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .pcr-teacher-status-tag {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.65rem;
+            padding: 0.18rem 0.58rem;
+            border-radius: 999px;
+            border: 1px solid rgba(109, 234, 243, 0.32);
+            background: rgba(14, 165, 183, 0.14);
+            color: #dff7fb;
+            font-size: 0.76rem;
+            font-weight: 760;
+            white-space: nowrap;
+        }
+
+        .pcr-teacher-status-tag.ok {
+            background: rgba(22, 163, 74, 0.16);
+            border-color: rgba(134, 239, 172, 0.35);
+            color: #dcfce7;
+        }
+
+        .pcr-teacher-status-tag.warn {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(253, 186, 116, 0.42);
+            color: #ffedd5;
+        }
+
+        .pcr-teacher-section {
+            margin-top: 1rem;
+            border: 1px solid rgba(216, 227, 234, 0.14);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 18px 54px rgba(11, 31, 58, 0.11);
+            padding: 1.15rem;
+        }
+
+        .pcr-teacher-section.dark {
+            background:
+                radial-gradient(circle at 82% 12%, rgba(14, 165, 183, 0.14), transparent 30%),
+                linear-gradient(135deg, rgba(7, 23, 43, 0.98), rgba(11, 31, 58, 0.96));
+            color: #ffffff;
+        }
+
+        .pcr-teacher-section-title {
+            margin: 0 0 0.22rem 0;
+            color: #07172b;
+            font-size: 1.3rem;
+            line-height: 1.36;
+            font-weight: 820;
+            letter-spacing: -0.02em;
+        }
+
+        .pcr-teacher-section.dark .pcr-teacher-section-title {
+            color: #ffffff;
+        }
+
+        .pcr-teacher-section-desc {
+            margin: 0 0 0.95rem 0;
+            color: #526174;
+            line-height: 1.68;
+            font-size: 0.94rem;
+        }
+
+        .pcr-teacher-section.dark .pcr-teacher-section-desc {
+            color: rgba(255, 255, 255, 0.76);
+        }
+
+        .pcr-teacher-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.88rem;
+            margin-top: 0.35rem;
+        }
+
+        .pcr-teacher-kpi-card {
+            min-height: 8.3rem;
+            padding: 1rem;
+            border-radius: 16px;
+            border: 1px solid rgba(11, 31, 58, 0.09);
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,251,253,0.94));
+            box-shadow: 0 12px 34px rgba(11, 31, 58, 0.08);
+        }
+
+        .pcr-teacher-kpi-card.focus {
+            border-top: 4px solid #0ea5b7;
+        }
+
+        .pcr-teacher-kpi-label {
+            color: #526174;
+            font-size: 0.82rem;
+            font-weight: 800;
+        }
+
+        .pcr-teacher-kpi-value {
+            margin: 0.55rem 0 0.35rem 0;
+            color: #07172b;
+            font-size: clamp(1.75rem, 2.5vw, 2.7rem);
+            font-weight: 840;
+            letter-spacing: -0.04em;
+        }
+
+        .pcr-teacher-kpi-note {
+            color: #64748b;
+            font-size: 0.82rem;
+            line-height: 1.55;
+        }
+
+        .pcr-teacher-insight-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 1rem;
+        }
+
+        .pcr-teacher-insight-card {
+            min-height: 23rem;
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,252,253,0.94));
+            padding: 1rem;
+            color: #0b1f3a;
+            box-shadow: 0 12px 34px rgba(11, 31, 58, 0.08);
+        }
+
+        .pcr-teacher-insight-title {
+            color: #07172b;
+            font-size: 1rem;
+            font-weight: 820;
+            margin-bottom: 0.72rem;
+        }
+
+        .pcr-teacher-mini-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.66rem;
+            margin-top: 0.9rem;
+        }
+
+        .pcr-teacher-mini-stat {
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 13px;
+            background: rgba(223, 247, 251, 0.46);
+            padding: 0.72rem;
+        }
+
+        .pcr-teacher-mini-stat span {
+            display: block;
+            color: #526174;
+            font-size: 0.76rem;
+            margin-bottom: 0.24rem;
+        }
+
+        .pcr-teacher-mini-stat b {
+            color: #07172b;
+            font-size: 1.18rem;
+        }
+
+        .pcr-teacher-empty-state {
+            min-height: 6.4rem;
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 14px;
+            background: rgba(223, 247, 251, 0.46);
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .pcr-teacher-empty-state b {
+            display: block;
+            color: #07172b;
+            margin-bottom: 0.25rem;
+            font-size: 0.96rem;
+        }
+
+        .pcr-teacher-empty-state span {
+            color: #526174;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+
+        .pcr-top-reason-row {
+            margin-top: 0.72rem;
+        }
+
+        .pcr-top-reason-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.8rem;
+            color: #0b1f3a;
+            font-size: 0.88rem;
+            font-weight: 760;
+        }
+
+        .pcr-top-reason-bar {
+            height: 0.64rem;
+            margin-top: 0.36rem;
+            border-radius: 999px;
+            background: rgba(11, 31, 58, 0.10);
+            overflow: hidden;
+        }
+
+        .pcr-top-reason-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #2563eb, #6deaf3);
+        }
+
+        .pcr-top-reason-row.top .pcr-top-reason-fill {
+            background: linear-gradient(90deg, #0ea5b7, #6deaf3);
+        }
+
+        .pcr-teacher-attention-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.78rem;
+            margin-top: 0.9rem;
+        }
+
+        .pcr-teacher-attention-card {
+            min-height: 8.6rem;
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 15px;
+            background: linear-gradient(180deg, #ffffff, #f7fbfd);
+            padding: 0.9rem;
+            box-shadow: 0 10px 28px rgba(11, 31, 58, 0.06);
+        }
+
+        .pcr-teacher-attention-card b {
+            display: block;
+            color: #07172b;
+            font-size: 0.95rem;
+            line-height: 1.45;
+            margin-bottom: 0.36rem;
+        }
+
+        .pcr-teacher-attention-card span {
+            display: block;
+            color: #526174;
+            font-size: 0.82rem;
+            line-height: 1.55;
+        }
+
+        .pcr-teacher-filter-panel {
+            margin-top: 0.8rem;
+            border: 1px solid rgba(11, 31, 58, 0.08);
+            border-radius: 16px;
+            background: rgba(223, 247, 251, 0.5);
+            padding: 0.9rem;
+        }
+
+        .pcr-teacher-filter-panel label,
+        .pcr-teacher-section label {
+            color: #0b1f3a !important;
+            font-weight: 740 !important;
+        }
+
+        .pcr-teacher-filter-panel [data-baseweb="select"] *,
+        .pcr-teacher-filter-panel input,
+        .pcr-teacher-filter-panel textarea {
+            color: #0b1f3a !important;
+        }
+
+        .pcr-teacher-case-card {
+            border: 1px solid rgba(11, 31, 58, 0.09);
+            border-radius: 16px;
+            background: linear-gradient(180deg, #ffffff, #f7fbfd);
+            padding: 0.95rem 1rem;
+            margin: 0.8rem 0 0.45rem 0;
+            box-shadow: 0 12px 32px rgba(11, 31, 58, 0.08);
+        }
+
+        .pcr-teacher-case-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .pcr-teacher-case-title {
+            color: #07172b;
+            font-size: 1.02rem;
+            font-weight: 830;
+            line-height: 1.45;
+        }
+
+        .pcr-teacher-case-meta {
+            color: #526174;
+            font-size: 0.86rem;
+            line-height: 1.65;
+            margin-top: 0.24rem;
+        }
+
+        .pcr-teacher-case-desc {
+            margin-top: 0.52rem;
+            color: #334155;
+            font-size: 0.88rem;
+            line-height: 1.62;
+        }
+
+        .pcr-teacher-review-form {
+            border: 1px solid rgba(14, 165, 183, 0.24);
+            border-radius: 15px;
+            background: linear-gradient(180deg, rgba(223,247,251,0.78), rgba(255,255,255,0.96));
+            padding: 0.95rem;
+            margin-top: 0.85rem;
+        }
+
+        .pcr-dashboard-empty {
+            min-height: 6.4rem !important;
+            border: 1px solid rgba(14, 165, 183, 0.18) !important;
+            background: rgba(223, 247, 251, 0.45) !important;
+        }
+
+        .pcr-dashboard-empty b {
+            color: #07172b !important;
+        }
+
+        .pcr-dashboard-empty span {
+            color: #526174 !important;
+        }
+
+        .pcr-teacher-section:not(.dark) .pcr-dashboard-empty {
+            background: rgba(223, 247, 251, 0.45) !important;
+            border-color: rgba(14, 165, 183, 0.18) !important;
+        }
+
+        .pcr-teacher-section:not(.dark) .pcr-dashboard-empty b {
+            color: #07172b !important;
+        }
+
+        .pcr-teacher-section:not(.dark) .pcr-dashboard-empty span {
+            color: #526174 !important;
+        }
+
+        .pcr-teacher-section [data-testid="stExpander"] details {
+            border-radius: 14px !important;
+            background: rgba(255,255,255,0.96) !important;
+            border-color: rgba(11, 31, 58, 0.1) !important;
+        }
+
+        .pcr-teacher-section [data-testid="stExpander"] summary,
+        .pcr-teacher-section [data-testid="stExpander"] p,
+        .pcr-teacher-section [data-testid="stExpander"] li {
+            color: #0b1f3a !important;
+        }
+
+        .pcr-teacher-section .stMarkdown,
+        .pcr-teacher-section p,
+        .pcr-teacher-section li {
+            color: #0b1f3a;
+        }
+
+        .pcr-teacher-section.dark .stMarkdown,
+        .pcr-teacher-section.dark p,
+        .pcr-teacher-section.dark li {
+            color: rgba(255,255,255,0.82);
+        }
+
+        .pcr-teacher-section div[data-testid="stVerticalBlockBorderWrapper"] {
+            border-color: rgba(11, 31, 58, 0.08) !important;
+            background: rgba(255,255,255,0.95) !important;
+        }
+
+        .pcr-teacher-section .stAlert {
+            color: #0b1f3a !important;
+        }
+
         @media (max-width: 768px) {
             .pcr-teacher-header {
                 padding: 1rem;
@@ -514,6 +1143,22 @@ def inject_teacher_dashboard_layout_styles():
 
             .pcr-teacher-header h1 {
                 font-size: 1.75rem;
+            }
+
+            .main .block-container,
+            .block-container,
+            .stMainBlockContainer,
+            div[data-testid="stMainBlockContainer"],
+            section[data-testid="stMain"] > div {
+                max-width: calc(100vw - 28px) !important;
+                width: calc(100vw - 28px) !important;
+            }
+
+            .pcr-teacher-kpi-grid,
+            .pcr-teacher-insight-grid,
+            .pcr-teacher-attention-grid,
+            .pcr-teacher-case-main {
+                grid-template-columns: 1fr;
             }
         }
         </style>
@@ -576,26 +1221,32 @@ def escape_html(value, default=""):
 
 
 def render_teacher_page_header(record_count):
-    """教师端紧凑页头。"""
-    st.markdown(
-        f"""
-        <div class="pcr-teacher-header">
-            <div class="pcr-teacher-header-top">
-                <div>
-                    <span class="pcr-teacher-chip">教师端</span>
-                    <h1>教师端记录查看</h1>
-                    <p>查看学生提交的记录，确认原因，并补充教师说明。</p>
-                </div>
-                <div class="pcr-teacher-header-actions">
-                    <span class="pcr-teacher-chip soft">教师已验证</span>
-                    <span class="pcr-teacher-chip">数据 {record_count} 条</span>
-                    <span class="pcr-teacher-chip">最近30天</span>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """教师端紧凑 Hero 区。"""
+    with st.container(key="pcr_teacher_hero_shell"):
+        with st.container(key="pcr_teacher_hero_inner"):
+            with st.container(key="pcr_teacher_hero_card"):
+                label_col, action_col = st.columns([0.78, 0.22], vertical_alignment="center")
+                with label_col:
+                    st.markdown('<div class="pcr-teacher-topbar">教师复核</div>', unsafe_allow_html=True)
+                with action_col:
+                    with st.container(key="pcr_teacher_return"):
+                        if st.button("返回首页", key="teacher_return_home", use_container_width=True):
+                            return_to_home(clear_entries=False)
+
+                st.markdown(
+                    f"""
+                    <div class="pcr-teacher-hero-copy">
+                        <h1>教师复核与案例看板</h1>
+                        <p>查看学生实验记录，复核系统诊断结果，并沉淀可用于教学改进的异常案例。</p>
+                        <div class="pcr-teacher-hero-meta">
+                            <span class="pcr-teacher-status-tag ok">教师已验证</span>
+                            <span class="pcr-teacher-status-tag">当前记录 {record_count} 条</span>
+                            <span class="pcr-teacher-status-tag">复核工作台</span>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 
 def render_section_kicker(text):
@@ -623,7 +1274,9 @@ def is_blank(value):
 
 
 def normalize_text(value):
-    return str(value or "").strip()
+    if value is None:
+        return ""
+    return str(value).strip()
 
 
 def normalize_record_id(value):
@@ -879,8 +1532,10 @@ def build_teacher_filter_options(records_df):
     """为历史记录筛选区生成动态选项"""
     options = {
         "异常类型选项": ["全部"],
+        "系统判断选项": ["全部"],
         "教师原因选项": ["全部"],
         "显示异常类型筛选": False,
+        "显示系统判断筛选": False,
         "显示教师原因筛选": False,
     }
     if records_df.empty:
@@ -897,6 +1552,12 @@ def build_teacher_filter_options(records_df):
         if teacher_reason_values:
             options["教师原因选项"].extend(teacher_reason_values)
             options["显示教师原因筛选"] = True
+
+    if "系统 Top1" in records_df.columns:
+        system_reason_values = sorted({value for value in records_df["系统 Top1"].tolist() if normalize_text(value) and value != "-"})
+        if system_reason_values:
+            options["系统判断选项"].extend(system_reason_values)
+            options["显示系统判断筛选"] = True
 
     return options
 
@@ -918,8 +1579,10 @@ def apply_teacher_record_filters(
     records_df,
     confirm_status,
     abnormality_filter,
+    system_reason_filter,
     teacher_reason_filter,
     keyword,
+    image_filter,
     only_unconfirmed,
     only_top1_mismatch,
     only_with_image,
@@ -940,6 +1603,9 @@ def apply_teacher_record_filters(
     if abnormality_filter != "全部" and "实验现象" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["实验现象"] == abnormality_filter]
 
+    if system_reason_filter != "全部" and "系统 Top1" in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df["系统 Top1"] == system_reason_filter]
+
     if teacher_reason_filter != "全部" and "教师最终原因" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["教师最终原因"] == teacher_reason_filter]
 
@@ -953,6 +1619,11 @@ def apply_teacher_record_filters(
     if only_top1_mismatch and "Top1 是否不一致" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Top1 是否不一致"]]
 
+    if image_filter == "有图片":
+        filtered_df = filtered_df[filtered_df["是否有图片"]]
+    elif image_filter == "无图片":
+        filtered_df = filtered_df[~filtered_df["是否有图片"]]
+
     if only_with_image:
         filtered_df = filtered_df[filtered_df["是否有图片"]]
 
@@ -960,6 +1631,24 @@ def apply_teacher_record_filters(
     if display_limit is not None:
         filtered_df = filtered_df.head(display_limit)
     return filtered_df
+
+
+def reset_teacher_history_filters():
+    """重置案例复核队列筛选项。"""
+    for key in [
+        "teacher_history_confirm_status",
+        "teacher_history_abnormality_filter",
+        "teacher_history_system_reason_filter",
+        "teacher_history_teacher_reason_filter",
+        "teacher_history_keyword",
+        "teacher_history_sort_order",
+        "teacher_history_image_filter",
+        "teacher_history_display_limit",
+        "teacher_history_only_unconfirmed",
+        "teacher_history_only_top1_mismatch",
+        "teacher_history_only_with_image",
+    ]:
+        st.session_state.pop(key, None)
 
 
 def load_teacher_dashboard_data():
@@ -1200,8 +1889,8 @@ def compute_consistency_stats(consistency_df):
         return {
             "已确认案例数": 0,
             "可比较已确认案例数": 0,
-            "Top1 一致率": "暂无可比较数据",
-            "Top3 命中率": "暂无可比较数据",
+            "Top1 一致率": "暂无可展示数据",
+            "Top3 命中率": "暂无可展示数据",
             "无法比较案例数": 0,
             "一致性分布": pd.DataFrame(columns=["类别", "案例数"]),
         }
@@ -1217,8 +1906,8 @@ def compute_consistency_stats(consistency_df):
     top1_match_count = comparable_df["Top1 是否一致"].sum() if comparable_count else 0
     top3_hit_count = comparable_df["Top3 是否命中"].sum() if comparable_count else 0
 
-    top1_rate = f"{(top1_match_count / comparable_count) * 100:.1f}%" if comparable_count else "暂无可比较数据"
-    top3_rate = f"{(top3_hit_count / comparable_count) * 100:.1f}%" if comparable_count else "暂无可比较数据"
+    top1_rate = f"{(top1_match_count / comparable_count) * 100:.1f}%" if comparable_count else "暂无可展示数据"
+    top3_rate = f"{(top3_hit_count / comparable_count) * 100:.1f}%" if comparable_count else "暂无可展示数据"
 
     # ================= 修复：只统计可比较的已确认案例 =================
     distribution_df = pd.DataFrame({
@@ -1607,16 +2296,18 @@ def build_stat_linked_records(linked_df, records_by_id):
 
 def render_case_detail(record, all_records, detail_key_prefix):
     record_id = record.get("id")
-    with st.expander(f"查看本条记录详情（记录ID: {record_id}）"):
+    with st.expander(f"查看详情（记录ID: {record_id}）"):
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown(f"- 记录 id：{record_id}")
+            st.markdown("**学生输入摘要**")
+            st.markdown(f"- 记录 ID：{record_id}")
             st.markdown(f"- 提交时间：{record.get('提交时间', '-')}")
             st.markdown(f"- 实验现象：{record.get('实验现象', '-')}")
             st.markdown(f"- 模板量：{record.get('模板量', '-')}")
             st.markdown(f"- 退火温度：{record.get('退火温度', '-')}")
             st.markdown(f"- 循环数：{record.get('循环数', '-')}")
         with col2:
+            st.markdown("**系统诊断摘要**")
             st.markdown(f"- 阳性对照是否正常：{record.get('阳性对照是否正常', '-')}")
             st.markdown(f"- 阴性对照是否有带：{record.get('阴性对照是否有带', '-')}")
             st.markdown(f"- Top1 原因：{record.get('Top1 原因', '-')}")
@@ -1669,19 +2360,20 @@ def render_case_detail(record, all_records, detail_key_prefix):
             st.info("无图片")
 
         with st.container(border=True):
-            render_card_title("教师确认", "请选择最终原因并补充备注。")
+            st.markdown('<div class="pcr-teacher-review-form">', unsafe_allow_html=True)
+            render_card_title("教师复核确认", "请选择最终原因并补充备注，保存后将作为本条案例的教师确认结论。")
             candidate_causes = [extract_cause_text(x) for x in candidates if extract_cause_text(x)]
             if not candidate_causes and record.get("Top1 原因"):
                 candidate_causes = [record.get("Top1 原因")]
             confirm_options = list(dict.fromkeys(candidate_causes + ["其他/待补充"]))
 
             with st.form(f"{detail_key_prefix}_teacher_confirm_form_{record_id}"):
-                teacher_choice = st.selectbox("教师最终原因", confirm_options, key=f"{detail_key_prefix}_teacher_choice_{record_id}")
+                teacher_choice = st.selectbox("最终原因", confirm_options, key=f"{detail_key_prefix}_teacher_choice_{record_id}")
                 custom_cause = ""
                 if teacher_choice == "其他/待补充":
                     custom_cause = st.text_input("请填写教师最终原因", key=f"{detail_key_prefix}_teacher_custom_{record_id}")
                 teacher_note = st.text_area("教师备注", height=100, key=f"{detail_key_prefix}_teacher_note_{record_id}")
-                save_confirm = st.form_submit_button("保存教师确认结果")
+                save_confirm = st.form_submit_button("保存复核结果")
 
             if save_confirm:
                 final_cause = custom_cause.strip() if teacher_choice == "其他/待补充" else teacher_choice
@@ -1689,9 +2381,10 @@ def render_case_detail(record, all_records, detail_key_prefix):
                     st.warning("请选择或填写教师最终原因。")
                 else:
                     save_teacher_confirmation(record_id, final_cause, teacher_note.strip())
-                    st.success("教师确认已保存！")
+                    st.success("复核结果已保存。")
                     st.cache_data.clear()  # 必须加
                     st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
 
 def build_case_queue_summary_dataframe(records_to_render, start_index=1):
@@ -1751,8 +2444,8 @@ def render_case_record_list(records_to_render, all_records, list_key_prefix, vis
         f"""
         <div class="pcr-case-list-toolbar">
             <div>
-                <b>记录查看列表</b><br/>
-                <span>默认显示前 {visible_count} 条记录，其余记录放在下方摘要中，页面更方便查看。</span>
+                <b>案例复核队列</b><br/>
+                <span>默认展开前 {visible_count} 条案例，其余记录放在下方摘要中，便于快速复核。</span>
             </div>
             <div>
                 <span class="pcr-tag info">共 {total_count} 条</span>
@@ -1768,28 +2461,35 @@ def render_case_record_list(records_to_render, all_records, list_key_prefix, vis
     for idx, record in enumerate(visible_records, 1):
         loop_status = build_feedback_loop_status(record)
         status_class = "ok" if loop_status["当前状态"] == "已确认" else "warn"
-        status_label = loop_status["当前状态"]
+        status_label = "已复核" if loop_status["当前状态"] == "已确认" else "待复核"
         consistency_status = loop_status["一致性状态"]
+        attention_label = "需关注" if loop_status["当前状态"] == "已确认" and consistency_status != "一致" else consistency_status
         consistency_class = "ok" if consistency_status == "一致" else "info" if "Top3" in consistency_status else "warn"
         image_status = normalize_display_text(record.get("凝胶图"), default="无图")
         image_class = "info" if "有" in image_status else "muted"
         teacher_final = loop_status["教师最终确认原因"]
+        desc = normalize_display_text(record.get("学生补充描述"), default="未填写")
+        if len(desc) > 68:
+            desc = f"{desc[:68]}..."
 
         st.markdown(
             f"""
-            <div class="pcr-record-row">
-                <div class="pcr-record-main">
+            <div class="pcr-teacher-case-card">
+                <div class="pcr-teacher-case-main">
                     <div>
-                        <div class="pcr-record-title">
-                            {idx}. {escape_html(record.get('提交时间'), '-')} ｜ {escape_html(record.get('实验现象'), '-')} ｜ Top1：{escape_html(record.get('Top1 原因'), '-')}
+                        <div class="pcr-teacher-case-title">
+                            {idx}. {escape_html(record.get('实验现象'), '-')} · Top1：{escape_html(record.get('Top1 原因'), '-')}
                         </div>
-                        <div class="pcr-record-meta">
-                            教师确认：{escape_html(teacher_final, '未确认')} ｜ 一致性：{escape_html(consistency_status, '-')}
+                        <div class="pcr-teacher-case-meta">
+                            提交时间：{escape_html(record.get('提交时间'), '-')} ｜ 教师确认：{escape_html(teacher_final, '未确认')}
+                        </div>
+                        <div class="pcr-teacher-case-desc">
+                            学生描述：{escape_html(desc, '未填写')}
                         </div>
                     </div>
                     <div class="pcr-record-tags">
                         <span class="pcr-tag {status_class}">{escape_html(status_label, '-')}</span>
-                        <span class="pcr-tag {consistency_class}">{escape_html(consistency_status, '-')}</span>
+                        <span class="pcr-tag {consistency_class}">{escape_html(attention_label, '-')}</span>
                         <span class="pcr-tag {image_class}">{escape_html(image_status, '无图')}</span>
                     </div>
                 </div>
@@ -1807,16 +2507,166 @@ def render_case_record_list(records_to_render, all_records, list_key_prefix, vis
 def render_dashboard_empty_state(title, detail, min_height_rem=18.35):
     """渲染等高空态面板，让左右看板在无数据时仍保持视觉平衡。"""
     st.markdown(
-        f"""
-        <div class="pcr-dashboard-empty" style="min-height:{float(min_height_rem):.2f}rem;">
-            <div>
-                <b>{escape_html(title, '-')}</b>
-                <span>{escape_html(detail, '-')}</span>
-            </div>
-        </div>
-        """,
+        f'<div class="pcr-dashboard-empty" style="min-height:{float(min_height_rem):.2f}rem;">'
+        f'<div><b>{escape_html(title, "-")}</b><span>{escape_html(detail, "-")}</span></div></div>',
         unsafe_allow_html=True,
     )
+
+
+def render_teacher_section_header(title, desc="", dark=False):
+    """统一教师端区域标题。"""
+    st.markdown(
+        f'<div><h2 class="pcr-teacher-section-title">{escape_html(title, "-")}</h2>'
+        f'<p class="pcr-teacher-section-desc">{escape_html(desc, "")}</p></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_teacher_kpi_cards(metrics):
+    """渲染班级实验记录概览 KPI。"""
+    kpi_items = [
+        ("总诊断记录", metrics.get("总诊断记录数", 0), "当前筛选范围内的全部学生记录", "focus"),
+        ("待复核记录", metrics.get("未确认数", 0), "需要教师继续确认的案例", ""),
+        ("已复核记录", metrics.get("已教师确认数", 0), "已完成教师最终原因确认", ""),
+        ("近 30 天记录", metrics.get("最近 30 天新增记录数", "无法统计"), "用于观察近期课堂实验情况", ""),
+    ]
+    cards = []
+    for label, value, note, card_class in kpi_items:
+        cards.append(
+            f'<div class="pcr-teacher-kpi-card {card_class}">'
+            f'<div class="pcr-teacher-kpi-label">{escape_html(label, "-")}</div>'
+            f'<div class="pcr-teacher-kpi-value">{escape_html(value, "-")}</div>'
+            f'<div class="pcr-teacher-kpi-note">{escape_html(note, "-")}</div>'
+            "</div>"
+        )
+    st.markdown(f'<div class="pcr-teacher-kpi-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+
+def render_consistency_insight_card(consistency_stats, consistency_df):
+    """渲染系统判断与教师确认一致性卡片。"""
+    comparable_count = int(consistency_stats.get("可比较已确认案例数", 0) or 0)
+    confirmed_count = int(consistency_stats.get("已确认案例数", 0) or 0)
+    unable_count = int(consistency_stats.get("无法比较案例数", 0) or 0)
+
+    if comparable_count == 0:
+        render_dashboard_empty_state(
+            "暂无可展示数据",
+            "当教师完成更多记录确认后，系统将展示一致率和差异分析。",
+            min_height_rem=7.2,
+        )
+        st.markdown(
+            f'<div class="pcr-teacher-mini-grid">'
+            f'<div class="pcr-teacher-mini-stat"><span>已复核记录</span><b>{confirmed_count}</b></div>'
+            f'<div class="pcr-teacher-mini-stat"><span>已比较记录</span><b>{comparable_count}</b></div>'
+            f'<div class="pcr-teacher-mini-stat"><span>待比较记录</span><b>{unable_count}</b></div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    latest_mismatch = "暂无近期不一致记录"
+    if not consistency_df.empty:
+        mismatch_df = get_recent_mismatch_cases(consistency_df, limit=1)
+        if not mismatch_df.empty:
+            row = mismatch_df.iloc[0]
+            latest_mismatch = (
+                f"{normalize_display_text(row.get('异常现象 / 案例摘要'), default='未填写')}："
+                f"系统 {normalize_display_text(row.get('系统 Top1'), default='-')}，"
+                f"教师 {normalize_display_text(row.get('教师最终原因'), default='-')}"
+            )
+
+    st.markdown(
+        f'<div><div class="pcr-teacher-kpi-value" style="color:#07172b; margin-top:0;">{escape_html(consistency_stats.get("Top1 一致率", "-"), "-")}</div>'
+        '<p style="color:#526174; margin:0 0 0.75rem 0;">系统 Top1 判断与教师确认的一致率。</p>'
+        f'<div class="pcr-teacher-mini-grid"><div class="pcr-teacher-mini-stat"><span>已比较记录</span><b>{comparable_count}</b></div>'
+        f'<div class="pcr-teacher-mini-stat"><span>待比较记录</span><b>{unable_count}</b></div>'
+        f'<div class="pcr-teacher-mini-stat"><span>Top3 命中率</span><b>{escape_html(consistency_stats.get("Top3 命中率", "-"), "-")}</b></div></div>'
+        f'<div class="pcr-teacher-empty-state" style="margin-top:0.85rem;"><div><b>最近不一致提示</b><span>{escape_html(latest_mismatch, "-")}</span></div></div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_top_reason_bars(reason_summary_df, top_n=5):
+    """渲染高频失败原因 Top5 横向条。"""
+    top_df = reason_summary_df[["失败原因", "次数"]].head(top_n).copy() if not reason_summary_df.empty else pd.DataFrame()
+    if top_df.empty:
+        render_dashboard_empty_state(
+            "暂无可展示数据",
+            "当前筛选范围内暂无可汇总的失败原因数据。",
+            min_height_rem=7.2,
+        )
+        return
+
+    max_count = max(int(top_df["次数"].max()), 1)
+    total_count = max(int(top_df["次数"].sum()), 1)
+    rows = []
+    for rank, row in enumerate(top_df.itertuples(index=False), 1):
+        reason = str(row[0])
+        count = int(row[1])
+        width = count / max_count * 100
+        percent = count / total_count * 100
+        rows.append(
+            f'<div class="pcr-top-reason-row {"top" if rank == 1 else ""}">'
+            f'<div class="pcr-top-reason-head"><span>Top{rank} {escape_html(reason, "-")}</span>'
+            f"<span>{count} 次 · {percent:.0f}%</span></div>"
+            f'<div class="pcr-top-reason-bar"><div class="pcr-top-reason-fill" style="width:{width:.1f}%;"></div></div>'
+            "</div>"
+        )
+    st.markdown("".join(rows), unsafe_allow_html=True)
+
+
+def render_recent_attention_records(records, limit=3):
+    """优先展示待复核和需关注案例。"""
+    if not records:
+        render_dashboard_empty_state(
+            "暂无可展示数据",
+            "当前还没有学生诊断记录，待提交后会在这里形成复核队列。",
+            min_height_rem=5.6,
+        )
+        return
+
+    unconfirmed = []
+    mismatch = []
+    completed = []
+    for record in records:
+        loop_status = build_feedback_loop_status(record)
+        if loop_status["当前状态"] != "已确认":
+            unconfirmed.append(record)
+        elif loop_status["一致性状态"] != "一致":
+            mismatch.append(record)
+        else:
+            completed.append(record)
+
+    selected = []
+    seen_ids = set()
+    for group in [unconfirmed, mismatch, completed]:
+        for record in group:
+            record_id = record.get("id")
+            if record_id in seen_ids:
+                continue
+            selected.append(record)
+            seen_ids.add(record_id)
+            if len(selected) >= limit:
+                break
+        if len(selected) >= limit:
+            break
+
+    cards = []
+    for record in selected:
+        loop_status = build_feedback_loop_status(record)
+        image_status = "有图片" if record.get("凝胶图路径") or normalize_text(record.get("凝胶图")) == "有图" else "无图片"
+        tag_class = "warn" if loop_status["当前状态"] != "已确认" else "ok" if loop_status["一致性状态"] == "一致" else "warn"
+        cards.append(
+            f'<div class="pcr-teacher-attention-card">'
+            f'<b>{escape_html(record.get("实验现象"), "未填写")} · {escape_html(loop_status["当前状态"], "-")}</b>'
+            f'<span>时间：{escape_html(record.get("提交时间"), "-")}</span>'
+            f'<span>系统 Top1：{escape_html(record.get("Top1 原因"), "-")}</span>'
+            f'<span>教师确认：{escape_html(loop_status["教师最终确认原因"], "未确认")}</span>'
+            f'<span>图片：{escape_html(image_status, "-")}</span>'
+            f'<span class="pcr-teacher-status-tag {tag_class}" style="margin-top:0.52rem; color:#0b1f3a;">{escape_html(loop_status["一致性状态"], "-")}</span>'
+            "</div>"
+        )
+    st.markdown(f'<div class="pcr-teacher-attention-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 
 def render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records):
@@ -1988,13 +2838,14 @@ def render_teacher_dashboard(records_by_id, all_records):
     reason_summary_df = pd.DataFrame(columns=["失败原因", "次数", "已确认数", "未确认数"])
 
     with st.container(border=True):
-        render_section_kicker("统计总览")
-        render_card_title("学情统计看板", "基于历史诊断记录自动汇总，支持按时间范围筛选；存在缺失字段时自动降级显示。")
-
+        render_teacher_section_header(
+            "班级实验记录概览",
+            "按当前范围汇总学生诊断记录、复核进度和近期提交情况。",
+        )
         if load_error:
             st.warning(load_error)
 
-        filter_cols = st.columns([1, 1, 2] if column_mapping.get("class") else [1, 2])
+        filter_cols = st.columns([1, 1, 1.8] if column_mapping.get("class") else [1, 1.8])
         with filter_cols[0]:
             time_scope = st.selectbox(
                 "统计时间范围",
@@ -2017,6 +2868,8 @@ def render_teacher_dashboard(records_by_id, all_records):
                 class_options.extend(class_values)
             with filter_cols[1]:
                 class_filter = st.selectbox("班级筛选", class_options, key="teacher_dashboard_class_filter")
+        with filter_cols[-1]:
+            st.caption("筛选只影响本页概览和洞察，不会改动历史记录。")
 
         class_scoped_df, filtered_df, time_filter_available = apply_dashboard_filters(
             dashboard_df,
@@ -2029,18 +2882,40 @@ def render_teacher_dashboard(records_by_id, all_records):
             st.caption("未识别到可用时间字段，时间范围筛选已自动降级为“全部数据”，最近 30 天指标显示为“无法统计”。")
 
         metrics = compute_dashboard_stats(filtered_df, class_scoped_df, column_mapping)
-        st.markdown('<div class="pcr-card-divider"></div>', unsafe_allow_html=True)
-        metric_cols = st.columns(4)
-        for col, (label, value) in zip(metric_cols, metrics.items()):
-            col.metric(label, value)
+        render_teacher_kpi_cards(metrics)
 
     if dashboard_df.empty:
-        st.info("暂无历史诊断数据，学情统计看板已就绪，待学生提交记录后自动更新。")
+        with st.container(border=True):
+            render_teacher_section_header(
+                "教学诊断洞察",
+                "当学生提交更多记录后，这里会展示一致性和高频失败原因。",
+            )
+            insight_left, insight_right = st.columns(2)
+            with insight_left:
+                render_dashboard_empty_state(
+                    "暂无可展示数据",
+                    "当前还没有历史诊断记录，待学生提交后自动生成统计洞察。",
+                    min_height_rem=7.2,
+                )
+            with insight_right:
+                render_dashboard_empty_state(
+                    "暂无可展示数据",
+                    "有记录后，这里会展示高频失败原因 Top 5。",
+                    min_height_rem=7.2,
+                )
         return
 
     if filtered_df.empty:
-        st.info("当前筛选条件下暂无可统计数据。")
-        render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records)
+        with st.container(border=True):
+            render_teacher_section_header(
+                "教学诊断洞察",
+                "当前筛选条件下暂无记录，可调整筛选条件后查看。",
+            )
+            render_dashboard_empty_state(
+                "暂无可展示数据",
+                "当前筛选条件下暂无记录，可调整统计时间范围或班级后查看。",
+                min_height_rem=7.2,
+            )
         return
 
     consistency_df = build_consistency_dataframe(filtered_df, column_mapping)
@@ -2048,108 +2923,28 @@ def render_teacher_dashboard(records_by_id, all_records):
     reason_summary_df = build_reason_summary(filtered_df)
 
     with st.container(border=True):
-        render_section_kicker("结果对照")
-        render_card_title("系统判断 vs 教师确认一致率", "按当前筛选结果统计系统判断和教师确认的匹配情况。")
-        consistency_metric_cols = st.columns(4)
-        consistency_metric_cols[0].metric("已确认案例数", consistency_stats["已确认案例数"])
-        consistency_metric_cols[1].metric("Top1 一致率", consistency_stats["Top1 一致率"])
-        consistency_metric_cols[2].metric("Top3 命中率", consistency_stats["Top3 命中率"])
-        consistency_metric_cols[3].metric("无法比较案例数", consistency_stats["无法比较案例数"])
+        render_teacher_section_header(
+            "教学诊断洞察",
+            "对照系统判断和教师复核结果，观察课堂实验中的高频异常来源。",
+        )
+        insight_left, insight_right = st.columns(2)
+        with insight_left:
+            st.markdown('<div class="pcr-teacher-insight-card">', unsafe_allow_html=True)
+            st.markdown('<div class="pcr-teacher-insight-title">系统判断与教师确认一致性</div>', unsafe_allow_html=True)
+            render_consistency_insight_card(consistency_stats, consistency_df)
+            st.markdown("</div>", unsafe_allow_html=True)
+        with insight_right:
+            st.markdown('<div class="pcr-teacher-insight-card">', unsafe_allow_html=True)
+            st.markdown('<div class="pcr-teacher-insight-title">高频失败原因 Top 5</div>', unsafe_allow_html=True)
+            render_top_reason_bars(reason_summary_df, top_n=5)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        if consistency_stats["可比较已确认案例数"] == 0:
-            st.info("当前筛选范围内暂无可比较的已确认案例。")
-        else:
-            st.caption(f"一致率分母为当前筛选范围内可比较的已确认案例数：{consistency_stats['可比较已确认案例数']} 条。")
-
-    dashboard_col_left, dashboard_col_right = st.columns(2)
-
-    with dashboard_col_left:
-        with st.container(border=True, height=500):
-            open_dashboard_card(13.5)
-            render_card_title("系统判断与教师确认一致性分布", "统计当前筛选范围内，已完成教师确认并且可以对比的记录。")
-            distribution_df = consistency_stats.get("一致性分布", pd.DataFrame())
-            render_consistency_distribution_visualization(distribution_df)
-            close_dashboard_card()
-
-    with dashboard_col_right:
-        with st.container(border=True, height=500):
-            open_dashboard_card(13.5)
-            render_card_title("高频失败原因 Top 5", "已确认记录使用教师确认原因；未确认记录使用系统首位判断。")
-            if reason_summary_df.empty:
-                render_dashboard_empty_state(
-                    "暂无失败原因聚合数据",
-                    "有记录后，这里会显示出现较多的失败原因。",
-                )
-            else:
-                render_top_reason_visualization(reason_summary_df, top_n=5)
-            close_dashboard_card()
-
-    case_col_left, case_col_right = st.columns(2)
-    with case_col_left:
-        with st.container(border=True, height=250):
-            open_dashboard_card(9.5)
-            render_card_title("最近不一致记录", "展示教师已确认，但系统首位判断与教师结论不一致的近期记录。")
-            mismatch_df = get_recent_mismatch_cases(consistency_df, limit=10)
-            if mismatch_df.empty:
-                render_dashboard_empty_state(
-                    "暂无近期不一致案例",
-                    "出现教师确认结果与系统首位判断不一致时，会优先显示在这里。",
-                    min_height_rem=4.6,
-                )
-            else:
-                st.dataframe(mismatch_df, use_container_width=True, hide_index=True)
-            close_dashboard_card()
-
-    with case_col_right:
-        with st.container(border=True, height=250):
-            open_dashboard_card(9.5)
-            render_card_title("最近一致记录", "展示系统首位判断与教师最终确认一致的近期记录。")
-            match_df = get_recent_match_cases(consistency_df, limit=10)
-            if match_df.empty:
-                render_dashboard_empty_state(
-                    "暂无近期一致案例",
-                    "系统首位判断与教师最终确认一致的记录会显示在这里。",
-                    min_height_rem=4.6,
-                )
-            else:
-                st.dataframe(match_df, use_container_width=True, hide_index=True)
-            close_dashboard_card()
-
-    detail_col_left, detail_col_right = st.columns(2)
-    with detail_col_left:
-        with st.container(border=True, height=290):
-            open_dashboard_card(10.5)
-            render_card_title("对照异常统计", "优先读取结构化记录；缺失时自动回退到原始文本关键词匹配。")
-            control_stats = compute_control_abnormal_stats(filtered_df, column_mapping)
-            negative_count = control_stats.get("negative_control_band_count")
-            positive_count = control_stats.get("positive_control_failure_count")
-            if negative_count is None and positive_count is None:
-                render_dashboard_empty_state(
-                    "暂无对照异常统计数据",
-                    "记录中包含阳性/阴性对照结果后，这里会汇总异常对照信号。",
-                    min_height_rem=5.2,
-                )
-            else:
-                control_cols = st.columns(2)
-                control_cols[0].metric("阴性对照有带", negative_count if negative_count is not None else "暂无可用数据")
-                control_cols[1].metric("阳性对照无带", positive_count if positive_count is not None else "暂无可用数据")
-            close_dashboard_card()
-
-    with detail_col_right:
-        with st.container(border=True, height=290):
-            open_dashboard_card(10.5)
-            render_card_title("失败原因统计明细", "按当前筛选条件统计原因，并按出现次数排序。")
-            if reason_summary_df.empty:
-                render_dashboard_empty_state(
-                    "暂无聚合明细",
-                    "有可统计记录后，这里会按失败原因列出结果。",
-                    min_height_rem=5.2,
-                )
-            else:
-                st.dataframe(reason_summary_df.head(10), use_container_width=True, hide_index=True)
-            close_dashboard_card()
-
-    render_stat_linked_case_list(filtered_df, consistency_df, reason_summary_df, records_by_id, all_records)
+    with st.container(border=True):
+        render_teacher_section_header(
+            "近期需关注记录",
+            "优先显示待复核记录，其次显示系统判断与教师确认不一致的案例。",
+        )
+        render_recent_attention_records(all_records, limit=3)
 
 
 def extract_cause_text(candidate_text):
@@ -2162,15 +2957,15 @@ def extract_cause_text(candidate_text):
 
 
 def main():
-    ensure_page_config("教师端记录查看")
+    ensure_page_config("教师复核与案例看板")
     init_access_state()
     if not st.session_state.get("teacher_verified"):
         apply_common_styles(theme="teacher")
         st.session_state["current_role"] = "home"
         render_page_hero(
-            "教师端记录查看",
+            "教师复核与案例看板",
             "当前页面需要先从首页教师入口完成访问码验证。",
-            "教师端",
+            "教师复核",
         )
         render_entry_guard("教师端")
         return
@@ -2190,23 +2985,30 @@ def main():
     render_teacher_dashboard(records_by_id, records)
 
     with st.container(border=True):
-        render_section_kicker("记录复核")
-        render_card_title("最近诊断记录", "可展开每条记录查看完整信息并进行教师确认。")
+        render_teacher_section_header(
+            "案例复核队列",
+            "按筛选条件查看学生实验记录，并在详情中完成教师复核确认。",
+        )
 
         if not records:
-            st.info("暂无历史诊断记录")
+            render_dashboard_empty_state(
+                "暂无可展示数据",
+                "当前还没有学生诊断记录，待学生提交后会在这里形成案例复核队列。",
+                min_height_rem=6.2,
+            )
             return
 
         records_df = build_teacher_records_dataframe(records)
         filter_options = build_teacher_filter_options(records_df)
 
-        render_card_title("筛选与快速定位", "先缩小记录范围，再进入详情查看与教师确认。")
-        st.markdown('<div class="pcr-filter-hint">按确认状态、异常类型、教师最终原因与关键词快速定位需要复核的案例。</div>', unsafe_allow_html=True)
-        filter_col1, filter_col2, filter_col3 = st.columns(3)
+        st.markdown('<div class="pcr-teacher-filter-panel">', unsafe_allow_html=True)
+        st.markdown('<div class="pcr-filter-hint">按确认状态、异常类型、系统判断、图片和关键词快速定位需要复核的案例。</div>', unsafe_allow_html=True)
+        filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
         with filter_col1:
             confirm_status = st.selectbox(
                 "确认状态",
                 ["全部", "已确认", "未确认"],
+                format_func=lambda value: {"已确认": "已复核", "未确认": "待复核"}.get(value, value),
                 key="teacher_history_confirm_status",
             )
         with filter_col2:
@@ -2218,15 +3020,23 @@ def main():
                     key="teacher_history_abnormality_filter",
                 )
         with filter_col3:
+            system_reason_filter = "全部"
+            if filter_options["显示系统判断筛选"]:
+                system_reason_filter = st.selectbox(
+                    "系统判断",
+                    filter_options["系统判断选项"],
+                    key="teacher_history_system_reason_filter",
+                )
+        with filter_col4:
             teacher_reason_filter = "全部"
             if filter_options["显示教师原因筛选"]:
                 teacher_reason_filter = st.selectbox(
-                    "教师最终原因",
+                    "教师确认",
                     filter_options["教师原因选项"],
                     key="teacher_history_teacher_reason_filter",
                 )
 
-        second_filter_cols = st.columns(3)
+        second_filter_cols = st.columns([1.4, 1, 1, 0.72])
         with second_filter_cols[0]:
             keyword = st.text_input(
                 "关键词搜索",
@@ -2241,6 +3051,12 @@ def main():
                 key="teacher_history_sort_order",
             )
         with second_filter_cols[2]:
+            image_filter = st.selectbox(
+                "是否有图片",
+                ["全部", "有图片", "无图片"],
+                key="teacher_history_image_filter",
+            )
+        with second_filter_cols[3]:
             display_label = st.selectbox(
                 "显示条数",
                 list(HISTORY_DISPLAY_OPTIONS.keys()),
@@ -2248,20 +3064,30 @@ def main():
                 key="teacher_history_display_limit",
             )
 
-        quick_filter_cols = st.columns(3)
+        quick_filter_cols = st.columns([1, 1, 1, 0.8])
         with quick_filter_cols[0]:
-            only_unconfirmed = st.checkbox("仅看未确认案例", key="teacher_history_only_unconfirmed")
+            only_unconfirmed = st.checkbox("只看待复核", key="teacher_history_only_unconfirmed")
         with quick_filter_cols[1]:
-            only_top1_mismatch = st.checkbox("仅看 Top1 不一致案例", key="teacher_history_only_top1_mismatch")
+            only_top1_mismatch = st.checkbox("只看需关注", key="teacher_history_only_top1_mismatch")
         with quick_filter_cols[2]:
-            only_with_image = st.checkbox("仅看有图片案例", key="teacher_history_only_with_image")
+            only_with_image = st.checkbox("只看有图片", key="teacher_history_only_with_image")
+        with quick_filter_cols[3]:
+            st.button(
+                "重置筛选",
+                key="teacher_history_reset_filters",
+                use_container_width=True,
+                on_click=reset_teacher_history_filters,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
         filtered_records_df = apply_teacher_record_filters(
             records_df,
             confirm_status=confirm_status,
             abnormality_filter=abnormality_filter,
+            system_reason_filter=system_reason_filter,
             teacher_reason_filter=teacher_reason_filter,
             keyword=keyword,
+            image_filter=image_filter,
             only_unconfirmed=only_unconfirmed,
             only_top1_mismatch=only_top1_mismatch,
             only_with_image=only_with_image,
@@ -2274,11 +3100,15 @@ def main():
         filtered_unconfirmed_count = filtered_count - filtered_confirmed_count
         filtered_image_count = int(filtered_records_df["是否有图片"].sum()) if not filtered_records_df.empty else 0
         st.caption(
-            f"当前共筛选出 {filtered_count} 条记录，其中已确认 {filtered_confirmed_count} 条，未确认 {filtered_unconfirmed_count} 条，含图片 {filtered_image_count} 条。"
+            f"当前共筛选出 {filtered_count} 条记录，其中已复核 {filtered_confirmed_count} 条，待复核 {filtered_unconfirmed_count} 条，含图片 {filtered_image_count} 条。"
         )
 
         if filtered_records_df.empty:
-            st.info("当前筛选条件下暂无历史记录。")
+            render_dashboard_empty_state(
+                "暂无可展示数据",
+                "当前筛选条件下暂无记录，可调整筛选条件后查看。",
+                min_height_rem=5.6,
+            )
             return
 
         display_records = [records[int(idx)] for idx in filtered_records_df["record_index"].tolist()]
