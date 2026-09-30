@@ -4,6 +4,7 @@
 """
 
 import os
+import secrets
 from datetime import datetime
 from html import escape
 
@@ -19,13 +20,22 @@ from core import (
     diagnose,
     detect_missing_key_info,
     ensure_page_config,
+    format_diagnosis_result_text,
     init_database,
+    load_student_record,
+    parse_candidate_result_item,
+    parse_all_candidates,
+    parse_followup_data,
     render_card_title,
     render_page_hero,
     return_to_home,
     save_diagnosis_record,
+    save_followup_reassessment,
+    save_student_revision,
     save_uploaded_image,
 )
+from diagnosis_normalization import STANDARD_TEXT_HINTS
+from followup_agent import apply_followup_choices, interpret_operation_text, plan_followup_questions
 
 
 STUDENT_FORM_DEFAULTS = {
@@ -36,6 +46,7 @@ STUDENT_FORM_DEFAULTS = {
     "student_form_positive_control_normal": "是",
     "student_form_negative_control_band": "否",
     "student_form_description": "",
+    "student_form_initial_hypothesis": "",
 }
 
 STUDENT_DEMO_DATA = {
@@ -46,6 +57,7 @@ STUDENT_DEMO_DATA = {
     "student_form_positive_control_normal": "否",
     "student_form_negative_control_band": "否",
     "student_form_description": "怀疑模板量不足，PCR体系可能漏加。",
+    "student_form_initial_hypothesis": "我初步认为模板量不足，因为样本泳道没有目标条带。",
 }
 
 STUDENT_FORM_STATE_VERSION = 2
@@ -59,945 +71,8 @@ STUDENT_STEP_TITLES = [
 
 
 def render_student_refined_styles():
-    """学生端专属样式：隐藏侧边栏，并与首页深蓝视觉保持一致。"""
-    st.markdown(
-        """
-        <style>
-        :root {
-            --pcr-primary: #0B1F3A;
-            --pcr-primary-2: #2563EB;
-            --pcr-accent: #0EA5B7;
-            --pcr-bg: #07172B;
-            --pcr-card: rgba(223, 247, 251, 0.13);
-            --pcr-text: #F6FAFC;
-            --pcr-muted: #D8E3EA;
-            --pcr-border: rgba(216, 227, 234, 0.20);
-        }
-
-        .stApp {
-            background:
-                linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-                radial-gradient(circle at 14% 0%, rgba(14, 165, 183, 0.18), transparent 28rem),
-                radial-gradient(circle at 88% 4%, rgba(37, 99, 235, 0.18), transparent 30rem),
-                linear-gradient(135deg, #06172B 0%, #0B1F3A 48%, #12345C 100%) !important;
-            background-size: 40px 40px, 40px 40px, auto, auto, auto;
-            color: #F6FAFC;
-            font-family: "IBM Plex Sans", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-        }
-
-        header[data-testid="stHeader"],
-        div[data-testid="stToolbar"],
-        div[data-testid="stDecoration"],
-        section[data-testid="stSidebar"],
-        [data-testid="collapsedControl"],
-        .pcr-sidebar-expand-hint {
-            display: none !important;
-            width: 0 !important;
-            min-width: 0 !important;
-        }
-
-        .main .block-container,
-        .block-container,
-        .stMainBlockContainer,
-        div[data-testid="stMainBlockContainer"],
-        section[data-testid="stMain"] > div {
-            max-width: min(1240px, calc(100vw - 48px)) !important;
-            width: min(1240px, calc(100vw - 48px)) !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            padding-top: 1.2rem !important;
-            padding-bottom: 3rem !important;
-        }
-
-        .pcr-student-topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            margin-bottom: 0.85rem;
-            color: #D8E3EA;
-            font-size: 0.88rem;
-        }
-
-        .pcr-student-page-label {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.7rem;
-            color: #DFF7FB;
-            font-size: 0.78rem;
-            letter-spacing: 0.04rem;
-            text-transform: uppercase;
-        }
-
-        .pcr-student-page-label::before {
-            content: "";
-            width: 2.35rem;
-            height: 1px;
-            background: #0EA5B7;
-            box-shadow: 0 0 16px rgba(14, 165, 183, 0.85);
-        }
-
-        .pcr-hero {
-            border-radius: 0 !important;
-            border: 1px solid rgba(216, 227, 234, 0.20) !important;
-            background:
-                linear-gradient(135deg, rgba(255,255,255,0.09), rgba(223,247,251,0.035)),
-                linear-gradient(135deg, rgba(6,23,43,0.98), rgba(18,52,92,0.92)) !important;
-            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24) !important;
-            padding: clamp(1.35rem, 2.6vw, 2rem) !important;
-            margin-bottom: 1rem !important;
-            min-height: auto !important;
-        }
-
-        .pcr-hero::after {
-            opacity: 0.48 !important;
-        }
-
-        .pcr-hero h1 {
-            color: #FFFFFF !important;
-            font-weight: 550 !important;
-            font-size: clamp(2rem, 3vw, 3.05rem) !important;
-            line-height: 1.16 !important;
-            max-width: 16em !important;
-            margin-top: 0.6rem !important;
-        }
-
-        .pcr-hero p {
-            color: #D8E3EA !important;
-            max-width: 42rem !important;
-        }
-
-        .pcr-role-badge,
-        .pcr-current-step-chip {
-            border-radius: 999px !important;
-            border: 1px solid rgba(223, 247, 251, 0.34) !important;
-            background: rgba(223, 247, 251, 0.10) !important;
-            color: #DFF7FB !important;
-        }
-
-        div[data-testid="stVerticalBlockBorderWrapper"],
-        .pcr-student-toolbar,
-        .pcr-readiness-panel,
-        .pcr-stepper-item,
-        .pcr-review-item,
-        .pcr-sub-card,
-        .pcr-top1-card,
-        [data-testid="stExpander"],
-        [data-testid="stMetric"] {
-            border-color: rgba(216, 227, 234, 0.20) !important;
-            background: rgba(223, 247, 251, 0.12) !important;
-            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.16) !important;
-            backdrop-filter: blur(14px);
-        }
-
-        .pcr-stepper-item.active {
-            border-color: rgba(109, 234, 243, 0.56) !important;
-            background: rgba(14, 165, 183, 0.20) !important;
-        }
-
-        .pcr-stepper-item.done {
-            border-color: rgba(109, 234, 243, 0.34) !important;
-            background: rgba(14, 165, 183, 0.12) !important;
-        }
-
-        .pcr-card-title,
-        .pcr-step-title,
-        .pcr-stepper-title,
-        .pcr-review-value,
-        .pcr-readiness-item b,
-        .pcr-student-toolbar-title,
-        .pcr-candidate-row b,
-        .pcr-top1-card * {
-            color: #FFFFFF !important;
-        }
-
-        .pcr-muted,
-        .pcr-step-desc,
-        .pcr-stepper-status,
-        .pcr-review-label,
-        .pcr-readiness-item span,
-        .pcr-student-toolbar-desc,
-        .stCaptionContainer,
-        .stMarkdown p,
-        label {
-            color: #D8E3EA !important;
-        }
-
-        .pcr-step-kicker,
-        .pcr-readiness-title {
-            color: #6DEAF3 !important;
-        }
-
-        div.stButton > button,
-        div.stDownloadButton > button {
-            border-radius: 0.25rem !important;
-            min-height: 2.8rem;
-        }
-
-        div.stButton > button:not([kind="primary"]),
-        div.stDownloadButton > button {
-            background: rgba(223, 247, 251, 0.08) !important;
-            color: #DFF7FB !important;
-            border: 1px solid rgba(223, 247, 251, 0.32) !important;
-        }
-
-        button[kind="primary"] {
-            background: #2563EB !important;
-            border-color: #2563EB !important;
-            color: #FFFFFF !important;
-        }
-
-        .stProgress > div > div > div > div {
-            background: linear-gradient(90deg, #2563EB, #0EA5B7) !important;
-        }
-
-        input, textarea, [data-baseweb="select"] > div {
-            background-color: rgba(255,255,255,0.92) !important;
-        }
-
-        @media (max-width: 768px) {
-            .main .block-container,
-            .block-container,
-            .stMainBlockContainer,
-            div[data-testid="stMainBlockContainer"],
-            section[data-testid="stMain"] > div {
-                max-width: calc(100vw - 28px) !important;
-                width: calc(100vw - 28px) !important;
-                padding-top: 0.85rem !important;
-            }
-
-            .pcr-student-topbar {
-                display: block;
-            }
-        }
-
-        .pcr-student-page-shell {
-            max-width: 1240px;
-            margin: 0 auto;
-        }
-
-        .pcr-student-topbar {
-            max-width: 1240px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .pcr-student-topbar-row,
-        .st-key-pcr_student_topbar_row {
-            max-width: 1240px;
-            margin: 0 auto 0.85rem auto;
-        }
-
-        .pcr-student-page-label {
-            color: rgba(223, 247, 251, 0.92) !important;
-            text-transform: none;
-            letter-spacing: 0;
-            font-weight: 750;
-        }
-
-        .pcr-hero {
-            max-width: 1240px;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            border-radius: 16px !important;
-            padding: 1.25rem 1.5rem !important;
-            min-height: 11.5rem !important;
-        }
-
-        .pcr-hero h1 {
-            font-size: clamp(1.82rem, 2.45vw, 2.42rem) !important;
-            max-width: 18em !important;
-        }
-
-        .pcr-hero p {
-            color: rgba(255,255,255,0.82) !important;
-            font-size: 1rem !important;
-            line-height: 1.72 !important;
-            max-width: 52rem !important;
-        }
-
-        .pcr-role-badge {
-            background: rgba(14,165,183,0.16) !important;
-            border-color: rgba(109,234,243,0.38) !important;
-            color: #DFF7FB !important;
-        }
-
-        .st-key-pcr_student_return button,
-        .pcr-student-return button {
-            background: rgba(223,247,251,0.06) !important;
-            border: 1px solid rgba(223,247,251,0.42) !important;
-            color: #EAFBFF !important;
-        }
-
-        .pcr-student-guide {
-            max-width: 1240px;
-            margin: 0 auto 1rem auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            border: 1px solid rgba(216, 227, 234, 0.18);
-            border-radius: 16px;
-            background: rgba(223, 247, 251, 0.11);
-            box-shadow: 0 18px 48px rgba(0,0,0,0.14);
-            padding: 1rem 1.1rem;
-            backdrop-filter: blur(14px);
-        }
-
-        .pcr-student-guide-title {
-            color: #FFFFFF;
-            font-weight: 760;
-            font-size: 1rem;
-            margin-bottom: 0.18rem;
-        }
-
-        .pcr-student-guide-desc {
-            color: rgba(255,255,255,0.76);
-            margin: 0;
-            line-height: 1.62;
-            font-size: 0.92rem;
-        }
-
-        .pcr-student-guide-chip {
-            flex: 0 0 auto;
-            color: #DFF7FB;
-            border: 1px solid rgba(109,234,243,0.38);
-            background: rgba(14,165,183,0.14);
-            border-radius: 999px;
-            padding: 0.28rem 0.78rem;
-            font-size: 0.8rem;
-            font-weight: 760;
-        }
-
-        .pcr-current-step-summary,
-        .pcr-stepper-grid,
-        .stProgress {
-            max-width: 1240px;
-            margin-left: auto !important;
-            margin-right: auto !important;
-        }
-
-        .pcr-current-step-summary {
-            border: 1px solid rgba(216, 227, 234, 0.16);
-            border-radius: 16px;
-            background: rgba(223, 247, 251, 0.10);
-            padding: 0.95rem 1.05rem;
-            box-shadow: 0 14px 34px rgba(0,0,0,0.12);
-        }
-
-        .pcr-step-kicker {
-            color: #6DEAF3 !important;
-            font-size: 0.78rem;
-            font-weight: 800;
-            margin-bottom: 0.18rem;
-        }
-
-        .pcr-step-title {
-            color: #FFFFFF !important;
-            font-size: 1.08rem;
-            font-weight: 780;
-            line-height: 1.45;
-        }
-
-        .pcr-step-desc {
-            color: rgba(255,255,255,0.74) !important;
-            margin-top: 0.22rem;
-            font-size: 0.92rem;
-            line-height: 1.58;
-        }
-
-        .pcr-stepper-grid {
-            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-            gap: 0.8rem !important;
-            margin-top: 0.85rem !important;
-            margin-bottom: 0.75rem !important;
-        }
-
-        .pcr-stepper-item {
-            border: 1px solid rgba(216,227,234,0.18) !important;
-            background: rgba(223,247,251,0.10) !important;
-            border-radius: 14px !important;
-            min-height: 6.2rem !important;
-            padding: 0.85rem 0.9rem !important;
-            box-shadow: none !important;
-        }
-
-        .pcr-stepper-item.active {
-            border-color: rgba(109,234,243,0.56) !important;
-            background: rgba(14,165,183,0.20) !important;
-        }
-
-        .pcr-stepper-item.done {
-            border-color: rgba(109,234,243,0.34) !important;
-            background: rgba(14,165,183,0.12) !important;
-        }
-
-        .pcr-stepper-index {
-            background: rgba(255,255,255,0.12) !important;
-            color: #DFF7FB !important;
-            border: 1px solid rgba(223,247,251,0.22);
-        }
-
-        .pcr-stepper-item.active .pcr-stepper-index,
-        .pcr-stepper-item.done .pcr-stepper-index {
-            background: #0EA5B7 !important;
-            color: #FFFFFF !important;
-        }
-
-        .pcr-stepper-title {
-            color: #FFFFFF !important;
-            font-size: 0.92rem !important;
-            line-height: 1.38 !important;
-        }
-
-        .pcr-stepper-status {
-            color: rgba(255,255,255,0.72) !important;
-        }
-
-        .pcr-current-step-chip {
-            background: rgba(14,165,183,0.16) !important;
-            border-color: rgba(109,234,243,0.38) !important;
-            color: #DFF7FB !important;
-        }
-
-        .st-key-pcr_student_workspace {
-            max-width: 1240px;
-            margin: 1rem auto 0 auto;
-        }
-
-        .st-key-pcr_student_workspace [data-testid="stHorizontalBlock"] {
-            align-items: flex-start;
-        }
-
-        .st-key-pcr_student_workspace [data-testid="column"] {
-            min-width: 0;
-        }
-
-        .st-key-pcr_student_form_card_step1 div[data-testid="stVerticalBlockBorderWrapper"],
-        .st-key-pcr_student_form_card_step2 div[data-testid="stVerticalBlockBorderWrapper"],
-        .st-key-pcr_student_form_card_step3 div[data-testid="stVerticalBlockBorderWrapper"],
-        .st-key-pcr_student_form_card_step4 div[data-testid="stVerticalBlockBorderWrapper"] {
-            min-height: 430px !important;
-            border-radius: 16px !important;
-            border: 1px solid rgba(216, 227, 234, 0.18) !important;
-            background: rgba(223, 247, 251, 0.12) !important;
-            box-shadow: 0 22px 56px rgba(0,0,0,0.18) !important;
-            backdrop-filter: blur(14px);
-        }
-
-        .st-key-pcr_student_form_card_step1 div[data-testid="stVerticalBlockBorderWrapper"] > div,
-        .st-key-pcr_student_form_card_step2 div[data-testid="stVerticalBlockBorderWrapper"] > div,
-        .st-key-pcr_student_form_card_step3 div[data-testid="stVerticalBlockBorderWrapper"] > div,
-        .st-key-pcr_student_form_card_step4 div[data-testid="stVerticalBlockBorderWrapper"] > div {
-            padding: 1.1rem 1.2rem !important;
-        }
-
-        .pcr-card-title {
-            color: #FFFFFF !important;
-            font-size: 1.18rem !important;
-            font-weight: 780 !important;
-        }
-
-        .pcr-muted {
-            color: rgba(255,255,255,0.76) !important;
-            line-height: 1.64 !important;
-        }
-
-        label,
-        [data-testid="stWidgetLabel"],
-        [data-testid="stWidgetLabel"] p,
-        .stRadio label,
-        .stRadio label p,
-        .stSelectbox label,
-        .stNumberInput label,
-        .stTextArea label,
-        .stFileUploader label {
-            color: rgba(255,255,255,0.88) !important;
-            font-weight: 680 !important;
-        }
-
-        input,
-        textarea,
-        [data-baseweb="select"] > div,
-        [data-baseweb="input"] > div,
-        [data-baseweb="textarea"] {
-            background-color: #FFFFFF !important;
-            color: #0B1F3A !important;
-            border-color: rgba(14,165,183,0.34) !important;
-        }
-
-        input::placeholder,
-        textarea::placeholder {
-            color: #64748B !important;
-            opacity: 1 !important;
-        }
-
-        [data-baseweb="select"] span,
-        [data-baseweb="select"] div,
-        [data-baseweb="input"] input,
-        [data-baseweb="textarea"] textarea {
-            color: #0B1F3A !important;
-        }
-
-        .stCaptionContainer,
-        .stCaptionContainer p,
-        .stMarkdown p {
-            color: rgba(255,255,255,0.76) !important;
-        }
-
-        .pcr-student-actions {
-            margin-top: 0.95rem;
-        }
-
-        .pcr-student-actions [data-testid="stHorizontalBlock"] {
-            align-items: stretch;
-        }
-
-        .pcr-readiness-panel {
-            position: sticky;
-            top: 1rem;
-            min-height: 430px;
-            border: 1px solid rgba(216, 227, 234, 0.18) !important;
-            border-radius: 16px !important;
-            background: rgba(7, 23, 43, 0.58) !important;
-            box-shadow: 0 22px 56px rgba(0,0,0,0.18) !important;
-            backdrop-filter: blur(14px);
-            padding: 1.1rem !important;
-            margin-bottom: 1rem !important;
-        }
-
-        .pcr-readiness-title {
-            color: #FFFFFF !important;
-            font-size: 1.05rem !important;
-            font-weight: 820 !important;
-            margin-bottom: 0.25rem !important;
-        }
-
-        .pcr-readiness-desc {
-            color: rgba(255,255,255,0.74);
-            margin: 0 0 0.85rem 0;
-            font-size: 0.9rem;
-            line-height: 1.58;
-        }
-
-        .pcr-readiness-grid {
-            display: grid !important;
-            grid-template-columns: 1fr !important;
-            gap: 0.58rem !important;
-        }
-
-        .pcr-readiness-item {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 0.56rem;
-            align-items: flex-start;
-            border-radius: 12px !important;
-            padding: 0.72rem 0.76rem !important;
-            border: 1px solid rgba(216,227,234,0.14) !important;
-            background: rgba(223,247,251,0.09) !important;
-        }
-
-        .pcr-readiness-dot {
-            width: 0.58rem;
-            height: 0.58rem;
-            margin-top: 0.35rem;
-            border-radius: 999px;
-            background: rgba(216,227,234,0.44);
-            box-shadow: none;
-        }
-
-        .pcr-readiness-dot.done {
-            background: #0EA5B7;
-            box-shadow: 0 0 14px rgba(109,234,243,0.55);
-        }
-
-        .pcr-readiness-label {
-            color: rgba(255,255,255,0.72);
-            font-size: 0.76rem;
-            font-weight: 760;
-            margin-bottom: 0.12rem;
-        }
-
-        .pcr-readiness-value {
-            display: block;
-            color: #FFFFFF;
-            font-size: 0.92rem;
-            font-weight: 760;
-            line-height: 1.48;
-            overflow-wrap: anywhere;
-        }
-
-        .pcr-review-grid,
-        .pcr-result-meta-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        }
-
-        .pcr-review-item,
-        .pcr-candidate-row {
-            border-color: rgba(216,227,234,0.16) !important;
-            background: rgba(255,255,255,0.95) !important;
-        }
-
-        .pcr-review-label {
-            color: #475569 !important;
-        }
-
-        .pcr-review-value,
-        .pcr-candidate-row b,
-        .pcr-candidate-row span {
-            color: #0B1F3A !important;
-        }
-
-        .pcr-gel-placeholder {
-            border-color: rgba(109,234,243,0.42) !important;
-            background:
-                repeating-linear-gradient(90deg, rgba(14,165,183,0.14) 0 10px, transparent 10px 32px),
-                linear-gradient(180deg, rgba(223,248,251,0.18), rgba(223,248,251,0.08)) !important;
-            color: rgba(255,255,255,0.76) !important;
-        }
-
-        .pcr-gel-placeholder b {
-            color: #FFFFFF !important;
-        }
-
-        .pcr-top1-card {
-            border: 1px solid rgba(109,234,243,0.34) !important;
-            background:
-                linear-gradient(135deg, rgba(14,165,183,0.20), rgba(37,99,235,0.12)),
-                rgba(7,23,43,0.72) !important;
-            border-radius: 16px !important;
-        }
-
-        .pcr-top1-card,
-        .pcr-top1-card * {
-            color: #FFFFFF !important;
-        }
-
-        [data-testid="stExpander"] {
-            border: 1px solid rgba(216,227,234,0.20) !important;
-            border-radius: 12px !important;
-            background: rgba(7,23,43,0.62) !important;
-            overflow: hidden;
-        }
-
-        [data-testid="stExpander"] details summary {
-            background: rgba(223,247,251,0.12) !important;
-            color: #FFFFFF !important;
-        }
-
-        [data-testid="stExpander"] details summary *,
-        [data-testid="stExpander"] p,
-        [data-testid="stExpander"] li {
-            color: #FFFFFF !important;
-        }
-
-        @media (max-width: 900px) {
-            .pcr-student-guide,
-            .pcr-current-step-summary {
-                display: block;
-            }
-
-            .pcr-stepper-grid,
-            .pcr-review-grid,
-            .pcr-result-meta-grid {
-                grid-template-columns: 1fr !important;
-            }
-
-            .pcr-readiness-panel {
-                position: static;
-                min-height: auto;
-            }
-
-            .st-key-pcr_student_form_card_step1 div[data-testid="stVerticalBlockBorderWrapper"],
-            .st-key-pcr_student_form_card_step2 div[data-testid="stVerticalBlockBorderWrapper"],
-            .st-key-pcr_student_form_card_step3 div[data-testid="stVerticalBlockBorderWrapper"],
-            .st-key-pcr_student_form_card_step4 div[data-testid="stVerticalBlockBorderWrapper"] {
-                min-height: auto !important;
-            }
-        }
-
-        /* Final student workbench overrides. Keep these scoped to this page. */
-        .main .block-container,
-        .block-container,
-        .stMainBlockContainer,
-        div[data-testid="stMainBlockContainer"],
-        section[data-testid="stMain"] > div {
-            max-width: min(1480px, calc(100vw - 64px)) !important;
-            width: min(1480px, calc(100vw - 64px)) !important;
-        }
-
-        .pcr-hero,
-        .pcr-student-topbar-row,
-        .st-key-pcr_student_topbar_row,
-        .pcr-student-guide,
-        .pcr-current-step-summary,
-        .pcr-stepper-grid,
-        .stProgress,
-        .st-key-pcr_student_workspace,
-        .pcr-student-result-page {
-            max-width: min(1480px, calc(100vw - 64px)) !important;
-            width: min(1480px, calc(100vw - 64px)) !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-        }
-
-        .pcr-hero {
-            min-height: 9.5rem !important;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-        }
-
-        .pcr-hero::before {
-            content: "";
-            position: absolute;
-            right: 1.4rem;
-            top: 1.2rem;
-            width: min(16rem, 24vw);
-            height: 5.8rem;
-            border-radius: 14px;
-            opacity: 0.34;
-            background:
-                repeating-linear-gradient(90deg, rgba(109,234,243,0.30) 0 2px, transparent 2px 1.55rem),
-                linear-gradient(135deg, rgba(14,165,183,0.25), rgba(37,99,235,0.20));
-        }
-
-        .pcr-hero h1,
-        .pcr-hero p,
-        .pcr-role-badge {
-            max-width: 54rem !important;
-        }
-
-        .pcr-hero h1 {
-            font-size: clamp(1.72rem, 2.15vw, 2.28rem) !important;
-        }
-
-        .pcr-student-guide {
-            display: flex !important;
-        }
-
-        .st-key-pcr_student_workspace div[data-testid="stHorizontalBlock"] {
-            gap: 1rem;
-        }
-
-        .st-key-pcr_student_form_card_step1 div[data-testid="stVerticalBlockBorderWrapper"],
-        .st-key-pcr_student_form_card_step2 div[data-testid="stVerticalBlockBorderWrapper"],
-        .st-key-pcr_student_form_card_step3 div[data-testid="stVerticalBlockBorderWrapper"],
-        .st-key-pcr_student_form_card_step4 div[data-testid="stVerticalBlockBorderWrapper"],
-        .pcr-readiness-panel {
-            min-height: 420px !important;
-        }
-
-        .pcr-readiness-panel {
-            top: 0.85rem;
-        }
-
-        .pcr-student-result-page {
-            display: grid;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .pcr-result-overview,
-        .pcr-result-primary,
-        .pcr-result-candidates,
-        .pcr-result-evidence,
-        .pcr-input-summary,
-        .pcr-result-actions {
-            border: 1px solid rgba(216,227,234,0.18);
-            border-radius: 18px;
-            background: rgba(7,23,43,0.64);
-            box-shadow: 0 24px 64px rgba(0,0,0,0.18);
-            backdrop-filter: blur(16px);
-            padding: 1.2rem;
-        }
-
-        .pcr-result-overview {
-            display: grid;
-            grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
-            gap: 1rem;
-            background:
-                linear-gradient(135deg, rgba(14,165,183,0.18), rgba(37,99,235,0.12)),
-                rgba(7,23,43,0.68);
-        }
-
-        .pcr-result-kicker,
-        .pcr-result-label {
-            color: #6DEAF3;
-            font-size: 0.78rem;
-            font-weight: 800;
-            margin-bottom: 0.32rem;
-        }
-
-        .pcr-result-title {
-            margin: 0;
-            color: #FFFFFF;
-            font-size: clamp(1.42rem, 2vw, 2rem);
-            line-height: 1.35;
-            font-weight: 820;
-        }
-
-        .pcr-result-desc,
-        .pcr-result-note,
-        .pcr-result-card p,
-        .pcr-result-evidence li {
-            color: rgba(255,255,255,0.76);
-            line-height: 1.68;
-        }
-
-        .pcr-result-stat-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.65rem;
-        }
-
-        .pcr-result-stat,
-        .pcr-result-card,
-        .pcr-input-summary-item {
-            border: 1px solid rgba(216,227,234,0.14);
-            border-radius: 14px;
-            background: rgba(223,247,251,0.09);
-            padding: 0.78rem 0.85rem;
-        }
-
-        .pcr-result-stat span,
-        .pcr-input-summary-label {
-            display: block;
-            color: rgba(255,255,255,0.68);
-            font-size: 0.76rem;
-            font-weight: 760;
-            margin-bottom: 0.18rem;
-        }
-
-        .pcr-result-stat b,
-        .pcr-input-summary-value {
-            color: #FFFFFF;
-            font-size: 0.98rem;
-            line-height: 1.45;
-            overflow-wrap: anywhere;
-        }
-
-        .pcr-confidence-pill {
-            display: inline-flex;
-            align-items: center;
-            border-radius: 999px;
-            padding: 0.22rem 0.74rem;
-            color: #FFFFFF;
-            background: rgba(14,165,183,0.28);
-            border: 1px solid rgba(109,234,243,0.38);
-            font-weight: 820;
-        }
-
-        .pcr-result-primary-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.78fr);
-            gap: 1rem;
-            align-items: stretch;
-        }
-
-        .pcr-primary-reason {
-            color: #FFFFFF;
-            font-size: clamp(1.24rem, 1.65vw, 1.7rem);
-            line-height: 1.38;
-            font-weight: 840;
-            margin: 0.2rem 0 0.55rem 0;
-        }
-
-        .pcr-score-chip {
-            display: inline-flex;
-            border-radius: 999px;
-            padding: 0.2rem 0.68rem;
-            background: rgba(37,99,235,0.28);
-            border: 1px solid rgba(147,197,253,0.34);
-            color: #FFFFFF;
-            font-weight: 780;
-            font-size: 0.82rem;
-        }
-
-        .pcr-evidence-list {
-            margin: 0.8rem 0 0 0;
-            padding-left: 1.1rem;
-        }
-
-        .pcr-candidate-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.8rem;
-        }
-
-        .pcr-candidate-card {
-            border: 1px solid rgba(216,227,234,0.14);
-            border-radius: 14px;
-            background: rgba(223,247,251,0.08);
-            padding: 0.92rem;
-        }
-
-        .pcr-candidate-rank {
-            color: #6DEAF3;
-            font-size: 0.76rem;
-            font-weight: 820;
-            margin-bottom: 0.3rem;
-        }
-
-        .pcr-candidate-card h4 {
-            color: #FFFFFF;
-            margin: 0 0 0.35rem 0;
-            font-size: 1rem;
-            line-height: 1.38;
-        }
-
-        .pcr-input-summary-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.75rem;
-        }
-
-        .pcr-result-actions-row {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.8rem;
-        }
-
-        .pcr-result-actions h3,
-        .pcr-result-section-title {
-            color: #FFFFFF;
-            margin: 0 0 0.75rem 0;
-            font-size: 1.15rem;
-        }
-
-        @media (max-width: 980px) {
-            .main .block-container,
-            .block-container,
-            .stMainBlockContainer,
-            div[data-testid="stMainBlockContainer"],
-            section[data-testid="stMain"] > div,
-            .pcr-hero,
-            .pcr-student-topbar-row,
-            .st-key-pcr_student_topbar_row,
-            .pcr-student-guide,
-            .pcr-current-step-summary,
-            .pcr-stepper-grid,
-            .stProgress,
-            .st-key-pcr_student_workspace,
-            .pcr-student-result-page {
-                max-width: calc(100vw - 28px) !important;
-                width: calc(100vw - 28px) !important;
-            }
-
-            .pcr-result-overview,
-            .pcr-result-primary-grid,
-            .pcr-candidate-grid,
-            .pcr-input-summary-grid,
-            .pcr-result-actions-row {
-                grid-template-columns: 1fr;
-            }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """页面样式由 core.apply_common_styles 统一注入。"""
+    return
 
 
 class SessionUploadedFile:
@@ -1114,6 +189,12 @@ def init_student_wizard_state():
         st.session_state["student_show_result_report"] = bool(st.session_state.get("student_last_payload"))
 
 
+def clear_followup_widget_state():
+    for key in list(st.session_state):
+        if key.startswith("student_followup_"):
+            del st.session_state[key]
+
+
 def clear_student_uploaded_image():
     """清空暂存图片"""
     st.session_state["student_uploaded_image_bytes"] = None
@@ -1138,6 +219,8 @@ def reset_student_form_state(overrides=None, target_step=None):
     st.session_state["student_current_step"] = target_step
     st.session_state["student_last_payload"] = None
     st.session_state["student_show_result_report"] = False
+    st.session_state.pop("student_access_code", None)
+    clear_followup_widget_state()
     clear_student_uploaded_image()
 
 
@@ -1313,6 +396,8 @@ def go_to_prev_step():
 def run_student_diagnosis():
     """执行原有诊断逻辑，并保存结果到 session_state"""
     form_data = collect_student_form_payload()
+    initial_hypothesis = st.session_state["student_form_initial_hypothesis"].strip()
+    access_code = secrets.token_urlsafe(12)
     saved_image_path, image_save_error = save_uploaded_image(form_data["gel_image_file"])
 
     results, _, text_clues, clue_source, api_debug = diagnose(
@@ -1324,6 +409,9 @@ def run_student_diagnosis():
         form_data["negative_control_band"],
         form_data["description"],
     )
+
+    clear_followup_widget_state()
+    questions, question_source = plan_followup_questions(form_data, results=results) if results else ([], "")
 
     payload = {
         "results": results,
@@ -1341,6 +429,10 @@ def run_student_diagnosis():
         "positive_control_normal": form_data["positive_control_normal"],
         "negative_control_band": form_data["negative_control_band"],
         "description": form_data["description"],
+        "followup_questions": questions,
+        "followup_question_source": question_source,
+        "followup_completed": False,
+        "student_initial_hypothesis": initial_hypothesis,
     }
 
     if results:
@@ -1358,8 +450,12 @@ def run_student_diagnosis():
             form_data["description"],
             result_text,
             gel_image_path=saved_image_path,
+            student_initial_hypothesis=initial_hypothesis,
+            student_access_code=access_code,
+            initial_results=results,
         )
         payload["record_id"] = record_id
+        st.session_state["student_access_code"] = access_code
 
     st.session_state["student_last_payload"] = payload
     st.session_state["last_api_debug"] = api_debug
@@ -1501,8 +597,8 @@ def render_step_4_review():
             ("实验现象", form_data["abnormality"]),
             ("阳性对照是否正常", form_data["positive_control_normal"]),
             ("阴性对照是否有带", form_data["negative_control_band"]),
-            ("模板量", form_data["template_amount"]),
-            ("退火温度", form_data["annealing_temp"]),
+            ("模板量", f"{form_data['template_amount']} μL"),
+            ("退火温度", f"{form_data['annealing_temp']} ℃"),
             ("循环数", form_data["cycles"]),
             ("是否已上传图片", image_status),
             ("学生补充描述", description_text),
@@ -1521,6 +617,15 @@ def render_step_4_review():
             unsafe_allow_html=True,
         )
         st.caption("如需修改，可返回前面步骤继续调整；确认后再生成诊断结果。")
+        st.text_area(
+            "查看系统结果前，你认为最可能的原因是什么？依据是什么？",
+            key="student_form_initial_hypothesis",
+            height=100,
+            placeholder="例如：我认为模板量不足，因为样本没有目标条带，但阳性对照正常。",
+            on_change=sync_val,
+            args=("student_form_initial_hypothesis",),
+        )
+        st.caption("请先独立写下判断；提交后将与系统结果、教师复核及你的修订一起保存。")
 
 
 def render_student_step_navigation():
@@ -1537,11 +642,14 @@ def render_student_step_navigation():
 
     with right_col:
         if current_step < total_steps:
-            if st.button("下一步", key=f"student_next_step_{current_step}", use_container_width=True):
+            if st.button("下一步", key=f"student_next_step_{current_step}", type="primary", use_container_width=True):
                 go_to_next_step()
                 st.rerun()
         else:
             if st.button("生成诊断结果", key="student_run_diagnosis", type="primary", use_container_width=True):
+                if not st.session_state.get("student_form_initial_hypothesis", "").strip():
+                    st.warning("请先填写你的初步判断和依据。")
+                    return
                 run_student_diagnosis()
                 st.session_state["student_show_result_report"] = True
                 st.success("诊断已完成，本次记录已保存，可在教师端继续复核。")
@@ -1554,6 +662,8 @@ def get_result_report_parts(payload):
     results = payload.get("results", []) or []
     top1 = results[0] if results else {}
     detail = top1.get("诊断依据", {}) or {}
+    followup_data = payload.get("followup_data", {})
+    operation_text = followup_data.get("answers", {}).get("operation", "")
     context = build_diagnosis_context(
         abnormality=payload.get("abnormality", ""),
         positive_control_normal=payload.get("positive_control_normal", ""),
@@ -1561,8 +671,8 @@ def get_result_report_parts(payload):
         template_amount=payload.get("template_amount"),
         annealing_temp=payload.get("annealing_temp"),
         cycles=payload.get("cycles"),
-        description=payload.get("description", ""),
-        text_clues=payload.get("text_clues", []),
+        description=payload.get("description", "") or operation_text,
+        text_clues=payload.get("text_clues", []) + followup_data.get("extra_hints", []),
         gel_image_path=payload.get("gel_image_path", ""),
         has_image=bool(payload.get("gel_image_path")),
     )
@@ -1573,58 +683,27 @@ def get_result_report_parts(payload):
 
 
 def render_result_overview(payload, results, top1, confidence_level):
-    """渲染诊断结果总览。"""
-    record_status = "已保存" if payload.get("record_id") else "未保存"
-    candidate_count = " / ".join(f"Top{index}" for index in range(1, len(results) + 1)) if results else "暂无"
-    st.markdown(
-        f"""
-        <div class="pcr-result-overview">
-            <div>
-                <div class="pcr-result-kicker">诊断结果总览</div>
-                <h2 class="pcr-result-title">{html_text(top1.get("原因", "暂无诊断结果"))}</h2>
-                <p class="pcr-result-desc">
-                    系统判断仅作为实验复盘参考，最终原因可由教师结合原始图像与操作记录确认。
-                </p>
-            </div>
-            <div class="pcr-result-stat-grid">
-                <div class="pcr-result-stat"><span>主要判断</span><b>{html_text(top1.get("原因", "-"))}</b></div>
-                <div class="pcr-result-stat"><span>置信度</span><b><span class="pcr-confidence-pill">{html_text(confidence_level)}</span></b></div>
-                <div class="pcr-result-stat"><span>候选原因</span><b>{html_text(candidate_count)}</b></div>
-                <div class="pcr-result-stat"><span>记录状态</span><b>{html_text(record_status)}</b></div>
-                <div class="pcr-result-stat"><span>诊断时间</span><b>{html_text(payload.get("submit_time", "-"))}</b></div>
-                <div class="pcr-result-stat"><span>文本线索</span><b>{html_text("、".join(payload.get("text_clues", [])) if payload.get("text_clues") else "未抽取")}</b></div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """以正文层级呈现结论，保留原有状态与文本线索信息。"""
+    st.html(f'''<div class="pcr-result-overview">
+        <div class="pcr-result-kicker">诊断结果总览</div>
+        <h2 class="pcr-result-title">{html_text(top1.get("原因", "暂无诊断结果"))}</h2>
+        <div class="pcr-result-meta"><span>置信度：<b class="pcr-confidence-pill">{html_text(confidence_level)}</b></span>
+        <span>总分 {html_text(top1.get("总分", "-"))}</span></div>
+        <p class="pcr-result-desc">系统判断仅作为实验复盘参考，最终原因可由教师结合原始图像与操作记录确认。</p>
+        </div>''')
 
 
-def render_primary_result(top1, confidence_level, confidence_reason, evidence_points):
-    """渲染 Top1 主要判断。"""
-    evidence_html = "".join(f"<li>{html_text(point)}</li>" for point in (evidence_points or ["当前可提炼的证据较少，系统主要基于已有规则分值进行排序。"])[:5])
-    st.markdown(
-        f"""
-        <div class="pcr-result-primary">
-            <h3 class="pcr-result-section-title">主要判断</h3>
-            <div class="pcr-result-primary-grid">
-                <div class="pcr-result-card">
-                    <div class="pcr-result-label">系统优先判断为</div>
-                    <div class="pcr-primary-reason">{html_text(top1.get("原因", "-"))}</div>
-                    <span class="pcr-confidence-pill">置信度 {html_text(confidence_level)}</span>
-                    <span class="pcr-score-chip">总分 {html_text(top1.get("总分", "-"))}</span>
-                    <p>{html_text(confidence_reason)}</p>
-                </div>
-                <div class="pcr-result-card">
-                    <div class="pcr-result-label">建议措施</div>
-                    <p>{html_text(top1.get("建议", "建议结合原始实验记录和凝胶图片继续复核。"))}</p>
-                </div>
-            </div>
-            <ul class="pcr-evidence-list">{evidence_html}</ul>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+def render_primary_result(top1, confidence_level, confidence_reason, evidence_points, missing_items=None):
+    """合并证据展示，原判断说明仍可展开查看。"""
+    points = list(evidence_points or ["当前可提炼的证据较少，系统主要基于已有规则分值进行排序。"])
+    points += list(missing_items or [])
+    evidence_html = "".join(f"<li>{html_text(point)}</li>" for point in dict.fromkeys(points))
+    st.html(f'''<div class="pcr-result-primary">
+        <h3>系统依据与补充建议</h3>
+        <ol class="pcr-evidence-list">{evidence_html}</ol>
+        <div class="pcr-soft-note"><div class="pcr-result-label">建议措施</div>
+        <p>{html_text(top1.get("建议", "建议结合原始实验记录和凝胶图片继续复核。"))}</p></div>
+        </div>''')
 
 
 def render_candidate_results(results):
@@ -1719,6 +798,242 @@ def return_to_student_editing():
     st.rerun()
 
 
+def reassess_with_followup(payload, questions, answers, extra_hints):
+    updated_case = apply_followup_choices(payload, answers)
+    results, _, text_clues, clue_source, api_debug = diagnose(
+        updated_case["abnormality"],
+        updated_case["template_amount"],
+        updated_case["annealing_temp"],
+        updated_case["cycles"],
+        updated_case["positive_control_normal"],
+        updated_case["negative_control_band"],
+        updated_case.get("description", ""),
+        extra_text_hints=extra_hints,
+        negative_control_detail=updated_case.get("negative_control_detail"),
+        band_pattern=updated_case.get("band_pattern"),
+        positive_control_detail=updated_case.get("positive_control_detail"),
+    )
+    if not results:
+        st.error("补证后没有可用的诊断结果，请返回修改原始记录。")
+        return
+
+    followup_data = {
+        "initial_results": payload.get("results", []),
+        "final_results": results,
+        "questions": questions,
+        "answers": answers,
+        "extra_hints": extra_hints,
+        "negative_control_detail": updated_case.get("negative_control_detail"),
+        "positive_control_detail": updated_case.get("positive_control_detail"),
+        "band_pattern": updated_case.get("band_pattern"),
+        "question_source": payload.get("followup_question_source", ""),
+        "hint_source": st.session_state.get("student_followup_hint_source", ""),
+    }
+    record_id = payload.get("record_id")
+    if record_id and not save_followup_reassessment(
+        record_id,
+        format_diagnosis_result_text(results),
+        updated_case["positive_control_normal"],
+        updated_case["negative_control_band"],
+        followup_data,
+    ):
+        st.error("补证结果未能保存到原案例；若教师已经确认该案例，请新建记录后再诊断。当前排序未更新。")
+        return
+
+    payload.update({
+        "results": results,
+        "text_clues": text_clues,
+        "clue_source": clue_source,
+        "api_debug": api_debug,
+        "positive_control_normal": updated_case["positive_control_normal"],
+        "negative_control_band": updated_case["negative_control_band"],
+        "negative_control_detail": updated_case.get("negative_control_detail"),
+        "band_pattern": updated_case.get("band_pattern"),
+        "followup_data": followup_data,
+        "followup_completed": True,
+    })
+    st.session_state["student_last_payload"] = payload
+    st.rerun()
+
+
+def render_followup_block(payload):
+    """展示一轮定向追问，补证后在同一案例内重新排序。"""
+    if payload.get("followup_completed"):
+        followup_data = payload.get("followup_data", {})
+        first = followup_data.get("initial_results", [])
+        latest = followup_data.get("final_results", [])
+        with st.container(border=True):
+            st.markdown("### 追问补证与再判断")
+            st.write(
+                f"初判 Top1：{first[0].get('原因', '未识别') if first else '未识别'} → "
+                f"补证后 Top1：{latest[0].get('原因', '未识别') if latest else '未识别'}"
+            )
+            for question in followup_data.get("questions", []):
+                answer = followup_data.get("answers", {}).get(question["id"], "")
+                if answer:
+                    st.markdown(f"- **{question['text']}** {answer}")
+            hints = followup_data.get("extra_hints", [])
+            st.caption(f"已确认的操作线索：{'、'.join(hints) if hints else '无'}。排序由规则引擎重新计算，最终原因仍需教师复核。")
+        return
+
+    questions = payload.get("followup_questions", [])
+    if not questions:
+        return
+    with st.container(key="pcr_followup_form"):
+        st.markdown("### 追问补证")
+        st.write("以下问题用于核对初判中尚不充分或可能矛盾的证据。无法确认的项目可保持原记录。")
+        st.caption(f"问法来源：{payload.get('followup_question_source', '本地追问规划')}；问题主题和选项由程序限定。")
+        answers = {}
+        for question_number, question in enumerate(questions, 1):
+            st.html(f'<div class="ds-question-title"><span>{question_number}</span><b>{html_text(question["text"])}</b></div>')
+            st.caption(question["reason"])
+            key = f"student_followup_{question['id']}"
+            if question["kind"] == "choice":
+                answers[question["id"]] = st.selectbox(
+                    "请选择观察结果", ["请选择"] + question["options"], key=key,
+                    label_visibility="visible",
+                )
+            else:
+                answers[question["id"]] = st.text_area(
+                    "实际操作描述", key=key, height=130,
+                    placeholder="例如：配液时确认漏加了聚合酶；没有把猜测写成已发生的事实。",
+                    label_visibility="visible",
+                ).strip()
+
+        operation_text = answers.get("operation", "")
+        if operation_text and st.session_state.get("student_followup_analyzed_text") != operation_text:
+            if st.button("整理操作线索", key="student_followup_extract", use_container_width=True):
+                hints, source = interpret_operation_text(operation_text)
+                st.session_state["student_followup_analyzed_text"] = operation_text
+                st.session_state["student_followup_confirmed_hints"] = hints
+                st.session_state["student_followup_hint_source"] = source
+                st.rerun()
+            st.info("请先整理操作描述，再确认哪些线索确实发生。")
+            return
+
+        confirmed_hints = []
+        if operation_text:
+            confirmed_hints = st.multiselect(
+                "请确认实际发生的操作线索（模型建议仅供核对）",
+                STANDARD_TEXT_HINTS,
+                key="student_followup_confirmed_hints",
+                placeholder="请选择已确认的操作线索",
+            )
+            st.caption(f"线索来源：{st.session_state.get('student_followup_hint_source', '手动确认线索')}。未勾选的线索不会影响规则排序。")
+
+        if st.button("用补充证据重新判断", key="student_followup_reassess", type="primary", use_container_width=True):
+            selected = any(
+                value and value not in {"请选择", "暂无法确认", "暂无法判断"}
+                for question_id, value in answers.items() if question_id != "operation"
+            )
+            if not selected and not confirmed_hints:
+                st.warning("尚无可用于重新排序的明确证据。请核对一个观察结果，或确认实际发生的操作线索。")
+                return
+            reassess_with_followup(payload, questions, answers, confirmed_hints)
+
+
+def render_student_case_lookup():
+    """跨会话找回本人案例，查询码仅在创建时显示给学生。"""
+    with st.expander("已有案例？用查询码找回反馈"):
+        with st.form("student_case_lookup_form"):
+            access_code = st.text_input("案例查询码", type="password", placeholder="输入创建案例时保存的查询码")
+            submitted = st.form_submit_button("找回案例")
+        if submitted:
+            record = load_student_record(access_code)
+            if not record:
+                st.error("未找到对应案例，请核对查询码。")
+                return
+            followup = parse_followup_data(record.get("followup_json"))
+            results = followup.get("final_results") or followup.get("initial_results") or [
+                parse_candidate_result_item(item, index)
+                for index, item in enumerate(parse_all_candidates(record.get("diagnosis_result")), 1)
+            ]
+            results = [item for item in results if isinstance(item, dict)]
+            case = {
+                "abnormality": record.get("abnormality"),
+                "template_amount": record.get("template_amount"),
+                "annealing_temp": record.get("annealing_temp"),
+                "cycles": record.get("cycles"),
+                "positive_control_normal": record.get("positive_control_normal"),
+                "negative_control_band": record.get("negative_control_band"),
+                "description": record.get("description") or "",
+            }
+            questions, source = ([], "")
+            if not followup.get("final_results") and not record.get("teacher_final_cause"):
+                questions, source = plan_followup_questions(case, results=results)
+            st.session_state["student_access_code"] = access_code.strip()
+            st.session_state["student_last_payload"] = {
+                **case,
+                "record_id": record["id"],
+                "results": results,
+                "text_clues": [],
+                "submit_time": record.get("diagnosis_time"),
+                "gel_image_path": record.get("gel_image_path"),
+                "followup_data": followup,
+                "followup_completed": bool(followup.get("final_results")),
+                "followup_questions": questions,
+                "followup_question_source": source,
+                "student_initial_hypothesis": record.get("student_initial_hypothesis") or "",
+                "restored": True,
+            }
+            st.session_state["student_show_result_report"] = True
+            clear_followup_widget_state()
+            st.rerun()
+
+
+def render_student_learning_loop(payload):
+    """展示初判、系统判断、教师反馈和一次学生修订。"""
+    record_id = payload.get("record_id")
+    code = st.session_state.get("student_access_code")
+    if not record_id or not code:
+        return
+    record = load_student_record(code)
+    if not record or record.get("id") != record_id:
+        return
+
+    with st.container(key="pcr_learning_loop"):
+        st.markdown("### 学习复盘")
+        st.write(f"案例编号：{record_id}｜你的诊断前判断：{record.get('student_initial_hypothesis') or '未填写'}")
+        st.caption("请妥善保存下方查询码。换浏览器或稍后返回时，可用它找回教师反馈；查询码不会出现在教师列表中。")
+        st.code(code, language=None)
+
+        followup = parse_followup_data(record.get("followup_json"))
+        initial = followup.get("initial_results") or []
+        final = followup.get("final_results") or []
+        if initial:
+            st.write(f"系统初判：{initial[0].get('原因', '未识别')}")
+        if final:
+            st.write(f"系统补证后判断：{final[0].get('原因', '未识别')}")
+
+        if st.button("刷新教师反馈", key=f"student_refresh_feedback_{record_id}"):
+            st.rerun()
+        teacher_final = record.get("teacher_final_cause")
+        if not teacher_final:
+            st.info("教师尚未复核。请保存查询码，稍后返回查看反馈并修订判断。")
+            return
+
+        st.success(f"教师确认原因：{teacher_final}")
+        st.write(f"教师反馈：{record.get('teacher_note') or '教师未填写补充说明。'}")
+        if record.get("student_revision_time"):
+            st.write(f"你修订后的原因：{record.get('student_revised_cause')}")
+            st.write(f"修订依据：{record.get('student_revision_reason')}")
+            st.caption(f"提交时间：{record.get('student_revision_time')}。本案例的学习复盘已完成。")
+            return
+
+        with st.form(f"student_revision_form_{record_id}"):
+            revised_cause = st.text_input("看到教师反馈后，你现在认为最可能的原因是什么？")
+            revision_reason = st.text_area("哪些证据让你保留或修改了初判？", height=100)
+            submitted = st.form_submit_button("提交修订判断", type="primary")
+        if submitted:
+            if not revised_cause.strip() or not revision_reason.strip():
+                st.warning("请同时填写修订原因和依据。")
+            elif save_student_revision(record_id, code, revised_cause, revision_reason):
+                st.success("修订已保存，学习复盘完成。")
+                st.rerun()
+            else:
+                st.error("修订未保存。请刷新案例并确认教师已经复核，且此前没有提交过修订。")
+
+
 def render_student_results(payload):
     """渲染报告化诊断结果区域。"""
     results = payload.get("results", [])
@@ -1736,10 +1051,53 @@ def render_student_results(payload):
         return
 
     results, top1, confidence_level, confidence_reason, evidence_points, missing_items = get_result_report_parts(payload)
-    render_result_overview(payload, results, top1, confidence_level)
-    render_primary_result(top1, confidence_level, confidence_reason, evidence_points)
-    render_candidate_results(results)
-    render_result_evidence(missing_items)
+    authorized_record = load_student_record(st.session_state.get("student_access_code"))
+    teacher_confirmed = bool(
+        authorized_record and authorized_record.get("id") == record_id
+        and authorized_record.get("teacher_final_cause")
+    )
+    if teacher_confirmed:
+        st.success("教师已完成复核。请在下方查看反馈并修订你的判断。")
+    elif payload.get("followup_completed"):
+        st.success("补充证据后已重新排序，教师端可查看初判与再判断记录。")
+    else:
+        st.info("当前为初步判断。请完成下方定向追问，补充证据后重新排序。", icon=":material/info:")
+    with st.container(key="pcr_diagnosis_split"):
+        diagnosis_col, followup_col = st.columns([0.49, 0.51])
+        with diagnosis_col:
+            render_result_overview(payload, results, top1, confidence_level)
+            render_primary_result(top1, confidence_level, confidence_reason, evidence_points, missing_items)
+            items = [("实验现象", payload.get("abnormality", "-")),
+                     ("阳性对照", payload.get("positive_control_normal", "-")),
+                     ("阴性对照", payload.get("negative_control_band", "-")),
+                     ("模板", f"{payload.get('template_amount', '-')} μL"),
+                     ("退火", f"{payload.get('annealing_temp', '-')} ℃"),
+                     ("循环", payload.get("cycles", "-"))]
+            st.html('<h3>本次输入摘要</h3><div class="ds-input-strip">' + ''.join(
+                f'<div><span>{html_text(label)}</span><b>{html_text(value)}</b></div>'
+                for label, value in items) + '</div>')
+        with followup_col:
+            if payload.get("followup_completed") or not teacher_confirmed:
+                render_followup_block(payload)
+            elif teacher_confirmed:
+                st.success("教师已完成复核。请在下方查看反馈并修订你的判断。")
+    render_student_learning_loop(payload)
+
+    status = "已保存" if payload.get("record_id") else "未保存"
+    hints = list(dict.fromkeys(payload.get("text_clues", []) + payload.get("followup_data", {}).get("extra_hints", [])))
+    with st.expander("记录状态与文本线索"):
+        st.write(f"记录状态：{status} · 诊断时间：{payload.get('submit_time', '-')}")
+        st.write(f"候选原因：{' / '.join(f'Top{i}' for i in range(1, len(results) + 1))}")
+        st.write(f"文本线索：{'、'.join(hints) if hints else '未抽取'}")
+
+    with st.expander("主要判断说明"):
+        st.write(f"系统优先判断为：{top1.get('原因', '-')}")
+        st.write(confidence_reason)
+
+    with st.expander("其他候选原因与补充建议"):
+        render_candidate_results(results)
+        render_result_evidence(missing_items)
+
 
     with st.expander("查看本次输入摘要", expanded=False):
         render_input_summary(payload)
@@ -1757,7 +1115,11 @@ def render_student_results(payload):
     )
     action_cols = st.columns([1, 1])
     with action_cols[0]:
-        if st.button("返回修改", key="student_return_to_editing", use_container_width=True):
+        if payload.get("restored"):
+            if st.button("新建实验记录", key="student_return_to_editing", use_container_width=True):
+                reset_student_form_state(target_step=1)
+                st.rerun()
+        elif st.button("返回修改", key="student_return_to_editing", use_container_width=True):
             return_to_student_editing()
 
     if record_id:
@@ -1786,21 +1148,25 @@ def main():
     st.session_state["current_role"] = "student"
     init_student_wizard_state()
 
-    render_student_topbar()
-
-    render_page_hero(
-        "实验异常记录与诊断输入",
-        "按步骤记录实验观察、对照结果和 PCR 条件，系统将生成可解释的诊断建议。",
-        "实验记录流程",
-    )
-
     payload = st.session_state.get("student_last_payload")
     show_result_report = bool(payload and st.session_state.get("student_show_result_report", True))
+    if show_result_report:
+        st.html(f'''<div class="ds-result-heading"><h1>实验异常记录与诊断输入</h1>
+            <div class="ds-record-context">案例 {html_text(payload.get('record_id', '-'))} ·
+            {html_text(payload.get('submit_time', '-'))} · {'已保存' if payload.get('record_id') else '未保存'}</div></div>''')
+    else:
+        render_page_hero(
+            "实验异常记录与诊断输入",
+            "按步骤记录实验观察、对照结果和 PCR 条件，系统将生成可解释的诊断建议。",
+            "实验记录流程",
+        )
 
     if show_result_report:
         render_student_results(payload)
+        render_student_case_lookup()
         return
 
+    render_student_case_lookup()
     render_student_quick_actions()
     render_student_wizard_header()
 

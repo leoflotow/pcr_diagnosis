@@ -14,14 +14,13 @@ import re
 
 UNKNOWN_LABEL = "unknown"
 
-TEMPLATE_LOW_THRESHOLD = 1.0
-TEMPLATE_HIGH_THRESHOLD = 5.0
 ANNEALING_TEMP_DELTA_THRESHOLD = 2.0
 
 STANDARD_TEXT_HINTS = [
     "污染",
     "普通台面配液",
     "模板低",
+    "模板过量",
     "模板差",
     "引物问题",
     "漏加试剂",
@@ -33,6 +32,7 @@ STANDARD_TEXT_HINTS = [
     "上样过量",
     "上样不足",
     "操作不规范",
+    "Marker异常",
 ]
 
 STANDARD_BAND_PATTERNS = {
@@ -145,25 +145,29 @@ def normalize_abnormality(raw_value):
 
 def normalize_positive_control(raw_positive_control_normal):
     if isinstance(raw_positive_control_normal, bool):
-        return "正常" if raw_positive_control_normal else "无带"
+        return "正常" if raw_positive_control_normal else "异常待分型"
 
     text = str(raw_positive_control_normal or "").strip()
     if text in {"1", "true", "True", "是", "正常"}:
         return "正常"
     if text in {"0", "false", "False", "否", "异常"}:
-        return "无带"
+        return "异常待分型"
+    if text in {"无带", "弱带", "异常待分型"}:
+        return text
     return UNKNOWN_LABEL
 
 
 def normalize_negative_control(raw_negative_control_band):
     if isinstance(raw_negative_control_band, bool):
-        return "目标大小相近带" if raw_negative_control_band else "无带"
+        return "有带待分型" if raw_negative_control_band else "无带"
 
     text = str(raw_negative_control_band or "").strip()
+    if text in {"目标大小相近带", "小片段带", "拖尾或弥散", "有带待分型"}:
+        return text
     if text in {"0", "false", "False", "否", "无"}:
         return "无带"
     if text in {"1", "true", "True", "是", "有"}:
-        return "目标大小相近带"
+        return "有带待分型"
     return UNKNOWN_LABEL
 
 
@@ -176,9 +180,10 @@ def _normalize_hint_token(raw_hint, student_text=""):
         "污染": ["污染", "气溶胶污染", "交叉污染"],
         "普通台面配液": ["普通台面配液", "台面配液", "开放台面配液"],
         "模板低": ["模板低", "模板量不足", "模板少", "模板浓度低", "模板太少"],
+        "模板过量": ["模板过量", "PCR模板过量", "模板加入过多"],
         "模板差": ["模板差", "模板质量差", "模板降解", "模板不纯", "有抑制物", "含抑制物"],
         "引物问题": ["引物问题", "引物失效", "引物降解", "引物设计问题"],
-        "漏加试剂": ["漏加试剂", "体系漏加", "PCR体系问题", "漏加"],
+        "漏加试剂": ["漏加试剂", "体系漏加", "漏加"],
         "退火偏低": ["退火偏低", "退火温度偏低", "退火温度过低"],
         "退火偏高": ["退火偏高", "退火温度偏高", "退火温度过高"],
         "循环偏少": ["循环偏少", "循环数少", "循环过少"],
@@ -187,6 +192,7 @@ def _normalize_hint_token(raw_hint, student_text=""):
         "上样过量": ["上样过量", "上样太多"],
         "上样不足": ["上样不足", "上样太少"],
         "操作不规范": ["操作不规范", "操作失误", "操作有误"],
+        "Marker异常": ["Marker异常", "DNA梯度异常", "分子量标准异常"],
     }
 
     for canonical, aliases in token_map.items():
@@ -239,7 +245,6 @@ def normalize_text_hints(student_text, extracted_hints):
     for raw_hint in _split_hint_values(extracted_hints):
         normalized.extend(_normalize_hint_token(raw_hint, student_text=student_text))
 
-    normalized.extend(_extract_hints_from_text(student_text))
     normalized = _dedupe_keep_order(normalized)
     return [hint for hint in normalized if hint in STANDARD_TEXT_HINTS]
 
@@ -249,14 +254,12 @@ def normalize_template_condition(template_value, text_hints):
     if "模板差" in text_hints:
         return "降解或不纯"
 
-    template_num = safe_to_float(template_value, None)
-    if template_num is None:
-        return UNKNOWN_LABEL
-    if template_num < TEMPLATE_LOW_THRESHOLD:
+    if "模板低" in text_hints:
         return "偏低"
-    if template_num > TEMPLATE_HIGH_THRESHOLD:
+    if "模板过量" in text_hints:
         return "偏高"
-    return "正常"
+    # 加入体积(μL)不是 DNA 输入量；缺少浓度、模板类型和反应总体积时不推断高低。
+    return UNKNOWN_LABEL
 
 
 def normalize_annealing_temp_condition(current_temp, recommended_temp, text_hints):
@@ -334,6 +337,8 @@ def build_normalized_case(raw_case):
     abnormality = normalize_abnormality(abnormality_raw)
     text_hints = normalize_text_hints(description, extracted_hints)
     positive_control = normalize_positive_control(positive_control_raw)
+    if positive_control == "异常待分型" and abnormality == "阳性对照无带":
+        positive_control = "无带"
     negative_control = normalize_negative_control(negative_control_raw)
     template_condition = normalize_template_condition(template_value, text_hints)
     annealing_temp_condition = normalize_annealing_temp_condition(current_temp, recommended_temp, text_hints)

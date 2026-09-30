@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 教师端页面
 """
@@ -11,6 +11,7 @@ import html
 import altair as alt
 import pandas as pd
 import streamlit as st
+from ui_design import design_color
 
 from core import (
     DB_PATH,
@@ -31,1170 +32,8 @@ from core import (
 
 
 def inject_teacher_dashboard_layout_styles():
-    """教师端专属布局样式，仅优化视觉与排版。"""
-    st.markdown(
-        """
-        <style>
-        :root {
-            --pcr-teacher-content-width: min(1320px, calc(100vw - 96px));
-        }
-
-        .main .block-container {
-            max-width: min(1500px, 96vw);
-            padding-top: 0.85rem;
-        }
-
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {
-            background: rgba(15, 118, 110, 0.1);
-            border-color: rgba(15, 118, 110, 0.28);
-            box-shadow: inset 4px 0 0 #0f766e, 0 10px 22px rgba(15, 23, 42, 0.06);
-        }
-
-        .pcr-teacher-header {
-            border: 1px solid rgba(15, 118, 110, 0.16);
-            border-radius: 18px;
-            padding: 1.1rem 1.25rem;
-            margin: 0.15rem 0 1rem 0;
-            background:
-                radial-gradient(circle at 92% 12%, rgba(20, 184, 166, 0.18), transparent 30%),
-                linear-gradient(135deg, #0f766e 0%, #14532d 100%);
-            color: #ffffff;
-            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.13);
-            overflow: hidden;
-        }
-
-        .pcr-teacher-header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .pcr-teacher-header h1 {
-            margin: 0.45rem 0 0.28rem 0;
-            font-size: clamp(1.7rem, 2.1vw, 2.35rem);
-            line-height: 1.2;
-            font-weight: 800;
-            letter-spacing: 0;
-        }
-
-        .pcr-teacher-header p {
-            margin: 0;
-            max-width: 58rem;
-            color: rgba(255, 255, 255, 0.9);
-            font-size: 0.98rem;
-            line-height: 1.65;
-        }
-
-        .pcr-teacher-header-actions {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-            padding-top: 0.12rem;
-        }
-
-        .pcr-teacher-chip {
-            display: inline-flex;
-            align-items: center;
-            min-height: 1.9rem;
-            padding: 0.28rem 0.72rem;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.14);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #ffffff;
-            font-size: 0.78rem;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .pcr-teacher-chip.soft {
-            background: rgba(236, 253, 245, 0.96);
-            color: #065f46;
-            border-color: rgba(187, 247, 208, 0.8);
-        }
-
-        .pcr-section-kicker {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.38rem;
-            margin: 0.1rem 0 0.35rem 0;
-            padding: 0.2rem 0.56rem;
-            border-radius: 999px;
-            background: rgba(15, 118, 110, 0.08);
-            color: #0f766e;
-            font-size: 0.76rem;
-            font-weight: 800;
-        }
-
-        .pcr-card-divider {
-            height: 1px;
-            margin: 0.75rem 0 0.9rem 0;
-            background: linear-gradient(90deg, rgba(15, 118, 110, 0.16), rgba(148, 163, 184, 0.08));
-        }
-
-        .pcr-stack-bar {
-            display: flex;
-            height: 0.68rem;
-            width: 100%;
-            overflow: hidden;
-            border-radius: 999px;
-            background: #e2e8f0;
-            margin: 0.35rem 0 0.7rem 0;
-        }
-
-        .pcr-stack-segment {
-            height: 100%;
-            min-width: 0;
-        }
-
-        .pcr-stack-legend {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            margin-bottom: 0.75rem;
-            color: #475569;
-            font-size: 0.82rem;
-        }
-
-        .pcr-legend-dot {
-            display: inline-block;
-            width: 0.62rem;
-            height: 0.62rem;
-            border-radius: 999px;
-            margin-right: 0.32rem;
-            vertical-align: -0.05rem;
-        }
-
-        .pcr-record-row {
-            border: 1px solid #dbe3f0;
-            border-radius: 12px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            padding: 0.72rem 0.86rem;
-            margin: 0.72rem 0 0.42rem 0;
-            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
-        }
-
-        .pcr-record-main {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 0.9rem;
-            flex-wrap: wrap;
-        }
-
-        .pcr-record-title {
-            color: #0f172a;
-            font-size: 0.96rem;
-            font-weight: 800;
-            line-height: 1.5;
-        }
-
-        .pcr-record-meta {
-            color: #64748b;
-            font-size: 0.82rem;
-            line-height: 1.5;
-            margin-top: 0.18rem;
-        }
-
-        .pcr-record-tags {
-            display: flex;
-            gap: 0.38rem;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-
-        .pcr-tag {
-            display: inline-flex;
-            align-items: center;
-            min-height: 1.55rem;
-            padding: 0.13rem 0.5rem;
-            border-radius: 999px;
-            border: 1px solid #cbd5e1;
-            background: #f8fafc;
-            color: #334155;
-            font-size: 0.74rem;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .pcr-tag.ok {
-            background: #dcfce7;
-            color: #166534;
-            border-color: #86efac;
-        }
-
-        .pcr-tag.warn {
-            background: #ffedd5;
-            color: #9a3412;
-            border-color: #fdba74;
-        }
-
-        .pcr-tag.info {
-            background: #dbeafe;
-            color: #1d4ed8;
-            border-color: #bfdbfe;
-        }
-
-        .pcr-tag.muted {
-            background: #f1f5f9;
-            color: #64748b;
-            border-color: #e2e8f0;
-        }
-
-        .pcr-filter-hint {
-            margin: 0.25rem 0 0.8rem 0;
-            color: #475569;
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }
-
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 12px !important;
-            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.055);
-        }
-
-        [data-testid="stMetric"] {
-            border-radius: 12px;
-            min-height: 6.15rem;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
-        }
-
-        [data-testid="stMetricValue"] {
-            font-size: clamp(1.42rem, 1.9vw, 2rem);
-        }
-
-        div[data-testid="stDataFrame"], [data-testid="stExpander"] {
-            border-radius: 12px;
-        }
-
-        [data-testid="stHorizontalBlock"] [data-testid="column"] > div {
-            height: 100%;
-        }
-        [data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
-            height: 100%;
-        }
-        [data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] > div {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-
-        @media (max-width: 900px) {
-            .pcr-teacher-header-actions,
-            .pcr-record-tags {
-                justify-content: flex-start;
-            }
-        }
-
-        .pcr-teacher-header {
-            border-radius: 20px;
-            background:
-                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 58%, rgba(14, 165, 183, 0.9) 100%);
-            box-shadow: 0 24px 64px rgba(11, 31, 58, 0.16);
-        }
-
-        .pcr-teacher-header::after {
-            content: "";
-            display: block;
-            height: 0.62rem;
-            margin-top: 1rem;
-            border-radius: 999px;
-            background: repeating-linear-gradient(90deg, rgba(103,232,249,0.72) 0 36px, rgba(255,255,255,0.18) 36px 54px, transparent 54px 78px);
-            opacity: 0.72;
-        }
-
-        .pcr-section-kicker {
-            background: rgba(223, 248, 251, 0.72);
-            color: #075985;
-            border: 1px solid rgba(14, 165, 183, 0.18);
-        }
-
-        [data-testid="stMetric"] {
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,251,253,0.92));
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-left: 4px solid #0ea5b7;
-        }
-
-        .pcr-record-row {
-            border-radius: 14px;
-            border-color: rgba(11, 31, 58, 0.09);
-            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,252,253,0.92));
-            box-shadow: 0 12px 28px rgba(11, 31, 58, 0.06);
-        }
-
-        .pcr-record-title {
-            color: #07172b;
-            font-size: 1rem;
-        }
-
-        .pcr-tag.info {
-            background: #dff8fb;
-            color: #075985;
-            border-color: rgba(14, 165, 183, 0.32);
-        }
-
-        .pcr-tag.warn {
-            background: #fff7ed;
-            color: #9a3412;
-            border-color: rgba(245, 158, 11, 0.34);
-        }
-
-        .pcr-dashboard-empty {
-            min-height: 18.35rem;
-            border: 1px dashed rgba(14, 165, 183, 0.36);
-            border-radius: 14px;
-            background:
-                repeating-linear-gradient(90deg, rgba(14,165,183,0.07) 0 10px, transparent 10px 34px),
-                linear-gradient(180deg, rgba(223,248,251,0.68), rgba(255,255,255,0.92));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 1.25rem;
-            margin-top: 0.8rem;
-        }
-
-        .pcr-dashboard-empty b {
-            display: block;
-            color: #07172b;
-            font-size: 1rem;
-            margin-bottom: 0.35rem;
-        }
-
-        .pcr-dashboard-empty span {
-            color: #475569;
-            line-height: 1.65;
-            font-size: 0.92rem;
-        }
-
-        .pcr-case-list-toolbar {
-            display: flex;
-            justify-content: space-between;
-            gap: 0.8rem;
-            align-items: center;
-            flex-wrap: wrap;
-            border: 1px solid rgba(14, 165, 183, 0.18);
-            border-radius: 14px;
-            background: linear-gradient(90deg, rgba(223,248,251,0.72), rgba(255,255,255,0.86));
-            padding: 0.72rem 0.86rem;
-            margin: 0.8rem 0 0.2rem 0;
-        }
-
-        .pcr-case-list-toolbar > div:last-child {
-            display: flex;
-            gap: 0.42rem;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-
-        .pcr-case-list-toolbar b {
-            color: #07172b;
-        }
-
-        .pcr-case-list-toolbar span {
-            color: #475569;
-            font-size: 0.88rem;
-        }
-
-        [data-testid="stExpander"] details {
-            border: 1px solid rgba(148, 163, 184, 0.34) !important;
-            border-radius: 12px !important;
-            background: rgba(255,255,255,0.92) !important;
-            box-shadow: 0 7px 18px rgba(11, 31, 58, 0.04);
-            overflow: hidden;
-        }
-
-        [data-testid="stExpander"] summary {
-            min-height: 2.75rem;
-            padding: 0.56rem 0.78rem !important;
-            color: #07172b !important;
-            font-weight: 760 !important;
-        }
-
-        [data-testid="stExpander"] summary:hover {
-            background: rgba(241, 245, 249, 0.82);
-        }
-
-        .pcr-summary-drawer {
-            margin-top: 0.9rem;
-            border: 1px solid rgba(14, 165, 183, 0.28);
-            border-radius: 16px;
-            background:
-                linear-gradient(90deg, rgba(223,248,251,0.82), rgba(255,255,255,0.96));
-            box-shadow: 0 14px 32px rgba(11, 31, 58, 0.08);
-            overflow: hidden;
-        }
-
-        .pcr-summary-drawer summary {
-            cursor: pointer;
-            list-style: none;
-            min-height: 3.4rem;
-            padding: 0.78rem 0.95rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.85rem;
-            color: #07172b;
-            font-weight: 860;
-        }
-
-        .pcr-summary-drawer summary::-webkit-details-marker {
-            display: none;
-        }
-
-        .pcr-summary-drawer summary::before {
-            content: "›";
-            width: 1.6rem;
-            height: 1.6rem;
-            border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            color: #075985;
-            background: #dff8fb;
-            border: 1px solid rgba(14, 165, 183, 0.3);
-            margin-right: 0.2rem;
-            transition: transform 160ms ease;
-        }
-
-        .pcr-summary-drawer[open] summary::before {
-            transform: rotate(90deg);
-        }
-
-        .pcr-summary-drawer-title {
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-            flex: 1;
-        }
-
-        .pcr-summary-drawer-hint {
-            color: #475569;
-            font-size: 0.84rem;
-            font-weight: 700;
-        }
-
-        .pcr-summary-drawer-body {
-            border-top: 1px solid rgba(14, 165, 183, 0.16);
-            background: rgba(255,255,255,0.72);
-            padding: 0.75rem 0.9rem 0.9rem;
-        }
-
-        .pcr-summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            overflow: hidden;
-            border-radius: 12px;
-            font-size: 0.88rem;
-        }
-
-        .pcr-summary-table th {
-            text-align: left;
-            background: rgba(15, 23, 42, 0.045);
-            color: #475569;
-            font-weight: 800;
-            padding: 0.55rem 0.62rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.22);
-        }
-
-        .pcr-summary-table td {
-            padding: 0.55rem 0.62rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-            color: #07172b;
-            vertical-align: top;
-        }
-
-        .pcr-summary-table tr:last-child td {
-            border-bottom: 0;
-        }
-
-        .main .block-container,
-        .block-container,
-        .stMainBlockContainer,
-        div[data-testid="stMainBlockContainer"],
-        section[data-testid="stMain"] > div {
-            max-width: var(--pcr-teacher-content-width) !important;
-            width: var(--pcr-teacher-content-width) !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            padding-top: 0 !important;
-            padding-bottom: 3rem !important;
-            overflow: visible !important;
-        }
-
-        header[data-testid="stHeader"] {
-            display: none !important;
-            height: 0 !important;
-            min-height: 0 !important;
-            background: transparent !important;
-            border: 0 !important;
-        }
-
-        div[data-testid="stToolbar"],
-        div[data-testid="stDecoration"],
-        div[data-testid="stStatusWidget"],
-        #MainMenu {
-            display: none !important;
-            visibility: hidden !important;
-            height: 0 !important;
-            min-height: 0 !important;
-        }
-
-        .stApp,
-        [data-testid="stAppViewContainer"] {
-            background:
-                radial-gradient(circle at 10% 2%, rgba(14, 165, 183, 0.10), transparent 28%),
-                radial-gradient(circle at 88% 0%, rgba(37, 99, 235, 0.08), transparent 30%),
-                linear-gradient(180deg, #f3f9fc 0%, #eef6fb 42%, #f7fbfd 100%) !important;
-        }
-
-        [data-testid="stMain"] {
-            background:
-                radial-gradient(circle at 10% 2%, rgba(14, 165, 183, 0.10), transparent 28%),
-                radial-gradient(circle at 88% 0%, rgba(37, 99, 235, 0.08), transparent 30%),
-                linear-gradient(180deg, #f3f9fc 0%, #eef6fb 42%, #f7fbfd 100%) !important;
-        }
-
-        body,
-        html {
-            background: #eef6fb !important;
-        }
-
-        section[data-testid="stSidebar"] {
-            background: rgba(7, 23, 43, 0.98) !important;
-        }
-
-        .pcr-teacher-page,
-        .pcr-teacher-inner,
-        .pcr-teacher-section,
-        .pcr-teacher-filter-panel,
-        .pcr-teacher-case-list {
-            max-width: var(--pcr-teacher-content-width);
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .st-key-pcr_teacher_hero_shell {
-            max-width: 100vw !important;
-            width: 100vw !important;
-            position: relative !important;
-            left: 50% !important;
-            right: 50% !important;
-            margin-left: -50vw !important;
-            margin-right: -50vw !important;
-            margin-top: 0 !important;
-            margin-bottom: 1.35rem !important;
-            padding: 1.55rem 0 1.55rem 0 !important;
-            background:
-                radial-gradient(circle at 78% 2%, rgba(14, 165, 183, 0.28), transparent 28%),
-                linear-gradient(180deg, #07172b 0%, #0b1f3a 100%);
-            overflow: visible !important;
-        }
-
-        .st-key-pcr_teacher_hero_inner {
-            max-width: var(--pcr-teacher-content-width) !important;
-            width: var(--pcr-teacher-content-width) !important;
-            margin: 0 auto !important;
-            box-sizing: border-box;
-            overflow: visible !important;
-        }
-
-        .st-key-pcr_teacher_hero_inner div[data-testid="stVerticalBlock"] {
-            gap: 0.85rem;
-        }
-
-        .st-key-pcr_teacher_hero_card {
-            position: relative;
-            width: calc(100% - 30px) !important;
-            max-width: calc(100% - 30px) !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            box-sizing: border-box;
-            overflow: hidden !important;
-            min-height: 10.6rem;
-            padding: 1.35rem 1.55rem 1.45rem 1.55rem;
-            border: 1px solid rgba(216, 227, 234, 0.18);
-            border-radius: 18px;
-            background:
-                radial-gradient(circle at 86% 25%, rgba(109, 234, 243, 0.28), transparent 30%),
-                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 62%, rgba(14, 165, 183, 0.82) 100%);
-            box-shadow: 0 26px 68px rgba(0, 0, 0, 0.24);
-        }
-
-        .st-key-pcr_teacher_hero_card::after {
-            content: "";
-            position: absolute;
-            right: 1.4rem;
-            top: 1.2rem;
-            width: min(18rem, 32%);
-            height: 7.4rem;
-            border-radius: 14px;
-            opacity: 0.36;
-            background:
-                repeating-linear-gradient(90deg, rgba(109, 234, 243, 0.22) 0 10px, transparent 10px 30px),
-                linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
-            border: 1px solid rgba(223, 247, 251, 0.18);
-            transform: skewX(-8deg);
-            pointer-events: none;
-        }
-
-        .st-key-pcr_teacher_hero_card > div {
-            position: relative;
-            z-index: 1;
-        }
-
-        .st-key-pcr_teacher_hero_card div[data-testid="stVerticalBlock"] {
-            gap: 0.9rem;
-        }
-
-        .pcr-teacher-topbar {
-            min-height: 2.45rem;
-            display: flex;
-            align-items: center;
-            color: #dff7fb;
-            font-size: 0.82rem;
-            font-weight: 800;
-            letter-spacing: 0.03em;
-        }
-
-        .pcr-teacher-topbar::before {
-            content: "";
-            width: 2.35rem;
-            height: 1px;
-            margin-right: 0.65rem;
-            background: #6deaf3;
-        }
-
-        .pcr-teacher-hero-copy h1 {
-            margin: 0.52rem 0 0.42rem 0;
-            color: #ffffff;
-            font-size: clamp(1.86rem, 2.6vw, 2.65rem);
-            line-height: 1.18;
-            font-weight: 780;
-            letter-spacing: -0.03em;
-        }
-
-        .pcr-teacher-hero-copy p {
-            max-width: 48rem;
-            margin: 0;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1rem;
-            line-height: 1.72;
-        }
-
-        .st-key-pcr_teacher_return button,
-        .st-key-teacher_history_reset_filters button {
-            background: rgba(223, 247, 251, 0.06) !important;
-            border: 1px solid rgba(223, 247, 251, 0.42) !important;
-            color: #eafbff !important;
-            font-weight: 780 !important;
-            border-radius: 0 !important;
-            min-height: 2.45rem !important;
-        }
-
-        .st-key-teacher_history_reset_filters button {
-            background: rgba(11, 31, 58, 0.05) !important;
-            border-color: rgba(11, 31, 58, 0.18) !important;
-            color: #0b1f3a !important;
-        }
-
-        .pcr-teacher-hero {
-            position: relative;
-            overflow: hidden;
-            min-height: 10.5rem;
-            padding: 1.35rem 1.55rem;
-            border: 1px solid rgba(216, 227, 234, 0.18);
-            border-radius: 18px;
-            background:
-                radial-gradient(circle at 86% 25%, rgba(109, 234, 243, 0.28), transparent 30%),
-                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 62%, rgba(14, 165, 183, 0.82) 100%);
-            box-shadow: 0 26px 68px rgba(0, 0, 0, 0.24);
-            width: 100%;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .pcr-teacher-hero::after {
-            content: "";
-            position: absolute;
-            right: 1.4rem;
-            top: 1.1rem;
-            width: min(18rem, 32%);
-            height: 7.6rem;
-            border-radius: 14px;
-            opacity: 0.38;
-            background:
-                repeating-linear-gradient(90deg, rgba(109, 234, 243, 0.22) 0 10px, transparent 10px 30px),
-                linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
-            border: 1px solid rgba(223, 247, 251, 0.18);
-            transform: skewX(-8deg);
-        }
-
-        .pcr-teacher-hero > * {
-            position: relative;
-            z-index: 1;
-        }
-
-        .pcr-teacher-label {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.55rem;
-            color: #dff7fb;
-            font-size: 0.78rem;
-            font-weight: 820;
-            letter-spacing: 0.04em;
-        }
-
-        .pcr-teacher-label::before {
-            content: "";
-            width: 2.35rem;
-            height: 1px;
-            background: #6deaf3;
-        }
-
-        .pcr-teacher-hero h1 {
-            margin: 0.62rem 0 0.42rem 0;
-            color: #ffffff;
-            font-size: clamp(1.86rem, 2.6vw, 2.65rem);
-            line-height: 1.18;
-            font-weight: 780;
-            letter-spacing: -0.03em;
-        }
-
-        .pcr-teacher-hero p {
-            max-width: 48rem;
-            margin: 0;
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1rem;
-            line-height: 1.72;
-        }
-
-        .pcr-teacher-hero-meta {
-            display: flex;
-            gap: 0.55rem;
-            flex-wrap: wrap;
-            margin-top: 1rem;
-        }
-
-        .pcr-teacher-status-tag {
-            display: inline-flex;
-            align-items: center;
-            min-height: 1.65rem;
-            padding: 0.18rem 0.58rem;
-            border-radius: 999px;
-            border: 1px solid rgba(109, 234, 243, 0.32);
-            background: rgba(14, 165, 183, 0.14);
-            color: #dff7fb;
-            font-size: 0.76rem;
-            font-weight: 760;
-            white-space: nowrap;
-        }
-
-        .pcr-teacher-status-tag.ok {
-            background: rgba(22, 163, 74, 0.16);
-            border-color: rgba(134, 239, 172, 0.35);
-            color: #dcfce7;
-        }
-
-        .pcr-teacher-status-tag.warn {
-            background: rgba(245, 158, 11, 0.15);
-            border-color: rgba(253, 186, 116, 0.42);
-            color: #ffedd5;
-        }
-
-        .pcr-teacher-section {
-            margin-top: 1rem;
-            border: 1px solid rgba(216, 227, 234, 0.14);
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.92);
-            box-shadow: 0 18px 54px rgba(11, 31, 58, 0.11);
-            padding: 1.15rem;
-        }
-
-        .pcr-teacher-section.dark {
-            background:
-                radial-gradient(circle at 82% 12%, rgba(14, 165, 183, 0.14), transparent 30%),
-                linear-gradient(135deg, rgba(7, 23, 43, 0.98), rgba(11, 31, 58, 0.96));
-            color: #ffffff;
-        }
-
-        .pcr-teacher-section-title {
-            margin: 0 0 0.22rem 0;
-            color: #07172b;
-            font-size: 1.3rem;
-            line-height: 1.36;
-            font-weight: 820;
-            letter-spacing: -0.02em;
-        }
-
-        .pcr-teacher-section.dark .pcr-teacher-section-title {
-            color: #ffffff;
-        }
-
-        .pcr-teacher-section-desc {
-            margin: 0 0 0.95rem 0;
-            color: #526174;
-            line-height: 1.68;
-            font-size: 0.94rem;
-        }
-
-        .pcr-teacher-section.dark .pcr-teacher-section-desc {
-            color: rgba(255, 255, 255, 0.76);
-        }
-
-        .pcr-teacher-kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.88rem;
-            margin-top: 0.35rem;
-            margin-bottom: 0.85rem;
-            align-items: stretch;
-        }
-
-        .pcr-teacher-kpi-card {
-            min-height: 8.3rem;
-            padding: 1rem;
-            border-radius: 16px;
-            border: 1px solid rgba(11, 31, 58, 0.09);
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,251,253,0.94));
-            box-shadow: 0 12px 34px rgba(11, 31, 58, 0.08);
-        }
-
-        .pcr-teacher-kpi-card.focus {
-            border-top: 4px solid #0ea5b7;
-        }
-
-        .pcr-teacher-kpi-label {
-            color: #526174;
-            font-size: 0.82rem;
-            font-weight: 800;
-        }
-
-        .pcr-teacher-kpi-value {
-            margin: 0.55rem 0 0.35rem 0;
-            color: #07172b;
-            font-size: clamp(1.75rem, 2.5vw, 2.7rem);
-            font-weight: 840;
-            letter-spacing: -0.04em;
-        }
-
-        .pcr-teacher-kpi-note {
-            color: #64748b;
-            font-size: 0.82rem;
-            line-height: 1.55;
-        }
-
-        .st-key-pcr_teacher_overview_section div[data-testid="stVerticalBlockBorderWrapper"] {
-            overflow: visible !important;
-        }
-
-        .pcr-teacher-overview-bottom-spacer {
-            height: 1rem;
-            min-height: 1rem;
-        }
-
-        .pcr-teacher-insight-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-            gap: 1rem;
-        }
-
-        .pcr-teacher-insight-card {
-            min-height: 23rem;
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-radius: 16px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,252,253,0.94));
-            padding: 1rem;
-            color: #0b1f3a;
-            box-shadow: 0 12px 34px rgba(11, 31, 58, 0.08);
-        }
-
-        .pcr-teacher-insight-title {
-            color: #07172b;
-            font-size: 1rem;
-            font-weight: 820;
-            margin-bottom: 0.72rem;
-        }
-
-        .pcr-teacher-mini-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.66rem;
-            margin-top: 0.9rem;
-        }
-
-        .pcr-teacher-mini-stat {
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-radius: 13px;
-            background: rgba(223, 247, 251, 0.46);
-            padding: 0.72rem;
-        }
-
-        .pcr-teacher-mini-stat span {
-            display: block;
-            color: #526174;
-            font-size: 0.76rem;
-            margin-bottom: 0.24rem;
-        }
-
-        .pcr-teacher-mini-stat b {
-            color: #07172b;
-            font-size: 1.18rem;
-        }
-
-        .pcr-teacher-empty-state {
-            min-height: 6.4rem;
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-radius: 14px;
-            background: rgba(223, 247, 251, 0.46);
-            display: flex;
-            align-items: center;
-            padding: 1rem;
-        }
-
-        .pcr-teacher-empty-state b {
-            display: block;
-            color: #07172b;
-            margin-bottom: 0.25rem;
-            font-size: 0.96rem;
-        }
-
-        .pcr-teacher-empty-state span {
-            color: #526174;
-            line-height: 1.6;
-            font-size: 0.9rem;
-        }
-
-        .pcr-top-reason-row {
-            margin-top: 0.72rem;
-        }
-
-        .pcr-top-reason-head {
-            display: flex;
-            justify-content: space-between;
-            gap: 0.8rem;
-            color: #0b1f3a;
-            font-size: 0.88rem;
-            font-weight: 760;
-        }
-
-        .pcr-top-reason-bar {
-            height: 0.64rem;
-            margin-top: 0.36rem;
-            border-radius: 999px;
-            background: rgba(11, 31, 58, 0.10);
-            overflow: hidden;
-        }
-
-        .pcr-top-reason-fill {
-            height: 100%;
-            border-radius: 999px;
-            background: linear-gradient(90deg, #2563eb, #6deaf3);
-        }
-
-        .pcr-top-reason-row.top .pcr-top-reason-fill {
-            background: linear-gradient(90deg, #0ea5b7, #6deaf3);
-        }
-
-        .pcr-teacher-attention-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.78rem;
-            margin-top: 0.9rem;
-        }
-
-        .pcr-teacher-attention-card {
-            min-height: 8.6rem;
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-radius: 15px;
-            background: linear-gradient(180deg, #ffffff, #f7fbfd);
-            padding: 0.9rem;
-            box-shadow: 0 10px 28px rgba(11, 31, 58, 0.06);
-        }
-
-        .pcr-teacher-attention-card b {
-            display: block;
-            color: #07172b;
-            font-size: 0.95rem;
-            line-height: 1.45;
-            margin-bottom: 0.36rem;
-        }
-
-        .pcr-teacher-attention-card span {
-            display: block;
-            color: #526174;
-            font-size: 0.82rem;
-            line-height: 1.55;
-        }
-
-        .pcr-teacher-filter-panel {
-            margin-top: 0.8rem;
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-radius: 16px;
-            background: rgba(223, 247, 251, 0.5);
-            padding: 0.9rem;
-        }
-
-        .pcr-teacher-filter-panel label,
-        .pcr-teacher-section label {
-            color: #0b1f3a !important;
-            font-weight: 740 !important;
-        }
-
-        .pcr-teacher-filter-panel [data-baseweb="select"] *,
-        .pcr-teacher-filter-panel input,
-        .pcr-teacher-filter-panel textarea {
-            color: #0b1f3a !important;
-        }
-
-        .pcr-teacher-case-card {
-            border: 1px solid rgba(11, 31, 58, 0.09);
-            border-radius: 16px;
-            background: linear-gradient(180deg, #ffffff, #f7fbfd);
-            padding: 0.95rem 1rem;
-            margin: 0.8rem 0 0.45rem 0;
-            box-shadow: 0 12px 32px rgba(11, 31, 58, 0.08);
-        }
-
-        .pcr-teacher-case-main {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: 1rem;
-            align-items: start;
-        }
-
-        .pcr-teacher-case-title {
-            color: #07172b;
-            font-size: 1.02rem;
-            font-weight: 830;
-            line-height: 1.45;
-        }
-
-        .pcr-teacher-case-meta {
-            color: #526174;
-            font-size: 0.86rem;
-            line-height: 1.65;
-            margin-top: 0.24rem;
-        }
-
-        .pcr-teacher-case-desc {
-            margin-top: 0.52rem;
-            color: #334155;
-            font-size: 0.88rem;
-            line-height: 1.62;
-        }
-
-        .pcr-teacher-review-form {
-            border: 1px solid rgba(14, 165, 183, 0.24);
-            border-radius: 15px;
-            background: linear-gradient(180deg, rgba(223,247,251,0.78), rgba(255,255,255,0.96));
-            padding: 0.95rem;
-            margin-top: 0.85rem;
-        }
-
-        .pcr-dashboard-empty {
-            min-height: 6.4rem !important;
-            border: 1px solid rgba(14, 165, 183, 0.18) !important;
-            background: rgba(223, 247, 251, 0.45) !important;
-        }
-
-        .pcr-dashboard-empty b {
-            color: #07172b !important;
-        }
-
-        .pcr-dashboard-empty span {
-            color: #526174 !important;
-        }
-
-        .pcr-teacher-section:not(.dark) .pcr-dashboard-empty {
-            background: rgba(223, 247, 251, 0.45) !important;
-            border-color: rgba(14, 165, 183, 0.18) !important;
-        }
-
-        .pcr-teacher-section:not(.dark) .pcr-dashboard-empty b {
-            color: #07172b !important;
-        }
-
-        .pcr-teacher-section:not(.dark) .pcr-dashboard-empty span {
-            color: #526174 !important;
-        }
-
-        .pcr-teacher-section [data-testid="stExpander"] details {
-            border-radius: 14px !important;
-            background: rgba(255,255,255,0.96) !important;
-            border-color: rgba(11, 31, 58, 0.1) !important;
-        }
-
-        .pcr-teacher-section [data-testid="stExpander"] summary,
-        .pcr-teacher-section [data-testid="stExpander"] p,
-        .pcr-teacher-section [data-testid="stExpander"] li {
-            color: #0b1f3a !important;
-        }
-
-        .pcr-teacher-section .stMarkdown,
-        .pcr-teacher-section p,
-        .pcr-teacher-section li {
-            color: #0b1f3a;
-        }
-
-        .pcr-teacher-section.dark .stMarkdown,
-        .pcr-teacher-section.dark p,
-        .pcr-teacher-section.dark li {
-            color: rgba(255,255,255,0.82);
-        }
-
-        .pcr-teacher-section div[data-testid="stVerticalBlockBorderWrapper"] {
-            border-color: rgba(11, 31, 58, 0.08) !important;
-            background: rgba(255,255,255,0.95) !important;
-        }
-
-        .pcr-teacher-section .stAlert {
-            color: #0b1f3a !important;
-        }
-
-        @media (max-width: 768px) {
-            :root {
-                --pcr-teacher-content-width: calc(100vw - 28px);
-            }
-
-            .pcr-teacher-header {
-                padding: 1rem;
-            }
-
-            .pcr-teacher-header h1 {
-                font-size: 1.75rem;
-            }
-
-            .main .block-container,
-            .block-container,
-            .stMainBlockContainer,
-            div[data-testid="stMainBlockContainer"],
-            section[data-testid="stMain"] > div {
-                max-width: var(--pcr-teacher-content-width) !important;
-                width: var(--pcr-teacher-content-width) !important;
-            }
-
-            .st-key-pcr_teacher_hero_inner {
-                max-width: var(--pcr-teacher-content-width) !important;
-                width: var(--pcr-teacher-content-width) !important;
-            }
-
-            .pcr-teacher-kpi-grid,
-            .pcr-teacher-insight-grid,
-            .pcr-teacher-attention-grid,
-            .pcr-teacher-case-main {
-                grid-template-columns: 1fr;
-            }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """页面样式由 core.apply_common_styles 统一注入。"""
+    return
 
 
 FIELD_ALIAS_MAP = {
@@ -1255,14 +94,6 @@ def render_teacher_page_header(record_count):
     with st.container(key="pcr_teacher_hero_shell"):
         with st.container(key="pcr_teacher_hero_inner"):
             with st.container(key="pcr_teacher_hero_card"):
-                label_col, action_col = st.columns([0.78, 0.22], vertical_alignment="center")
-                with label_col:
-                    st.markdown('<div class="pcr-teacher-topbar">教师复核</div>', unsafe_allow_html=True)
-                with action_col:
-                    with st.container(key="pcr_teacher_return"):
-                        if st.button("返回首页", key="teacher_return_home", use_container_width=True):
-                            return_to_home(clear_entries=False)
-
                 st.markdown(
                     f"""
                     <div class="pcr-teacher-hero-copy">
@@ -2333,8 +1164,8 @@ def render_case_detail(record, all_records, detail_key_prefix):
             st.markdown(f"- 记录 ID：{record_id}")
             st.markdown(f"- 提交时间：{record.get('提交时间', '-')}")
             st.markdown(f"- 实验现象：{record.get('实验现象', '-')}")
-            st.markdown(f"- 模板量：{record.get('模板量', '-')}")
-            st.markdown(f"- 退火温度：{record.get('退火温度', '-')}")
+            st.markdown(f"- 模板量：{record.get('模板量', '-')} μL")
+            st.markdown(f"- 退火温度：{record.get('退火温度', '-')} ℃")
             st.markdown(f"- 循环数：{record.get('循环数', '-')}")
         with col2:
             st.markdown("**系统诊断摘要**")
@@ -2344,6 +1175,8 @@ def render_case_detail(record, all_records, detail_key_prefix):
             st.markdown(f"- Top1 分数：{record.get('Top1 分数', '-')}")
 
         st.markdown(f"- 学生补充描述：{record.get('学生补充描述', '-')}")
+        if record.get("学生初判") not in (None, "-"):
+            st.markdown(f"- 学生诊断前判断：{record.get('学生初判')}")
         clues = record.get("抽取到的文本线索", [])
         st.markdown(f"- 抽取到的文本线索：{('、'.join(clues)) if clues else '无'}")
 
@@ -2353,6 +1186,33 @@ def render_case_detail(record, all_records, detail_key_prefix):
                 st.markdown(f"- 其他候选原因：{item}")
         else:
             st.markdown("- 其他候选原因：无")
+
+        with st.container(border=True):
+            st.markdown('<div class="pcr-teacher-review-form">', unsafe_allow_html=True)
+            render_card_title("教师复核确认", "请选择最终原因并补充备注，保存后将作为本条案例的教师确认结论。")
+            candidate_causes = [extract_cause_text(x) for x in candidates if extract_cause_text(x)]
+            if not candidate_causes and record.get("Top1 原因"):
+                candidate_causes = [record.get("Top1 原因")]
+            confirm_options = list(dict.fromkeys(candidate_causes + ["其他/待补充"]))
+
+            with st.form(f"{detail_key_prefix}_teacher_confirm_form_{record_id}"):
+                teacher_choice = st.selectbox("最终原因", confirm_options, key=f"{detail_key_prefix}_teacher_choice_{record_id}")
+                custom_cause = ""
+                if teacher_choice == "其他/待补充":
+                    custom_cause = st.text_input("请填写教师最终原因", key=f"{detail_key_prefix}_teacher_custom_{record_id}")
+                teacher_note = st.text_area("教师备注", height=100, key=f"{detail_key_prefix}_teacher_note_{record_id}")
+                save_confirm = st.form_submit_button("保存复核结果", type="primary")
+
+            if save_confirm:
+                final_cause = custom_cause.strip() if teacher_choice == "其他/待补充" else teacher_choice
+                if not final_cause:
+                    st.warning("请选择或填写教师最终原因。")
+                else:
+                    save_teacher_confirmation(record_id, final_cause, teacher_note.strip())
+                    st.success("复核结果已保存。")
+                    st.cache_data.clear()  # 必须加
+                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
         render_diagnosis_quality_block(
             top_results=record.get("系统结果列表", []),
@@ -2373,11 +1233,35 @@ def render_case_detail(record, all_records, detail_key_prefix):
         )
 
         render_feedback_loop_block(record)
+        followup_data = record.get("followup_data", {})
+        if followup_data.get("final_results"):
+            st.markdown("**追问补证记录**")
+            initial = followup_data.get("initial_results", [])
+            final = followup_data.get("final_results", [])
+            st.write(
+                f"初判 Top1：{initial[0].get('原因', '未识别') if initial else '未识别'} → "
+                f"补证后 Top1：{final[0].get('原因', '未识别') if final else '未识别'}"
+            )
+            for question in followup_data.get("questions", []):
+                answer = followup_data.get("answers", {}).get(question.get("id"), "")
+                if answer:
+                    st.write(f"{question.get('text', '')} 回答：{answer}")
+            hints = followup_data.get("extra_hints", [])
+            st.write(f"学生确认的操作线索：{'、'.join(hints) if hints else '无'}")
         render_similar_case_block(record, all_records)
 
         st.markdown(f"- 教师最终原因：{record.get('教师最终原因', '未确认')}")
         st.markdown(f"- 教师备注：{record.get('教师备注', '-')}")
         st.markdown(f"- 教师确认时间：{record.get('教师确认时间', '-')}")
+        if record.get("学生初判") not in (None, "-"):
+            if record.get("学生修订时间") not in (None, "-"):
+                st.markdown(f"- 学生修订原因：{record.get('学生修订原因', '-')}")
+                st.markdown(f"- 学生修订依据：{record.get('学生修订依据', '-')}")
+                st.markdown(f"- 学生修订时间：{record.get('学生修订时间', '-')}")
+            elif record.get("教师最终原因") not in (None, "未确认", "-"):
+                st.markdown("- 学生反馈后修订：待提交")
+            else:
+                st.markdown("- 学生反馈后修订：待教师复核")
 
         img_path = record.get("凝胶图路径", "")
         if img_path and os.path.exists(img_path):
@@ -2388,33 +1272,6 @@ def render_case_detail(record, all_records, detail_key_prefix):
             st.info("图片文件不存在")
         else:
             st.info("无图片")
-
-        with st.container(border=True):
-            st.markdown('<div class="pcr-teacher-review-form">', unsafe_allow_html=True)
-            render_card_title("教师复核确认", "请选择最终原因并补充备注，保存后将作为本条案例的教师确认结论。")
-            candidate_causes = [extract_cause_text(x) for x in candidates if extract_cause_text(x)]
-            if not candidate_causes and record.get("Top1 原因"):
-                candidate_causes = [record.get("Top1 原因")]
-            confirm_options = list(dict.fromkeys(candidate_causes + ["其他/待补充"]))
-
-            with st.form(f"{detail_key_prefix}_teacher_confirm_form_{record_id}"):
-                teacher_choice = st.selectbox("最终原因", confirm_options, key=f"{detail_key_prefix}_teacher_choice_{record_id}")
-                custom_cause = ""
-                if teacher_choice == "其他/待补充":
-                    custom_cause = st.text_input("请填写教师最终原因", key=f"{detail_key_prefix}_teacher_custom_{record_id}")
-                teacher_note = st.text_area("教师备注", height=100, key=f"{detail_key_prefix}_teacher_note_{record_id}")
-                save_confirm = st.form_submit_button("保存复核结果")
-
-            if save_confirm:
-                final_cause = custom_cause.strip() if teacher_choice == "其他/待补充" else teacher_choice
-                if not final_cause:
-                    st.warning("请选择或填写教师最终原因。")
-                else:
-                    save_teacher_confirmation(record_id, final_cause, teacher_note.strip())
-                    st.success("复核结果已保存。")
-                    st.cache_data.clear()  # 必须加
-                    st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
 
 
 def build_case_queue_summary_dataframe(records_to_render, start_index=1):
@@ -2606,8 +1463,8 @@ def render_consistency_insight_card(consistency_stats, consistency_df):
             )
 
     st.markdown(
-        f'<div><div class="pcr-teacher-kpi-value" style="color:#07172b; margin-top:0;">{escape_html(consistency_stats.get("Top1 一致率", "-"), "-")}</div>'
-        '<p style="color:#526174; margin:0 0 0.75rem 0;">系统 Top1 判断与教师确认的一致率。</p>'
+        f'<div><div class="pcr-teacher-kpi-value" style="color:var(--ds-text); margin-top:0;">{escape_html(consistency_stats.get("Top1 一致率", "-"), "-")}</div>'
+        '<p style="color:var(--ds-muted); margin:0 0 var(--ds-3) 0;">系统 Top1 判断与教师确认的一致率。</p>'
         f'<div class="pcr-teacher-mini-grid"><div class="pcr-teacher-mini-stat"><span>已比较记录</span><b>{comparable_count}</b></div>'
         f'<div class="pcr-teacher-mini-stat"><span>待比较记录</span><b>{unable_count}</b></div>'
         f'<div class="pcr-teacher-mini-stat"><span>Top3 命中率</span><b>{escape_html(consistency_stats.get("Top3 命中率", "-"), "-")}</b></div></div>'
@@ -2693,7 +1550,7 @@ def render_recent_attention_records(records, limit=3):
             f'<span>系统 Top1：{escape_html(record.get("Top1 原因"), "-")}</span>'
             f'<span>教师确认：{escape_html(loop_status["教师最终确认原因"], "未确认")}</span>'
             f'<span>图片：{escape_html(image_status, "-")}</span>'
-            f'<span class="pcr-teacher-status-tag {tag_class}" style="margin-top:0.52rem; color:#0b1f3a;">{escape_html(loop_status["一致性状态"], "-")}</span>'
+            f'<span class="pcr-teacher-status-tag {tag_class}" style="margin-top:0.52rem; color:var(--ds-text);">{escape_html(loop_status["一致性状态"], "-")}</span>'
             "</div>"
         )
     st.markdown(f'<div class="pcr-teacher-attention-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
@@ -2808,9 +1665,9 @@ def render_consistency_distribution_visualization(distribution_df):
         return
 
     color_map = {
-        "Top1 一致": "#0f766e",
-        "Top1 不一致但 Top3 命中": "#0ea5e9",
-        "Top3 也未命中": "#f59e0b",
+        "Top1 一致": design_color("primary"),
+        "Top1 不一致但 Top3 命中": design_color("focus"),
+        "Top3 也未命中": design_color("warning-text"),
     }
     total = max(int(distribution_df["案例数"].sum()), 1)
     segments = []
@@ -2819,7 +1676,7 @@ def render_consistency_distribution_visualization(distribution_df):
         category = str(row["类别"])
         count = int(row["案例数"])
         width = count / total * 100
-        color = color_map.get(category, "#64748b")
+        color = color_map.get(category, design_color("muted"))
         segments.append(
             f'<div class="pcr-stack-segment" style="width:{width:.1f}%; background:{color};"></div>'
         )
@@ -2867,7 +1724,7 @@ def render_teacher_dashboard(records_by_id, all_records):
     consistency_df = pd.DataFrame()
     reason_summary_df = pd.DataFrame(columns=["失败原因", "次数", "已确认数", "未确认数"])
 
-    with st.container(border=True, key="pcr_teacher_overview_section"):
+    with st.container(border=False, key="pcr_teacher_overview_section"):
         render_teacher_section_header(
             "班级实验记录概览",
             "按当前范围汇总学生诊断记录、复核进度和近期提交情况。",
@@ -2916,7 +1773,7 @@ def render_teacher_dashboard(records_by_id, all_records):
         st.markdown('<div class="pcr-teacher-overview-bottom-spacer"></div>', unsafe_allow_html=True)
 
     if dashboard_df.empty:
-        with st.container(border=True):
+        with st.container(border=False):
             render_teacher_section_header(
                 "教学诊断洞察",
                 "当学生提交更多记录后，这里会展示一致性和高频失败原因。",
@@ -2937,7 +1794,7 @@ def render_teacher_dashboard(records_by_id, all_records):
         return
 
     if filtered_df.empty:
-        with st.container(border=True):
+        with st.container(border=False):
             render_teacher_section_header(
                 "教学诊断洞察",
                 "当前筛选条件下暂无记录，可调整筛选条件后查看。",
@@ -2953,7 +1810,7 @@ def render_teacher_dashboard(records_by_id, all_records):
     consistency_stats = compute_consistency_stats(consistency_df)
     reason_summary_df = build_reason_summary(filtered_df)
 
-    with st.container(border=True):
+    with st.container(border=False):
         render_teacher_section_header(
             "教学诊断洞察",
             "对照系统判断和教师复核结果，观察课堂实验中的高频异常来源。",
@@ -2970,7 +1827,7 @@ def render_teacher_dashboard(records_by_id, all_records):
             render_top_reason_bars(reason_summary_df, top_n=5)
             st.markdown("</div>", unsafe_allow_html=True)
 
-    with st.container(border=True):
+    with st.container(border=False):
         render_teacher_section_header(
             "近期需关注记录",
             "优先显示待复核记录，其次显示系统判断与教师确认不一致的案例。",
@@ -3171,8 +2028,8 @@ def render_top_reason_rankings(reason_summary_df, top_n=5):
             st.markdown(
                 f"""
                 <div style="margin-top: 0.45rem;">
-                    <div style="width: 100%; height: 14px; background: #e5eefb; border-radius: 999px; overflow: hidden;">
-                        <div style="width: {progress_value * 100:.1f}%; height: 14px; background: linear-gradient(90deg, #0f766e 0%, #14b8a6 100%); border-radius: 999px;"></div>
+                    <div style="width: 100%; height: 14px; background: var(--ds-subtle); border-radius: 999px; overflow: hidden;">
+                        <div style="width: {progress_value * 100:.1f}%; height: 14px; background: var(--ds-primary); border-radius: 999px;"></div>
                     </div>
                 </div>
                 """,

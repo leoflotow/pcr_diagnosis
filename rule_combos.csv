@@ -1,25 +1,3 @@
 combo_id,cause,condition_1,condition_2,condition_3,bonus_score,combo_type,combo_evidence,enabled
-C001,ÎÛÈ¾,abnormality=ÒõĞÔ¶ÔÕÕÓĞ´ø,negative_control=Ä¿±ê´óĞ¡Ïà½ü´ø,text_hint=ÎÛÈ¾,35,support,ÒõĞÔ¶ÔÕÕ³öÏÖÓëÄ¿±ê´óĞ¡Ïà½üÌõ´øÇÒÎÄ±¾ÌáÊ¾ÎÛÈ¾£¬Ç¿Ö§³ÖÎÛÈ¾,1
-C002,ÎÛÈ¾,abnormality=ÒõĞÔ¶ÔÕÕÓĞ´ø,negative_control=Ä¿±ê´óĞ¡Ïà½ü´ø,text_hint=ÆÕÍ¨Ì¨ÃæÅäÒº,25,support,ÒõĞÔ¶ÔÕÕÒì³£ÇÒ´æÔÚÆÕÍ¨Ì¨ÃæÅäÒºµÈ¸ß·çÏÕ²Ù×÷£¬Ö§³ÖÎÛÈ¾,1
-C003,ÎÛÈ¾,abnormality=ÒõĞÔ¶ÔÕÕÓĞ´ø,negative_control=ÎŞ´ø,,25,contradict,ÒõĞÔ¶ÔÕÕÎŞ´øÊ±²»Ö§³ÖÎÛÈ¾ÅĞ¶Ï,1
-C004,Ä£°åÁ¿²»×ã,abnormality=Ìõ´øÈõ,template_condition=Æ«µÍ,positive_control=Õı³£,30,support,Ìõ´øÈõÇÒÄ£°åÁ¿Æ«µÍ£¬Í¬Ê±ÑôĞÔ¶ÔÕÕÕı³££¬Ç¿Ö§³ÖÄ£°åÁ¿²»×ã,1
-C005,Ä£°åÁ¿²»×ã,abnormality=ÎŞÌõ´ø,template_condition=Æ«µÍ,positive_control=Õı³£,28,support,ÎŞÌõ´øÇÒÄ£°åÁ¿Æ«µÍ£¬Í¬Ê±ÑôĞÔ¶ÔÕÕÕı³££¬Ö§³ÖÄ£°åÁ¿²»×ã,1
-C006,Ä£°åÁ¿²»×ã,positive_control=ÎŞ´ø,template_condition=Æ«µÍ,,22,contradict,ÑôĞÔ¶ÔÕÕ±¾ÉíÎŞ´øÊ±£¬²»ÄÜÓÅÏÈ¹éÒòÎªÄ£°åÁ¿²»×ã,1
-C007,Ä£°åÖÊÁ¿²î»òº¬ÒÖÖÆÎï,abnormality=Ìõ´øÍÏÎ²»òÃÖÉ¢,template_condition=½µ½â»ò²»´¿,text_hint=Ä£°å²î,30,support,ÍÏÎ²»òÃÖÉ¢½áºÏÄ£°åÖÊÁ¿²îÏßË÷£¬Ç¿Ö§³ÖÄ£°åÖÊÁ¿ÎÊÌâ»òÒÖÖÆÎï¸ÉÈÅ,1
-C008,Ä£°åÖÊÁ¿²î»òº¬ÒÖÖÆÎï,abnormality=ÎŞÌõ´ø,template_condition=½µ½â»ò²»´¿,positive_control=Õı³£,26,support,ÎŞÌõ´øÇÒÄ£°å×´Ì¬²î¶øÑôĞÔ¶ÔÕÕÕı³££¬Ö§³ÖÄ£°åÖÊÁ¿ÎÊÌâ,1
-C009,PCRÌåÏµÂ©¼Ó»ò¹Ø¼üÊÔ¼ÁÊ§»î,positive_control=ÎŞ´ø,negative_control=ÎŞ´ø,text_hint=Â©¼ÓÊÔ¼Á,38,support,ÑôĞÔ¶ÔÕÕÎŞ´øÇÒÒõĞÔ¶ÔÕÕÎŞ´ø²¢°éËæÂ©¼ÓÊÔ¼ÁÏßË÷£¬Ç¿Ö§³ÖÌåÏµÎÊÌâ,1
-C010,PCRÌåÏµÂ©¼Ó»ò¹Ø¼üÊÔ¼ÁÊ§»î,positive_control=ÎŞ´ø,negative_control=ÎŞ´ø,abnormality=ÑôĞÔ¶ÔÕÕÎŞ´ø,35,support,ÑôĞÔ¶ÔÕÕÊ§Ğ§ÇÒÒõĞÔ¶ÔÕÕÎŞ´øÊ±£¬Ó¦ÓÅÏÈÅÅ²éÌåÏµÓë¹Ø¼üÊÔ¼Á,1
-C011,PCRÌåÏµÂ©¼Ó»ò¹Ø¼üÊÔ¼ÁÊ§»î,positive_control=Õı³£,negative_control=ÎŞ´ø,,18,contradict,ÑôĞÔ¶ÔÕÕÕı³£ÇÒÒõĞÔ¶ÔÕÕÎŞ´øÊ±£¬²»ÓÅÏÈÖ§³ÖÌåÏµÕûÌåÊ§°Ü,1
-C012,ÍË»ğÎÂ¶È¹ı¸ß,abnormality=ÎŞÌõ´ø,annealing_temp_condition=Æ«¸ß,positive_control=Õı³£,30,support,ÎŞÌõ´øÇÒÍË»ğÎÂ¶ÈÆ«¸ß¡¢ÑôĞÔ¶ÔÕÕÕı³£Ê±£¬Ö§³ÖÍË»ğÎÂ¶È¹ı¸ß,1
-C013,ÍË»ğÎÂ¶È¹ı¸ß,abnormality=Ìõ´øÈõ,annealing_temp_condition=Æ«¸ß,positive_control=Õı³£,24,support,Ìõ´øÈõÇÒÍË»ğÎÂ¶ÈÆ«¸ß¡¢¶ÔÕÕÕı³£Ê±£¬Ö§³ÖÍË»ğÎÂ¶È¹ı¸ß,1
-C014,ÍË»ğÎÂ¶È¹ıµÍ,abnormality=¶àÌõ´ø»ò·ÇÌØÒìÀ©Ôö,annealing_temp_condition=Æ«µÍ,positive_control=Õı³£,32,support,¶àÌõ´ø°éËæÍË»ğÎÂ¶ÈÆ«µÍ£¬Ç¿Ö§³ÖÍË»ğÎÂ¶È¹ıµÍµ¼ÖÂ·ÇÌØÒìÀ©Ôö,1
-C015,ÍË»ğÎÂ¶È¹ıµÍ,band_pattern=primer_dimer_like,annealing_temp_condition=Æ«µÍ,negative_control=Ğ¡·Ö×ÓÈõ´ø,28,support,µÍ·Ö×ÓÁ¿Ğ¡´øÇÒÍË»ğÎÂ¶ÈÆ«µÍÊ±£¬Ö§³ÖµÍÌØÒìĞÔÀ©Ôö»òÒıÎï¶ş¾ÛÌå,1
-C016,ÒıÎïÊ§Ğ§»òÉè¼Æ²»¼Ñ,abnormality=Ìõ´ø´óĞ¡²»¶Ô,text_hint=ÒıÎïÎÊÌâ,,35,support,Ìõ´ø´óĞ¡Òì³£²¢°éËæÒıÎïÎÊÌâÏßË÷£¬Ç¿Ö§³ÖÒıÎïÉè¼Æ»òÒıÎï×´Ì¬Òì³£,1
-C017,ÒıÎïÊ§Ğ§»òÉè¼Æ²»¼Ñ,abnormality=¶àÌõ´ø»ò·ÇÌØÒìÀ©Ôö,text_hint=ÒıÎïÎÊÌâ,positive_control=Õı³£,26,support,¶àÌõ´øÇÒÎÄ±¾ÌáÊ¾ÒıÎïÎÊÌâ£¬Í¬Ê±¶ÔÕÕÕı³££¬Ö§³ÖÒıÎïÌØÒìĞÔ²»×ã,1
-C018,ÒıÎï¶ş¾ÛÌå»ò·ÇÌØÒìĞÔÀ©Ôö,negative_control=Ğ¡·Ö×ÓÈõ´ø,band_pattern=primer_dimer_like,annealing_temp_condition=Æ«µÍ,34,support,ÒõĞÔ¶ÔÕÕµÍ·Ö×ÓÁ¿Ğ¡´øÇÒÖ÷Ñù±¾±íÏÖÎªĞ¡´ø£¬Ö§³ÖÒıÎï¶ş¾ÛÌå»òµÍÌØÒìĞÔÀ©Ôö,1
-C019,ÒıÎï¶ş¾ÛÌå»ò·ÇÌØÒìĞÔÀ©Ôö,negative_control=Ä¿±ê´óĞ¡Ïà½ü´ø,band_pattern=primer_dimer_like,,18,contradict,ÒõĞÔ¶ÔÕÕÈôÎªÄ¿±ê´óĞ¡Ïà½üÌõ´ø£¬¸üÓ¦¾¯ÌèÎÛÈ¾¶ø·Çµ¥´¿ÒıÎï¶ş¾ÛÌå,1
-C020,Ñ­»·²ÎÊı²»ºÏÊÊ,abnormality=Ìõ´øÈõ,text_hint=Ñ­»·Æ«ÉÙ,positive_control=Õı³£,22,support,Ìõ´øÈõÇÒÎÄ±¾ÌáÊ¾Ñ­»·Æ«ÉÙ£¬Ö§³ÖÑ­»·²ÎÊıÆ«Èõ,1
-C021,Ñ­»·²ÎÊı²»ºÏÊÊ,abnormality=¶àÌõ´ø»ò·ÇÌØÒìÀ©Ôö,text_hint=Ñ­»·Æ«¶à,positive_control=Õı³£,22,support,¶àÌõ´øÇÒÑ­»·Æ«¶à£¬Ö§³ÖÑ­»·Êı¹ı¸ß·Å´ó·ÇÌØÒì²úÎï,1
-C022,µçÓ¾»òÉÏÑùÎÊÌâ,abnormality=Ìõ´øÍÏÎ²»òÃÖÉ¢,text_hint=µçÓ¾ÎÊÌâ,text_hint=ÉÏÑù¹ıÁ¿,26,support,ÍÏÎ²»òÃÖÉ¢²¢°éËæµçÓ¾»òÉÏÑùÒì³£ÏßË÷£¬Ö§³ÖµçÓ¾»òÉÏÑùÎÊÌâ,1
-C023,ÉÏÑùÁ¿¹ı¸ß»òÑÎÅ¨¶È¹ı¸ß,abnormality=Ìõ´ø»ûĞÎ,text_hint=ÉÏÑù¹ıÁ¿,positive_control=Õı³£,25,support,Ã÷È·Ìá¼°ÉÏÑù¹ıÁ¿£¬Ç¿Ö§³ÖÉÏÑùÁ¿/ÑÎÅ¨¶ÈÎÊÌâ,1
-C024,Äı½º²»¾ù»òµçÓ¾É¢ÈÈ²»Á¼,abnormality=Ìõ´ø»ûĞÎ,text_hint=µçÓ¾ÎÊÌâ,positive_control=Õı³£,20,support,Ìá¼°µçÓ¾ÎÊÌâ£¬Ö§³ÖÄı½º»òÉ¢ÈÈÒì³£,1
+C001,æ±¡æŸ“,negative_control=ç›®æ ‡å¤§å°ç›¸è¿‘å¸¦,text_hint=æ“ä½œä¸è§„èŒƒ,,6,support,é˜´æ€§å¯¹ç…§ç›®æ ‡å¤§å°å¸¦åŒæ—¶æœ‰å·²ç¡®è®¤çš„é˜²æ±¡æŸ“æ“ä½œå¼‚å¸¸ï¼Œå¢åŠ æ±¡æŸ“å‡è®¾çš„æ”¯æŒåº¦ä½†ä»éœ€å¤æµ‹,1
+C002,å¼•ç‰©äºŒèšä½“æˆ–çŸ­ç‰‡æ®µéç‰¹å¼‚æ‰©å¢,negative_control=å°ç‰‡æ®µå¸¦,annealing_temp_condition=åä½,,6,support,é˜´æ€§å¯¹ç…§çŸ­ç‰‡æ®µå¸¦ä¼´éšç›¸å¯¹æ–¹æ¡ˆåä½çš„é€€ç«æ¡ä»¶ï¼Œå¢åŠ çŸ­ç‰‡æ®µéç‰¹å¼‚äº§ç‰©çš„å¯èƒ½æ€§,1

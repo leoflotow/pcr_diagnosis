@@ -1,0 +1,8 @@
+# 原生控件和 Canvas 表格使用与 ui_design.css 相同的设计 token。
+[theme]
+base = "light"
+primaryColor = "#3f6254"
+backgroundColor = "#faf9f5"
+secondaryBackgroundColor = "#f1f3ed"
+textColor = "#25342f"
+font = "sans serif"

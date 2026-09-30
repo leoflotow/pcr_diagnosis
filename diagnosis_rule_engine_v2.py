@@ -137,13 +137,13 @@ def load_rules_v2(path=RULES_V2_PATH):
     except Exception:
         return pd.DataFrame(columns=BASE_RULE_COLUMNS)
 
-    for column in BASE_RULE_COLUMNS:
-        if column not in df.columns:
-            df[column] = ""
-
     signature = {"rule_id", "cause", "abnormality", "base_score", "enabled"}
     if not signature.issubset(set(df.columns)):
         return pd.DataFrame(columns=BASE_RULE_COLUMNS)
+
+    for column in BASE_RULE_COLUMNS:
+        if column not in df.columns:
+            df[column] = ""
 
     try:
         df = df[df["enabled"].apply(_is_enabled)].copy()
@@ -170,13 +170,13 @@ def load_rule_combos_v2(path=RULE_COMBOS_V2_PATH):
     except Exception:
         return pd.DataFrame(columns=COMBO_RULE_COLUMNS)
 
-    for column in COMBO_RULE_COLUMNS:
-        if column not in df.columns:
-            df[column] = ""
-
     signature = {"combo_id", "cause", "condition_1", "condition_2", "bonus_score", "combo_type", "enabled"}
     if not signature.issubset(set(df.columns)):
         return pd.DataFrame(columns=COMBO_RULE_COLUMNS)
+
+    for column in COMBO_RULE_COLUMNS:
+        if column not in df.columns:
+            df[column] = ""
 
     try:
         df = df[df["enabled"].apply(_is_enabled)].copy()
@@ -302,7 +302,10 @@ def aggregate_base_rule_hits(base_rule_hits):
 
         item = aggregated[cause]
         item["priority"] = max(int(item["priority"]), int(_safe_float(hit.get("priority"), 0)))
-        item["total_base_score"] += float(_safe_float(hit.get("base_score"), 0))
+        # 同一原因可同时命中通用规则和细化规则；分数取最强证据，避免重复累计。
+        item["total_base_score"] = max(
+            item["total_base_score"], float(_safe_float(hit.get("base_score"), 0))
+        )
         item["hit_rules"].append(hit)
 
         evidence_text = _safe_text(hit.get("evidence_text"))

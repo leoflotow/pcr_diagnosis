@@ -9,12 +9,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import streamlit as st
+from ui_design import apply_design_system
 import pandas as pd
 import sqlite3
 import os
 import re
 import json
 import uuid
+import hashlib
 from datetime import datetime
 from diagnosis_normalization import build_normalized_case, explain_normalized_case
 from diagnosis_rule_engine_v2 import evaluate_rules_v2
@@ -27,7 +29,7 @@ except:
     OpenAI = None
 
 # 数据库路径
-DB_PATH = "data/app.db"
+DB_PATH = os.getenv("PCR_DIAGNOSIS_DB_PATH", "data/app.db")
 
 # 规则文件路径
 RULES_PATH = "rules.csv"
@@ -241,1801 +243,8 @@ def render_entry_guard(page_name):
 
 
 def apply_common_styles(theme="student"):
-    """
-    注入全局样式（只做视觉优化，不改业务逻辑）
-    theme: student / teacher / dev
-    """
-    # 三个角色页的主色区分：学生蓝、教师青、开发灰黑
-    palette_map = {
-        "home": {
-            "primary": "#0b1f3a",
-            "primary_2": "#123a63",
-            "accent": "#0ea5b7",
-            "bg": "#eef7fb",
-        },
-        "student": {
-            "primary": "#0b1f3a",
-            "primary_2": "#1d4ed8",
-            "accent": "#0ea5b7",
-            "bg": "#eef7fb",
-        },
-        "teacher": {
-            "primary": "#0b1f3a",
-            "primary_2": "#0f766e",
-            "accent": "#0ea5b7",
-            "bg": "#edf8f7",
-        },
-        "dev": {
-            "primary": "#0b1f3a",
-            "primary_2": "#334155",
-            "accent": "#0ea5b7",
-            "bg": "#f2f6f8",
-        },
-    }
-    palette = palette_map.get(theme, palette_map["student"])
-
-    st.markdown(
-        f"""
-        <style>
-        :root {{
-            --pcr-primary: {palette["primary"]};
-            --pcr-primary-2: {palette["primary_2"]};
-            --pcr-accent: {palette["accent"]};
-            --pcr-bg: {palette["bg"]};
-            --pcr-card: #ffffff;
-            --pcr-text: #0f172a;
-            --pcr-muted: #475569;
-            --pcr-success: #16a34a;
-            --pcr-warning: #ea580c;
-            --pcr-danger: #dc2626;
-            --pcr-border: #dbe3f0;
-        }}
-
-        .stApp {{
-            background: linear-gradient(180deg, var(--pcr-bg) 0%, #f8fbff 100%);
-        }}
-
-        .main .block-container {{
-            padding-top: 1rem;
-            padding-bottom: 2.9rem;
-            padding-left: clamp(1rem, 2.2vw, 2.4rem);
-            padding-right: clamp(1rem, 2.2vw, 2.4rem);
-            max-width: 1520px;
-        }}
-
-        @media (min-width: 1400px) {{
-            .main .block-container {{
-                max-width: min(1540px, 96vw);
-            }}
-        }}
-
-        @media (max-width: 768px) {{
-            .main .block-container {{
-                padding-left: 0.85rem;
-                padding-right: 0.85rem;
-                padding-top: 0.7rem;
-            }}
-        }}
-
-        section[data-testid="stSidebar"] {{
-            background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(241,245,255,0.96) 100%);
-            border-right: 1px solid rgba(148, 163, 184, 0.18);
-        }}
-
-        section[data-testid="stSidebar"] > div {{
-            padding-top: 0.75rem;
-        }}
-
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {{
-            border-radius: 12px;
-            margin-bottom: 0.28rem;
-            padding: 0.56rem 0.72rem;
-            border: 1px solid transparent;
-            transition: all 0.18s ease;
-        }}
-
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {{
-            background: rgba(255, 255, 255, 0.85);
-            border-color: rgba(148, 163, 184, 0.2);
-        }}
-
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {{
-            background: rgba(255, 255, 255, 0.98);
-            border-color: rgba(59, 130, 246, 0.22);
-            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
-        }}
-
-        .pcr-hero {{
-            background: linear-gradient(135deg, var(--pcr-primary) 0%, var(--pcr-primary-2) 100%);
-            color: #ffffff;
-            border-radius: 24px;
-            padding: 1.55rem 1.65rem;
-            margin-bottom: 1.15rem;
-            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
-            position: relative;
-            overflow: hidden;
-        }}
-
-        .pcr-hero::after {{
-            content: "";
-            position: absolute;
-            right: -80px;
-            bottom: -180px;
-            width: 340px;
-            height: 340px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.12);
-        }}
-
-        .pcr-hero h1 {{
-            margin: 0.45rem 0 0.45rem 0;
-            font-size: clamp(1.85rem, 2.4vw, 2.5rem);
-            font-weight: 700;
-            letter-spacing: 0.1px;
-            position: relative;
-            z-index: 1;
-        }}
-
-        .pcr-hero p {{
-            margin: 0;
-            opacity: 0.96;
-            font-size: 1.02rem;
-            line-height: 1.65;
-            max-width: 72ch;
-            position: relative;
-            z-index: 1;
-        }}
-
-        .pcr-role-badge {{
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.16);
-            border: 1px solid rgba(255, 255, 255, 0.35);
-            color: #ffffff;
-            border-radius: 999px;
-            padding: 0.28rem 0.82rem;
-            font-size: 0.79rem;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            position: relative;
-            z-index: 1;
-        }}
-
-        .pcr-card-title {{
-            color: var(--pcr-text);
-            font-size: 1.16rem;
-            font-weight: 700;
-            margin: 0.05rem 0 0.34rem 0;
-            line-height: 1.35;
-        }}
-
-        .pcr-muted {{
-            color: var(--pcr-muted);
-            font-size: 0.95rem;
-            line-height: 1.6;
-            margin-bottom: 0.2rem;
-        }}
-
-        /* 统一卡片边框、阴影、圆角，适配 st.container(border=True) */
-        div[data-testid="stVerticalBlockBorderWrapper"] {{
-            border-color: var(--pcr-border) !important;
-            border-radius: 18px !important;
-            background: var(--pcr-card);
-            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
-            overflow: hidden;
-        }}
-
-        div[data-testid="stVerticalBlockBorderWrapper"] > div {{
-            padding: 0.14rem 0.18rem;
-        }}
-
-        .pcr-top1-card {{
-            border: 1px solid #bfd4ff;
-            background: linear-gradient(180deg, #f4f8ff 0%, #eef5ff 100%);
-            border-radius: 16px;
-            padding: 0.95rem 1rem;
-            margin-bottom: 0.7rem;
-        }}
-
-        .pcr-sub-card {{
-            border: 1px solid var(--pcr-border);
-            background: #ffffff;
-            border-radius: 14px;
-            padding: 0.82rem 0.95rem;
-            margin-bottom: 0.65rem;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
-        }}
-
-        .pcr-status-pill {{
-            display: inline-block;
-            border-radius: 999px;
-            padding: 0.18rem 0.65rem;
-            font-size: 0.77rem;
-            font-weight: 700;
-            margin-left: 0.45rem;
-        }}
-
-        .pcr-status-ok {{
-            background: #dcfce7;
-            color: #166534;
-            border: 1px solid #86efac;
-        }}
-
-        .pcr-status-pending {{
-            background: #ffedd5;
-            color: #9a3412;
-            border: 1px solid #fdba74;
-        }}
-
-        /* 按钮风格统一 */
-        .pcr-tile {{
-            height: 100%;
-            border: 1px solid var(--pcr-border);
-            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,250,255,0.96) 100%);
-            border-radius: 18px;
-            padding: 1rem 1rem 0.95rem 1rem;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-        }}
-
-        .pcr-tile-tag {{
-            display: inline-block;
-            margin-bottom: 0.55rem;
-            padding: 0.18rem 0.62rem;
-            border-radius: 999px;
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--pcr-primary);
-            font-size: 0.76rem;
-            font-weight: 700;
-        }}
-
-        .pcr-tile h3 {{
-            margin: 0 0 0.4rem 0;
-            font-size: 1.04rem;
-            color: var(--pcr-text);
-        }}
-
-        .pcr-tile p {{
-            margin: 0;
-            color: var(--pcr-muted);
-            font-size: 0.94rem;
-            line-height: 1.65;
-        }}
-
-        .pcr-soft-note {{
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            border-left: 4px solid var(--pcr-primary);
-            background: rgba(255, 255, 255, 0.84);
-            border-radius: 16px;
-            padding: 0.95rem 1rem;
-        }}
-
-        .pcr-soft-note-title {{
-            margin: 0 0 0.28rem 0;
-            font-size: 0.92rem;
-            font-weight: 700;
-            color: var(--pcr-text);
-        }}
-
-        .pcr-soft-note p {{
-            margin: 0;
-            color: var(--pcr-muted);
-            line-height: 1.68;
-            font-size: 0.94rem;
-        }}
-
-        .pcr-dev-panel {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 18px;
-            background: #ffffff;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-            padding: 1rem 1rem 0.9rem 1rem;
-            min-height: 23rem;
-            margin-bottom: 1rem;
-        }}
-
-        .pcr-dev-panel.compact {{
-            min-height: 17rem;
-        }}
-
-        .pcr-dev-grid {{
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.8rem;
-            margin-top: 0.8rem;
-        }}
-
-        .pcr-dev-check-card {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 14px;
-            padding: 0.9rem 0.95rem;
-            background: #ffffff;
-            min-height: 7.5rem;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
-        }}
-
-        .pcr-dev-check-card b {{
-            display: block;
-            margin-bottom: 0.35rem;
-            font-size: 0.96rem;
-            color: var(--pcr-text);
-        }}
-
-        .pcr-dev-check-card p {{
-            margin: 0;
-            color: var(--pcr-muted);
-            font-size: 0.9rem;
-            line-height: 1.6;
-        }}
-
-        .pcr-dev-check-card.success {{ border-left: 4px solid #16a34a; background: #f0fdf4; }}
-        .pcr-dev-check-card.warning {{ border-left: 4px solid #d97706; background: #fffbeb; }}
-        .pcr-dev-check-card.error {{ border-left: 4px solid #dc2626; background: #fef2f2; }}
-
-        .pcr-status-card {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 16px;
-            padding: 0.85rem 0.95rem;
-            background: #ffffff;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
-            margin-bottom: 0.7rem;
-        }}
-
-        .pcr-status-card b {{
-            display: block;
-            margin-bottom: 0.28rem;
-            font-size: 0.95rem;
-            color: var(--pcr-text);
-        }}
-
-        .pcr-status-card p {{
-            margin: 0;
-            font-size: 0.88rem;
-            line-height: 1.58;
-            color: var(--pcr-muted);
-        }}
-
-        .pcr-status-success {{ border-left: 4px solid #16a34a; }}
-        .pcr-status-warning {{ border-left: 4px solid #ea580c; }}
-        .pcr-status-error {{ border-left: 4px solid #dc2626; }}
-        .pcr-status-neutral {{ border-left: 4px solid #64748b; }}
-
-        .pcr-step-header {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 18px;
-            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,249,255,0.95) 100%);
-            padding: 1rem 1rem 0.8rem 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-        }}
-
-        .pcr-step-kicker {{
-            color: var(--pcr-primary);
-            font-weight: 700;
-            font-size: 0.84rem;
-            margin-bottom: 0.18rem;
-        }}
-
-        .pcr-step-title {{
-            color: var(--pcr-text);
-            font-weight: 700;
-            font-size: 1.16rem;
-            margin-bottom: 0.3rem;
-        }}
-
-        .pcr-step-desc {{
-            color: var(--pcr-muted);
-            font-size: 0.93rem;
-            line-height: 1.6;
-        }}
-
-        .pcr-student-toolbar {{
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            border: 1px solid var(--pcr-border);
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.92);
-            padding: 0.95rem 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-        }}
-
-        .pcr-student-toolbar-title {{
-            margin: 0 0 0.18rem 0;
-            color: var(--pcr-text);
-            font-weight: 700;
-            font-size: 1rem;
-            line-height: 1.35;
-        }}
-
-        .pcr-student-toolbar-desc {{
-            margin: 0;
-            color: var(--pcr-muted);
-            font-size: 0.9rem;
-            line-height: 1.55;
-        }}
-
-        .pcr-stepper-grid {{
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.75rem;
-            margin: 0.85rem 0 0.85rem 0;
-        }}
-
-        .pcr-stepper-item {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 14px;
-            background: #ffffff;
-            padding: 0.78rem 0.85rem;
-            min-height: 5.25rem;
-        }}
-
-        .pcr-stepper-item.active {{
-            border-color: rgba(29, 78, 216, 0.42);
-            background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
-            box-shadow: 0 10px 24px rgba(29, 78, 216, 0.1);
-        }}
-
-        .pcr-stepper-item.done {{
-            border-color: rgba(22, 163, 74, 0.28);
-            background: #f0fdf4;
-        }}
-
-        .pcr-stepper-index {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.55rem;
-            height: 1.55rem;
-            border-radius: 999px;
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--pcr-primary);
-            font-size: 0.78rem;
-            font-weight: 800;
-            margin-bottom: 0.46rem;
-        }}
-
-        .pcr-stepper-item.done .pcr-stepper-index {{
-            background: #dcfce7;
-            color: #166534;
-        }}
-
-        .pcr-stepper-item.active .pcr-stepper-index {{
-            background: var(--pcr-primary);
-            color: #ffffff;
-        }}
-
-        .pcr-stepper-title {{
-            color: var(--pcr-text);
-            font-weight: 700;
-            font-size: 0.92rem;
-            line-height: 1.35;
-            margin-bottom: 0.25rem;
-        }}
-
-        .pcr-stepper-status {{
-            color: var(--pcr-muted);
-            font-size: 0.78rem;
-            line-height: 1.45;
-        }}
-
-        .pcr-current-step-summary {{
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 1rem;
-            margin-bottom: 0.25rem;
-        }}
-
-        .pcr-current-step-chip {{
-            flex: 0 0 auto;
-            border-radius: 999px;
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--pcr-primary);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            padding: 0.2rem 0.7rem;
-            font-size: 0.78rem;
-            font-weight: 800;
-        }}
-
-        .pcr-review-grid {{
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.75rem;
-            margin: 0.75rem 0;
-        }}
-
-        .pcr-review-item {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 14px;
-            background: #ffffff;
-            padding: 0.75rem 0.85rem;
-        }}
-
-        .pcr-review-label {{
-            color: var(--pcr-muted);
-            font-size: 0.78rem;
-            font-weight: 700;
-            margin-bottom: 0.24rem;
-        }}
-
-        .pcr-review-value {{
-            color: var(--pcr-text);
-            font-size: 0.98rem;
-            font-weight: 700;
-            line-height: 1.45;
-            overflow-wrap: anywhere;
-        }}
-
-        .pcr-result-meta-grid {{
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.75rem;
-            margin: 0.65rem 0 0.85rem 0;
-        }}
-
-        @media (max-width: 900px) {{
-            .pcr-student-toolbar,
-            .pcr-current-step-summary {{
-                display: block;
-            }}
-
-            .pcr-stepper-grid,
-            .pcr-review-grid,
-            .pcr-result-meta-grid {{
-                grid-template-columns: 1fr;
-            }}
-
-            .pcr-current-step-chip {{
-                display: inline-flex;
-                margin-top: 0.55rem;
-            }}
-        }}
-
-        [data-testid="stMetric"] {{
-            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(247,249,255,0.94) 100%);
-            border: 1px solid var(--pcr-border);
-            border-radius: 16px;
-            padding: 0.9rem 1rem;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-        }}
-
-        [data-testid="stMetricLabel"] {{
-            font-size: 0.88rem;
-            font-weight: 700;
-        }}
-
-        [data-testid="stMetricValue"] {{
-            font-size: clamp(1.5rem, 2.1vw, 2.1rem);
-        }}
-
-        div[data-testid="stDataFrame"] {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 16px;
-            overflow: hidden;
-            background: #ffffff;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
-        }}
-
-        [data-testid="stExpander"] {{
-            border: 1px solid var(--pcr-border);
-            border-radius: 16px;
-            overflow: hidden;
-            background: #ffffff;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
-            margin-bottom: 0.7rem;
-        }}
-
-        [data-testid="stExpander"] details summary {{
-            background: rgba(248, 250, 252, 0.9);
-        }}
-
-        .stAlert {{
-            border-radius: 14px;
-        }}
-
-        div.stButton > button, div.stDownloadButton > button, div[data-testid="stFormSubmitButton"] button {{
-            border-radius: 12px;
-            font-weight: 700;
-            border: 1px solid #c9d6ef;
-            min-height: 2.8rem;
-            padding-left: 0.95rem;
-            padding-right: 0.95rem;
-            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
-        }}
-
-        button[kind="primary"] {{
-            background: linear-gradient(135deg, var(--pcr-primary) 0%, var(--pcr-primary-2) 100%) !important;
-            color: #ffffff !important;
-            border: none !important;
-        }}
-
-        .stMarkdown p, .stMarkdown li {{
-            line-height: 1.68;
-        }}
-
-        .stMarkdown ul {{
-            margin-top: 0.25rem;
-            margin-bottom: 0.4rem;
-        }}
-
-        [data-testid="stHorizontalBlock"] {{
-            gap: 1rem;
-        }}
-
-        .stProgress > div > div > div > div {{
-            background: linear-gradient(90deg, var(--pcr-primary) 0%, var(--pcr-accent) 100%);
-        }}
-
-        .stProgress > div > div {{
-            height: 0.48rem;
-            border-radius: 999px;
-        }}
-
-        div.stButton > button, div.stDownloadButton > button {{
-            border-radius: 10px;
-            font-weight: 600;
-            border: 1px solid #c9d6ef;
-        }}
-
-        /* Competition polish layer: unified lab brand system */
-        :root {{
-            --pcr-ink: #07172b;
-            --pcr-lab-blue: #0b1f3a;
-            --pcr-diagnostic-blue: #2563eb;
-            --pcr-gel-cyan: #0ea5b7;
-            --pcr-cyan-soft: #dff8fb;
-            --pcr-amber: #f59e0b;
-            --pcr-surface: rgba(255, 255, 255, 0.88);
-            --pcr-surface-strong: #ffffff;
-            --pcr-shadow-sm: 0 8px 20px rgba(11, 31, 58, 0.07);
-            --pcr-shadow-md: 0 18px 44px rgba(11, 31, 58, 0.12);
-            --pcr-shadow-lg: 0 26px 70px rgba(11, 31, 58, 0.16);
-        }}
-
-        .stApp {{
-            background:
-                linear-gradient(rgba(14, 165, 183, 0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(14, 165, 183, 0.03) 1px, transparent 1px),
-                radial-gradient(circle at 18% 8%, rgba(14, 165, 183, 0.16), transparent 28%),
-                radial-gradient(circle at 92% 2%, rgba(37, 99, 235, 0.12), transparent 26%),
-                linear-gradient(180deg, var(--pcr-bg) 0%, #f8fbfd 48%, #ffffff 100%);
-            background-size: 34px 34px, 34px 34px, auto, auto, auto;
-            color: var(--pcr-ink);
-        }}
-
-        .main .block-container {{
-            padding-top: clamp(0.75rem, 1.7vw, 1.4rem);
-            max-width: min(1480px, 95vw);
-        }}
-
-        section[data-testid="stSidebar"] {{
-            background:
-                linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 249, 251, 0.98) 100%);
-            border-right: 1px solid rgba(11, 31, 58, 0.08);
-            box-shadow: 12px 0 34px rgba(11, 31, 58, 0.045);
-        }}
-
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {{
-            border-radius: 14px;
-            min-height: 2.95rem;
-            font-weight: 750;
-            letter-spacing: 0;
-        }}
-
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {{
-            background: linear-gradient(90deg, rgba(14, 165, 183, 0.13), rgba(37, 99, 235, 0.08));
-            border-color: rgba(14, 165, 183, 0.28);
-            box-shadow: inset 4px 0 0 var(--pcr-gel-cyan), 0 12px 24px rgba(11, 31, 58, 0.08);
-        }}
-
-        [data-testid="collapsedControl"] {{
-            position: relative;
-        }}
-
-        [data-testid="collapsedControl"]::after {{
-            content: "点此展开侧边栏";
-            position: absolute;
-            left: 2.15rem;
-            top: 50%;
-            transform: translateY(-50%);
-            white-space: nowrap;
-            pointer-events: none;
-            border: 1px solid rgba(14, 165, 183, 0.2);
-            border-radius: 999px;
-            padding: 0.18rem 0.56rem;
-            background: rgba(255, 255, 255, 0.82);
-            color: #075985;
-            font-size: 0.76rem;
-            font-weight: 750;
-            box-shadow: 0 6px 16px rgba(11, 31, 58, 0.06);
-        }}
-
-        .pcr-sidebar-expand-hint {{
-            position: fixed;
-            top: 0.72rem;
-            left: 2.45rem;
-            z-index: 999999;
-            display: none;
-            pointer-events: none;
-            border: 1px solid rgba(14, 165, 183, 0.22);
-            border-radius: 999px;
-            padding: 0.18rem 0.62rem;
-            background: rgba(255, 255, 255, 0.9);
-            color: #075985;
-            font-size: 0.76rem;
-            font-weight: 800;
-            line-height: 1.2;
-            box-shadow: 0 8px 18px rgba(11, 31, 58, 0.07);
-            backdrop-filter: blur(8px);
-        }}
-
-        body:has([data-testid="collapsedControl"]) .pcr-sidebar-expand-hint {{
-            display: block;
-        }}
-
-        @media (max-width: 640px) {{
-            .pcr-sidebar-expand-hint {{
-                display: none;
-            }}
-        }}
-
-        .pcr-hero {{
-            border-radius: 22px;
-            padding: clamp(1.25rem, 2.2vw, 2rem);
-            margin-bottom: 1.1rem;
-            background:
-                linear-gradient(135deg, rgba(11, 31, 58, 0.98) 0%, rgba(18, 58, 99, 0.96) 54%, rgba(14, 165, 183, 0.88) 100%);
-            box-shadow: var(--pcr-shadow-lg);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            min-height: 10.8rem;
-        }}
-
-        .pcr-hero::after {{
-            content: "";
-            position: absolute;
-            inset: auto 2rem 1.2rem auto;
-            width: min(30vw, 360px);
-            height: 74%;
-            border-radius: 18px;
-            background:
-                repeating-linear-gradient(
-                    90deg,
-                    rgba(255,255,255,0.08) 0 14px,
-                    rgba(14,165,183,0.26) 14px 18px,
-                    rgba(255,255,255,0.05) 18px 40px
-                ),
-                linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02));
-            opacity: 0.78;
-            transform: skewX(-7deg);
-        }}
-
-        .pcr-hero h1 {{
-            max-width: 13em;
-            font-size: clamp(2rem, 3vw, 3.15rem);
-            font-weight: 850;
-            letter-spacing: 0;
-            line-height: 1.12;
-        }}
-
-        .pcr-hero p {{
-            max-width: 46rem;
-            font-size: clamp(0.98rem, 1.1vw, 1.1rem);
-            color: rgba(255, 255, 255, 0.9);
-            white-space: normal !important;
-        }}
-
-        .pcr-role-badge {{
-            background: rgba(223, 248, 251, 0.12);
-            border-color: rgba(223, 248, 251, 0.38);
-            color: #e7fdff;
-        }}
-
-        div[data-testid="stVerticalBlockBorderWrapper"] {{
-            border-color: rgba(11, 31, 58, 0.1) !important;
-            border-radius: 14px !important;
-            background: var(--pcr-surface);
-            box-shadow: var(--pcr-shadow-sm);
-            backdrop-filter: blur(10px);
-        }}
-
-        .pcr-card-title {{
-            font-size: 1.08rem;
-            font-weight: 850;
-            color: var(--pcr-ink);
-        }}
-
-        .pcr-home-hero {{
-            position: relative;
-            overflow: hidden;
-            border-radius: 24px;
-            padding: clamp(1.35rem, 2.5vw, 2.4rem);
-            margin-bottom: 1rem;
-            color: #ffffff;
-            background:
-                linear-gradient(135deg, rgba(7, 23, 43, 0.98) 0%, rgba(11, 31, 58, 0.96) 58%, rgba(14, 165, 183, 0.88) 100%);
-            box-shadow: var(--pcr-shadow-lg);
-            display: grid;
-            grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-            gap: clamp(1.2rem, 3vw, 3rem);
-            align-items: center;
-        }}
-
-        .pcr-home-hero h1 {{
-            margin: 0;
-            font-size: clamp(2.15rem, 3.5vw, 4rem);
-            line-height: 1.08;
-            font-weight: 900;
-            letter-spacing: 0;
-        }}
-
-        .pcr-home-hero p {{
-            max-width: 52rem;
-            margin: 0.85rem 0 1.1rem 0;
-            color: rgba(255, 255, 255, 0.88);
-            line-height: 1.75;
-            font-size: 1.04rem;
-        }}
-
-        .pcr-home-proof {{
-            display: flex;
-            gap: 0.55rem;
-            flex-wrap: wrap;
-            margin-top: 0.9rem;
-        }}
-
-        .pcr-home-proof span {{
-            border: 1px solid rgba(223, 248, 251, 0.32);
-            background: rgba(223, 248, 251, 0.1);
-            color: #e7fdff;
-            border-radius: 999px;
-            padding: 0.28rem 0.7rem;
-            font-size: 0.8rem;
-            font-weight: 750;
-        }}
-
-        .pcr-hero-actions {{
-            margin: 0.2rem 0 1.6rem 0;
-        }}
-
-        .pcr-home-section-title {{
-            margin: clamp(1.55rem, 2.4vw, 2.2rem) 0 0.82rem 0;
-        }}
-
-        .pcr-home-section-title h2 {{
-            margin: 0;
-            color: var(--pcr-ink);
-            font-size: clamp(1.3rem, 1.6vw, 1.75rem);
-            line-height: 1.28;
-            font-weight: 880;
-            letter-spacing: 0;
-        }}
-
-        .pcr-home-section-title p {{
-            margin: 0.35rem 0 0 0;
-            color: var(--pcr-muted);
-            font-size: 0.96rem;
-            line-height: 1.7;
-        }}
-
-        .pcr-gel-panel {{
-            position: relative;
-            min-height: 15.5rem;
-            border-radius: 22px;
-            padding: 1.05rem;
-            background: rgba(255, 255, 255, 0.09);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
-        }}
-
-        .pcr-gel-title {{
-            color: rgba(255,255,255,0.76);
-            font-size: 0.78rem;
-            font-weight: 750;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            margin-bottom: 0.75rem;
-        }}
-
-        .pcr-gel-grid {{
-            display: grid;
-            grid-template-columns: repeat(7, minmax(0, 1fr));
-            gap: 0.58rem;
-            height: 10.8rem;
-        }}
-
-        .pcr-gel-lane {{
-            position: relative;
-            overflow: hidden;
-            border-radius: 12px;
-            background: linear-gradient(180deg, rgba(7,23,43,0.64), rgba(11,31,58,0.36));
-            border: 1px solid rgba(223, 248, 251, 0.14);
-        }}
-
-        .pcr-gel-lane::before,
-        .pcr-gel-lane::after {{
-            content: "";
-            position: absolute;
-            left: 18%;
-            right: 18%;
-            height: 0.52rem;
-            border-radius: 999px;
-            background: rgba(103, 232, 249, 0.78);
-            box-shadow: 0 0 18px rgba(103, 232, 249, 0.7);
-        }}
-
-        .pcr-gel-lane::before {{ top: var(--band-a, 26%); opacity: var(--a, .92); }}
-        .pcr-gel-lane::after {{ top: var(--band-b, 62%); opacity: var(--b, .5); }}
-
-        .pcr-workbench-card {{
-            border: 1px solid rgba(11, 31, 58, 0.1);
-            border-radius: 14px;
-            padding: 1rem;
-            background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,251,253,0.92));
-            min-height: 13rem;
-            box-shadow: var(--pcr-shadow-sm);
-        }}
-
-        .pcr-workbench-card h3 {{
-            margin: 0 0 0.45rem 0;
-            font-size: 1.05rem;
-            color: var(--pcr-ink);
-        }}
-
-        .pcr-workbench-card p {{
-            margin: 0 0 0.8rem 0;
-            color: var(--pcr-muted);
-            line-height: 1.6;
-            min-height: 3.1rem;
-        }}
-
-        .pcr-workbench-meta {{
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.42rem;
-            margin-bottom: 0.8rem;
-        }}
-
-        .pcr-workbench-meta span,
-        .pcr-status-strip span,
-        .pcr-home-status-grid span,
-        .pcr-current-step-chip {{
-            border-radius: 999px;
-            border: 1px solid rgba(14, 165, 183, 0.22);
-            background: rgba(223, 248, 251, 0.58);
-            color: #075985;
-            font-size: 0.76rem;
-            font-weight: 800;
-            padding: 0.18rem 0.58rem;
-        }}
-
-        .pcr-status-strip {{
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 0.7rem;
-        }}
-
-        .pcr-status-strip > div {{
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-radius: 12px;
-            padding: 0.74rem 0.82rem;
-            background: rgba(255,255,255,0.72);
-        }}
-
-        .pcr-status-strip b {{
-            display: block;
-            margin-top: 0.32rem;
-            color: var(--pcr-ink);
-            font-size: 1.05rem;
-        }}
-
-        .pcr-flow-grid {{
-            display: grid;
-            grid-template-columns: repeat(6, minmax(0, 1fr));
-            gap: 0.72rem;
-            margin-bottom: 0.65rem;
-        }}
-
-        .pcr-flow-card {{
-            position: relative;
-            min-height: 12.4rem;
-            border: 1px solid rgba(11, 31, 58, 0.1);
-            border-radius: 14px;
-            padding: 0.9rem 0.85rem;
-            background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(246,251,253,0.9));
-            box-shadow: var(--pcr-shadow-sm);
-        }}
-
-        .pcr-flow-index {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 2rem;
-            height: 2rem;
-            border-radius: 999px;
-            background: rgba(14, 165, 183, 0.12);
-            border: 1px solid rgba(14, 165, 183, 0.22);
-            color: #075985;
-            font-size: 0.8rem;
-            font-weight: 850;
-            margin-bottom: 0.62rem;
-        }}
-
-        .pcr-flow-card h3 {{
-            margin: 0 0 0.45rem 0;
-            color: var(--pcr-ink);
-            font-size: 0.98rem;
-            line-height: 1.38;
-            font-weight: 850;
-        }}
-
-        .pcr-flow-card p {{
-            margin: 0;
-            color: var(--pcr-muted);
-            font-size: 0.86rem;
-            line-height: 1.58;
-        }}
-
-        .pcr-flow-arrow {{
-            position: absolute;
-            top: 1rem;
-            right: -0.62rem;
-            z-index: 2;
-            width: 1.28rem;
-            height: 1.28rem;
-            border-radius: 999px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            color: #075985;
-            background: #e0f7fb;
-            border: 1px solid rgba(14, 165, 183, 0.24);
-            font-weight: 850;
-            font-size: 0.78rem;
-        }}
-
-        .pcr-home-status-panel {{
-            border: 1px solid rgba(11, 31, 58, 0.08);
-            border-radius: 14px;
-            padding: 0.75rem;
-            background: rgba(255, 255, 255, 0.66);
-            box-shadow: 0 8px 18px rgba(11, 31, 58, 0.04);
-            margin-bottom: 0.58rem;
-        }}
-
-        .pcr-home-status-grid {{
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.58rem;
-        }}
-
-        .pcr-home-status-grid > div {{
-            border: 1px solid rgba(11, 31, 58, 0.07);
-            border-radius: 12px;
-            padding: 0.58rem 0.68rem;
-            background: rgba(248, 252, 253, 0.78);
-        }}
-
-        .pcr-home-status-grid b {{
-            display: block;
-            margin-top: 0.25rem;
-            color: var(--pcr-ink);
-            font-size: 0.96rem;
-        }}
-
-        .pcr-student-toolbar {{
-            border-radius: 14px;
-            background: linear-gradient(90deg, #ffffff 0%, rgba(223,248,251,0.7) 100%);
-            border-color: rgba(14, 165, 183, 0.16);
-        }}
-
-        .pcr-stepper-item {{
-            border-radius: 13px;
-        }}
-
-        .pcr-stepper-item.active {{
-            border-color: rgba(14, 165, 183, 0.55);
-            background: linear-gradient(180deg, rgba(223,248,251,0.78), #ffffff);
-            box-shadow: 0 12px 28px rgba(14, 165, 183, 0.13);
-        }}
-
-        .pcr-stepper-item.active .pcr-stepper-index {{
-            background: var(--pcr-gel-cyan);
-        }}
-
-        .pcr-readiness-panel {{
-            border: 1px solid rgba(14, 165, 183, 0.2);
-            border-radius: 14px;
-            padding: 0.95rem;
-            background: linear-gradient(180deg, rgba(223,248,251,0.68), rgba(255,255,255,0.94));
-            box-shadow: var(--pcr-shadow-sm);
-            margin-bottom: 0.8rem;
-        }}
-
-        .pcr-readiness-title {{
-            margin: 0 0 0.6rem 0;
-            font-size: 0.95rem;
-            font-weight: 850;
-            color: var(--pcr-ink);
-        }}
-
-        .pcr-readiness-grid {{
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.5rem;
-        }}
-
-        .pcr-readiness-item {{
-            border-radius: 11px;
-            padding: 0.58rem 0.62rem;
-            background: rgba(255,255,255,0.76);
-            border: 1px solid rgba(11,31,58,0.07);
-        }}
-
-        .pcr-readiness-item span {{
-            color: var(--pcr-muted);
-            font-size: 0.74rem;
-            font-weight: 750;
-        }}
-
-        .pcr-readiness-item b {{
-            display: block;
-            margin-top: 0.15rem;
-            color: var(--pcr-ink);
-            font-size: 0.95rem;
-        }}
-
-        .pcr-gel-placeholder {{
-            border: 1px dashed rgba(14, 165, 183, 0.45);
-            border-radius: 14px;
-            min-height: 9.5rem;
-            padding: 0.95rem;
-            background:
-                repeating-linear-gradient(90deg, rgba(14,165,183,0.1) 0 10px, transparent 10px 32px),
-                linear-gradient(180deg, rgba(223,248,251,0.72), rgba(255,255,255,0.86));
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            color: #075985;
-        }}
-
-        .pcr-gel-placeholder b {{
-            color: var(--pcr-ink);
-            margin-bottom: 0.28rem;
-        }}
-
-        .pcr-top1-card {{
-            border-color: rgba(14, 165, 183, 0.28);
-            background:
-                linear-gradient(135deg, rgba(223,248,251,0.9), rgba(255,255,255,0.98));
-            border-radius: 16px;
-            box-shadow: var(--pcr-shadow-md);
-        }}
-
-        .pcr-candidate-list {{
-            display: grid;
-            gap: 0.55rem;
-            margin: 0.7rem 0;
-        }}
-
-        .pcr-candidate-row {{
-            display: flex;
-            justify-content: space-between;
-            gap: 0.75rem;
-            align-items: center;
-            border: 1px solid rgba(11,31,58,0.08);
-            border-radius: 12px;
-            padding: 0.62rem 0.75rem;
-            background: rgba(255,255,255,0.8);
-        }}
-
-        .pcr-candidate-row b {{
-            color: var(--pcr-ink);
-        }}
-
-        .pcr-candidate-row span {{
-            color: var(--pcr-muted);
-            font-weight: 750;
-            white-space: nowrap;
-        }}
-
-        div.stButton > button, div.stDownloadButton > button {{
-            border-radius: 11px;
-            border-color: rgba(14, 165, 183, 0.32);
-            min-height: 2.8rem;
-        }}
-
-        div.stButton > button[kind="primary"],
-        div.stButton > button[data-testid="baseButton-primary"] {{
-            background: linear-gradient(90deg, var(--pcr-lab-blue), var(--pcr-diagnostic-blue));
-            border: 0;
-            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
-        }}
-
-        /* Open Design / IBM Carbon inspired homepage layer */
-        :root {{
-            --pcr-bg: #F6FAFC;
-            --pcr-surface: #FFFFFF;
-            --pcr-ink: #161616;
-            --pcr-muted: #525252;
-            --pcr-border: #D8E3EA;
-            --pcr-lab-blue: #0B1F3A;
-            --pcr-diagnostic-blue: #2563EB;
-            --pcr-diagnostic-blue-hover: #1D4ED8;
-            --pcr-gel-cyan: #0EA5B7;
-            --pcr-domain-muted: #E0F7FA;
-            --pcr-accent-tint: #EFF6FF;
-        }}
-
-        .stApp {{
-            background: var(--pcr-bg);
-            color: var(--pcr-ink);
-        }}
-
-        .main .block-container {{
-            max-width: min(1200px, calc(100vw - 64px));
-            padding-top: 0;
-            padding-left: 0;
-            padding-right: 0;
-            padding-bottom: 0;
-        }}
-
-        .pcr-home-hero {{
-            min-height: clamp(560px, 72vh, 720px);
-            width: 100%;
-            margin: 0 0 4rem 0;
-            padding: clamp(4rem, 8vw, 6rem) clamp(2rem, 4vw, 4rem);
-            border-radius: 0;
-            border: 0;
-            box-shadow: none;
-            color: #F6FAFC;
-            background: var(--pcr-lab-blue);
-            display: grid;
-            grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
-            gap: clamp(2rem, 5vw, 5rem);
-            align-items: center;
-            overflow: hidden;
-        }}
-
-        .pcr-home-hero::before {{
-            content: "";
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 1px;
-            background: rgba(216, 227, 234, 0.16);
-        }}
-
-        .pcr-home-hero-content {{
-            padding-left: 2rem;
-        }}
-
-        .pcr-home-kicker {{
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-            color: var(--pcr-gel-cyan);
-            font-size: 0.78rem;
-            font-weight: 600;
-            letter-spacing: 0.02rem;
-        }}
-
-        .pcr-home-kicker i {{
-            width: 0.5rem;
-            height: 0.5rem;
-            border-radius: 50%;
-            background: var(--pcr-gel-cyan);
-        }}
-
-        .pcr-home-hero h1 {{
-            max-width: 11.5em;
-            margin: 0 0 1.25rem 0;
-            font-size: clamp(2.25rem, 4vw, 3.25rem);
-            line-height: 1.15;
-            font-weight: 300;
-            letter-spacing: 0;
-            color: #F6FAFC;
-        }}
-
-        .pcr-home-hero p {{
-            max-width: 34rem;
-            margin: 0;
-            color: rgba(246, 250, 252, 0.8);
-            font-size: 1rem;
-            line-height: 1.6;
-        }}
-
-        .pcr-gel-panel {{
-            min-height: 32rem;
-            border-radius: 4px;
-            padding: 0;
-            border: 1px solid rgba(14, 165, 183, 0.24);
-            background: rgba(14, 165, 183, 0.08);
-            box-shadow: none;
-            overflow: hidden;
-        }}
-
-        .pcr-gel-header {{
-            display: grid;
-            grid-template-columns: 4.6rem repeat(7, 1fr);
-            gap: 0;
-            padding: 0.9rem 1.1rem 0.55rem 1.1rem;
-            color: rgba(103, 197, 221, 0.72);
-            font-family: "IBM Plex Mono", Consolas, monospace;
-            font-size: 0.8rem;
-            text-align: center;
-            border-bottom: 1px solid rgba(14, 165, 183, 0.13);
-            background: rgba(3, 16, 32, 0.18);
-        }}
-
-        .pcr-gel-body {{
-            position: relative;
-            display: grid;
-            grid-template-columns: 4.6rem 1fr;
-            gap: 0.75rem;
-            height: 27.4rem;
-            padding: 1.2rem 1.2rem 1.4rem 1.2rem;
-        }}
-
-        .pcr-gel-scale {{
-            display: grid;
-            grid-template-rows: repeat(7, 1fr);
-            color: rgba(103, 197, 221, 0.72);
-            font-family: "IBM Plex Mono", Consolas, monospace;
-            font-size: 0.76rem;
-            align-items: center;
-            text-align: right;
-        }}
-
-        .pcr-gel-grid {{
-            display: grid;
-            grid-template-columns: repeat(7, minmax(0, 1fr));
-            gap: 0.75rem;
-            height: 100%;
-        }}
-
-        .pcr-gel-lane {{
-            position: relative;
-            overflow: hidden;
-            border-radius: 4px;
-            border: 1px solid rgba(14, 165, 183, 0.14);
-            background: rgba(2, 16, 32, 0.24);
-        }}
-
-        .pcr-gel-lane::before,
-        .pcr-gel-lane::after {{
-            left: 20%;
-            right: 20%;
-            height: 0.2rem;
-            border-radius: 2px;
-            background: var(--pcr-gel-cyan);
-            box-shadow: none;
-        }}
-
-        .pcr-gel-lane.marker::before {{
-            top: 10%;
-            box-shadow:
-                0 2.7rem 0 var(--pcr-gel-cyan),
-                0 5.4rem 0 var(--pcr-gel-cyan),
-                0 8.1rem 0 var(--pcr-gel-cyan),
-                0 10.8rem 0 var(--pcr-gel-cyan),
-                0 13.5rem 0 var(--pcr-gel-cyan),
-                0 16.2rem 0 var(--pcr-gel-cyan),
-                0 18.9rem 0 var(--pcr-gel-cyan);
-        }}
-
-        .pcr-gel-lane.marker::after {{
-            display: none;
-        }}
-
-        .pcr-gel-lane.weak::before,
-        .pcr-gel-lane.weak::after {{
-            opacity: 0.35;
-        }}
-
-        .pcr-gel-lane.smear::after {{
-            left: 28%;
-            right: 28%;
-            height: 3rem;
-            border-radius: 4px;
-            opacity: 0.22;
-        }}
-
-        .pcr-diagnosis-note {{
-            position: absolute;
-            right: 1.2rem;
-            bottom: 1.4rem;
-            width: 12rem;
-            border: 1px solid rgba(37, 99, 235, 0.32);
-            border-radius: 4px;
-            padding: 0.9rem;
-            background: rgba(11, 31, 58, 0.72);
-        }}
-
-        .pcr-diagnosis-note span {{
-            display: block;
-            margin-bottom: 0.35rem;
-            color: var(--pcr-gel-cyan);
-            font-family: "IBM Plex Mono", Consolas, monospace;
-            font-size: 0.72rem;
-            letter-spacing: 0.08rem;
-        }}
-
-        .pcr-diagnosis-note b {{
-            display: block;
-            margin-bottom: 0.35rem;
-            color: #F6FAFC;
-            font-size: 0.95rem;
-            font-weight: 600;
-        }}
-
-        .pcr-diagnosis-note p {{
-            margin: 0;
-            color: rgba(246, 250, 252, 0.62);
-            font-size: 0.78rem;
-            line-height: 1.5;
-        }}
-
-        div.stButton > button,
-        div.stDownloadButton > button {{
-            border-radius: 0;
-            min-height: 3rem;
-            border: 1px solid var(--pcr-border);
-            box-shadow: none;
-            font-size: 0.88rem;
-            font-weight: 600;
-            letter-spacing: 0;
-        }}
-
-        div.stButton > button[kind="primary"],
-        div.stButton > button[data-testid="baseButton-primary"] {{
-            background: var(--pcr-diagnostic-blue) !important;
-            border-color: var(--pcr-diagnostic-blue) !important;
-            box-shadow: none !important;
-            color: #ffffff !important;
-        }}
-
-        div.stButton > button[kind="primary"]:hover,
-        div.stButton > button[data-testid="baseButton-primary"]:hover {{
-            background: var(--pcr-diagnostic-blue-hover) !important;
-            border-color: var(--pcr-diagnostic-blue-hover) !important;
-        }}
-
-        .pcr-home-section-title {{
-            margin: 0 auto 3rem auto;
-            padding-top: 4.5rem;
-            text-align: center;
-            max-width: 56rem;
-        }}
-
-        .pcr-home-section-title span {{
-            display: inline-flex;
-            margin-bottom: 1rem;
-            border-radius: 999px;
-            padding: 0.3rem 0.8rem;
-            background: var(--pcr-accent-tint);
-            color: var(--pcr-diagnostic-blue);
-            font-size: 0.78rem;
-            font-weight: 600;
-        }}
-
-        .pcr-home-section-title span:empty {{
-            display: none;
-        }}
-
-        .pcr-home-section-title h2 {{
-            margin: 0;
-            color: var(--pcr-ink);
-            font-size: clamp(1.9rem, 3vw, 2.25rem);
-            line-height: 1.22;
-            font-weight: 300;
-        }}
-
-        .pcr-home-section-title p {{
-            margin: 1rem 0 0 0;
-            color: var(--pcr-muted);
-            font-size: 1rem;
-            line-height: 1.6;
-        }}
-
-        .pcr-problem-grid {{
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 1rem;
-        }}
-
-        .pcr-problem-card {{
-            min-height: 12.6rem;
-            border-radius: 4px;
-            padding: 2rem;
-            background: var(--pcr-lab-blue);
-            color: #F6FAFC;
-        }}
-
-        .pcr-problem-number {{
-            margin-bottom: 1rem;
-            color: var(--pcr-gel-cyan);
-            font-family: "IBM Plex Mono", Consolas, monospace;
-            font-size: 0.9rem;
-        }}
-
-        .pcr-problem-card h3 {{
-            margin: 0 0 0.75rem 0;
-            color: #F6FAFC;
-            font-size: 1.1rem;
-            line-height: 1.35;
-            font-weight: 600;
-        }}
-
-        .pcr-problem-card p {{
-            margin: 0;
-            color: rgba(246, 250, 252, 0.72);
-            font-size: 0.92rem;
-            line-height: 1.58;
-        }}
-
-        .pcr-flow-grid {{
-            display: grid;
-            grid-template-columns: repeat(6, minmax(0, 1fr));
-            gap: 0;
-            margin: 1rem 0 2rem 0;
-        }}
-
-        .pcr-flow-card {{
-            position: relative;
-            min-height: 15rem;
-            border: 1px solid var(--pcr-border);
-            border-radius: 4px;
-            padding: 2rem 1.25rem;
-            background: #FFFFFF;
-            box-shadow: none;
-            text-align: center;
-        }}
-
-        .pcr-flow-card:hover {{
-            border-color: var(--pcr-diagnostic-blue);
-        }}
-
-        .pcr-flow-index {{
-            width: 2.5rem;
-            height: 2.5rem;
-            margin: 0 auto 1rem auto;
-            border: 0;
-            border-radius: 50%;
-            background: var(--pcr-accent-tint);
-            color: var(--pcr-diagnostic-blue);
-            font-family: "IBM Plex Mono", Consolas, monospace;
-            font-size: 0.9rem;
-            font-weight: 400;
-        }}
-
-        .pcr-flow-card h3 {{
-            margin: 0 0 0.55rem 0;
-            color: var(--pcr-ink);
-            font-size: 1rem;
-            line-height: 1.35;
-            font-weight: 600;
-        }}
-
-        .pcr-flow-card p {{
-            margin: 0;
-            color: var(--pcr-muted);
-            font-size: 0.82rem;
-            line-height: 1.5;
-        }}
-
-        .pcr-flow-connector {{
-            position: absolute;
-            right: -1px;
-            top: 50%;
-            width: 2px;
-            height: 2rem;
-            background: var(--pcr-border);
-            transform: translateY(-50%);
-        }}
-
-        .pcr-flow-connector::after {{
-            content: "";
-            position: absolute;
-            right: -5px;
-            top: 50%;
-            width: 0;
-            height: 0;
-            border-left: 6px solid var(--pcr-border);
-            border-top: 4px solid transparent;
-            border-bottom: 4px solid transparent;
-            transform: translateY(-50%);
-        }}
-
-        .pcr-capability-grid {{
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 5rem;
-        }}
-
-        .pcr-capability-card {{
-            min-height: 17rem;
-            border: 1px solid var(--pcr-border);
-            border-radius: 4px;
-            padding: 2rem;
-            background: #FFFFFF;
-        }}
-
-        .pcr-capability-card:hover {{
-            border-color: var(--pcr-diagnostic-blue);
-        }}
-
-        .pcr-capability-icon {{
-            width: 3rem;
-            height: 3rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.25rem;
-            border-radius: 4px;
-            font-family: "IBM Plex Mono", Consolas, monospace;
-            font-size: 0.9rem;
-        }}
-
-        .pcr-capability-icon.blue {{
-            background: var(--pcr-accent-tint);
-            color: var(--pcr-diagnostic-blue);
-        }}
-
-        .pcr-capability-icon.cyan {{
-            background: var(--pcr-domain-muted);
-            color: var(--pcr-gel-cyan);
-        }}
-
-        .pcr-capability-card h3 {{
-            margin: 0 0 0.75rem 0;
-            color: var(--pcr-ink);
-            font-size: 1.12rem;
-            font-weight: 600;
-        }}
-
-        .pcr-capability-card p {{
-            margin: 0;
-            color: var(--pcr-muted);
-            font-size: 0.92rem;
-            line-height: 1.6;
-        }}
-
-        .pcr-home-footer {{
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1.2fr;
-            gap: 3rem;
-            margin-top: 3.5rem;
-            padding: 3rem 2rem;
-            border-radius: 0;
-            background: var(--pcr-lab-blue);
-            color: #F6FAFC;
-        }}
-
-        .pcr-home-footer h3 {{
-            margin: 0 0 0.5rem 0;
-            color: #F6FAFC;
-            font-size: 1rem;
-            font-weight: 600;
-        }}
-
-        .pcr-home-footer p {{
-            margin: 0;
-            color: rgba(246, 250, 252, 0.58);
-            font-size: 0.88rem;
-            line-height: 1.55;
-        }}
-
-        .pcr-footer-label {{
-            display: block;
-            margin-bottom: 1rem;
-            color: rgba(246, 250, 252, 0.48);
-            font-size: 0.76rem;
-            font-weight: 600;
-        }}
-
-        .pcr-footer-status {{
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.55rem;
-            color: rgba(246, 250, 252, 0.78);
-            font-size: 0.88rem;
-        }}
-
-        .pcr-footer-status i {{
-            width: 0.38rem;
-            height: 0.38rem;
-            border-radius: 50%;
-            background: #6F6F6F;
-        }}
-
-        .pcr-footer-status i.open {{
-            background: #24A148;
-        }}
-
-        .pcr-footer-status i.current {{
-            background: var(--pcr-gel-cyan);
-            box-shadow: 0 0 0 3px rgba(14, 165, 183, 0.18);
-        }}
-
-        @media (max-width: 768px) {{
-            .main .block-container {{
-                max-width: 100vw;
-                padding-left: 0;
-                padding-right: 0;
-            }}
-
-            .pcr-home-hero {{
-                grid-template-columns: 1fr;
-                min-height: auto;
-                padding: 4rem 1rem 3rem 1rem;
-            }}
-
-            .pcr-home-hero h1 {{
-                font-size: 2.15rem;
-            }}
-
-            .pcr-home-hero-content {{
-                padding-left: 0;
-            }}
-
-            .pcr-gel-panel {{
-                min-height: 20rem;
-            }}
-
-            .pcr-gel-grid {{
-                height: 100%;
-            }}
-
-            .pcr-hero {{
-                min-height: 8.8rem;
-                padding: 1.1rem;
-            }}
-
-            .pcr-hero::after {{
-                width: 52%;
-                opacity: 0.34;
-            }}
-
-            .pcr-status-strip,
-            .pcr-readiness-grid,
-            .pcr-home-status-grid {{
-                grid-template-columns: 1fr;
-            }}
-
-            .pcr-problem-grid,
-            .pcr-capability-grid,
-            .pcr-home-footer {{
-                grid-template-columns: 1fr;
-            }}
-
-            .pcr-stepper-grid {{
-                display: none;
-            }}
-
-            .pcr-flow-grid {{
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }}
-
-            .pcr-flow-card {{
-                min-height: auto;
-            }}
-
-            .pcr-flow-connector,
-            .pcr-flow-arrow {{
-                display: none;
-            }}
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """所有角色共享同一视觉体系，theme 保留原调用兼容性。"""
+    apply_design_system()
 
 
 def render_page_hero(title, subtitle, role_label):
@@ -2293,7 +502,7 @@ def run_rules_library_check():
             build_normalized_case({"abnormality": abn}).get("abnormality")
             for abn in ABNORMALITY_OPTIONS
         }
-        allowed_values = set(ABNORMALITY_OPTIONS) | {value for value in normalized_options if value}
+        allowed_values = set(ABNORMALITY_OPTIONS) | {value for value in normalized_options if value} | {"any"}
         for abn in ABNORMALITY_OPTIONS:
             normalized_abn = build_normalized_case({"abnormality": abn}).get("abnormality")
             if int(((abn_series == abn) | (abn_series == normalized_abn)).sum()) == 0:
@@ -2384,7 +593,13 @@ def init_database():
             gel_image_path TEXT,
             teacher_final_cause TEXT,
             teacher_note TEXT,
-            teacher_confirm_time TEXT
+            teacher_confirm_time TEXT,
+            followup_json TEXT,
+            student_initial_hypothesis TEXT,
+            student_access_hash TEXT,
+            student_revised_cause TEXT,
+            student_revision_reason TEXT,
+            student_revision_time TEXT
         )
     """)
 
@@ -2399,6 +614,14 @@ def init_database():
         cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN teacher_confirm_time TEXT")
     if "gel_image_path" not in existing_cols:
         cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN gel_image_path TEXT")
+    if "followup_json" not in existing_cols:
+        cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN followup_json TEXT")
+    for column in (
+        "student_initial_hypothesis", "student_access_hash", "student_revised_cause",
+        "student_revision_reason", "student_revision_time",
+    ):
+        if column not in existing_cols:
+            cursor.execute(f"ALTER TABLE diagnosis_records ADD COLUMN {column} TEXT")
 
     conn.commit()
     conn.close()
@@ -2406,7 +629,9 @@ def init_database():
 
 def save_diagnosis_record(abnormality, template_amount, annealing_temp, cycles,
                           positive_control_normal, negative_control_band,
-                          description, diagnosis_result, gel_image_path=None):
+                          description, diagnosis_result, gel_image_path=None,
+                          student_initial_hypothesis=None, student_access_code=None,
+                          initial_results=None):
     """保存诊断记录到数据库"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -2414,8 +639,9 @@ def save_diagnosis_record(abnormality, template_amount, annealing_temp, cycles,
         INSERT INTO diagnosis_records 
         (abnormality, template_amount, annealing_temp, cycles, 
          positive_control_normal, negative_control_band, description, 
-         diagnosis_result, diagnosis_time, gel_image_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         diagnosis_result, diagnosis_time, gel_image_path,
+         student_initial_hypothesis, student_access_hash, followup_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         abnormality,
         template_amount,
@@ -2426,7 +652,10 @@ def save_diagnosis_record(abnormality, template_amount, annealing_temp, cycles,
         description,
         diagnosis_result,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        gel_image_path
+        gel_image_path,
+        (student_initial_hypothesis or "").strip(),
+        hashlib.sha256(student_access_code.encode("utf-8")).hexdigest() if student_access_code else None,
+        json.dumps({"initial_results": initial_results}, ensure_ascii=False) if initial_results else None,
     ))
     # 返回本次写入记录ID，后续教师确认可复用同一条记录
     record_id = cursor.lastrowid
@@ -2451,6 +680,79 @@ def save_teacher_confirmation(record_id, teacher_final_cause, teacher_note):
     ))
     conn.commit()
     conn.close()
+
+
+def save_followup_reassessment(record_id, diagnosis_result, positive_control_normal,
+                               negative_control_band, followup_data):
+    """将补证后的排序和完整追问记录写回同一案例。"""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cursor = conn.execute("""
+            UPDATE diagnosis_records
+            SET diagnosis_result = ?, positive_control_normal = ?,
+                negative_control_band = ?, followup_json = ?
+            WHERE id = ? AND (teacher_final_cause IS NULL OR TRIM(teacher_final_cause) = '')
+        """, (
+            diagnosis_result,
+            positive_control_normal,
+            negative_control_band,
+            json.dumps(followup_data, ensure_ascii=False),
+            record_id,
+        ))
+        conn.commit()
+        return cursor.rowcount == 1
+    finally:
+        conn.close()
+
+
+def parse_followup_data(value):
+    try:
+        result = json.loads(value or "{}")
+        return result if isinstance(result, dict) else {}
+    except (TypeError, ValueError):
+        return {}
+
+
+def load_student_record(access_code):
+    """凭私有查询码读取案例；数据库只保存查询码摘要。"""
+    code = str(access_code or "").strip()
+    if not code:
+        return None
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM diagnosis_records WHERE student_access_hash = ?",
+            (hashlib.sha256(code.encode("utf-8")).hexdigest(),),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def save_student_revision(record_id, access_code, revised_cause, revision_reason):
+    """教师确认后允许学生提交一次有依据的修订。"""
+    cause = str(revised_cause or "").strip()
+    reason = str(revision_reason or "").strip()
+    code = str(access_code or "").strip()
+    if not (record_id and code and cause and reason):
+        return False
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cursor = conn.execute("""
+            UPDATE diagnosis_records
+            SET student_revised_cause = ?, student_revision_reason = ?, student_revision_time = ?
+            WHERE id = ? AND student_access_hash = ?
+              AND teacher_final_cause IS NOT NULL AND TRIM(teacher_final_cause) != ''
+              AND (student_revision_time IS NULL OR TRIM(student_revision_time) = '')
+        """, (
+            cause, reason, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            record_id, hashlib.sha256(code.encode("utf-8")).hexdigest(),
+        ))
+        conn.commit()
+        return cursor.rowcount == 1
+    finally:
+        conn.close()
 
 
 def save_uploaded_image(uploaded_file):
@@ -2564,22 +866,29 @@ def mask_api_key(api_key):
     return f"{key[:6]}***{key[-4:]}"
 
 
+def filter_confirmed_description(description):
+    """猜测、提问和否定语句不能作为已证实的规则线索。"""
+    clauses = re.split(r"[。；;，,！？!?\n]+", str(description or ""))
+    uncertain = re.compile(r"怀疑|疑似|可能|也许|或许|估计|猜测|不确定|是否|是不是|会不会|推测|待确认|需确认|尚未确认|未确认|排除|不是|并非|未见|没有污染|没有漏加")
+    return "。".join(clause.strip() for clause in clauses if clause.strip() and not uncertain.search(clause))
+
+
 def extract_text_clues(description):
     """
     从学生补充描述中提取简单文本线索（关键词规则法）
     这是一个“伪 AI 抽取器”，用于先打通自由文本参与诊断的链路
     """
-    text = str(description or "").strip().lower()
+    text = filter_confirmed_description(description).lower()
     if not text:
         return []
 
     # 每类线索对应一组关键词（命中任意一个即可）
     clue_rules = {
-        "污染": ["污染", "contam", "杂带", "阴性对照有带"],
-        "模板量不足": ["模板量不足", "模板少", "模板浓度低", "模板太少", "上样少"],
+        "污染": ["污染", "contam"],
+        "模板量不足": ["模板量不足", "模板少", "模板浓度低", "模板太少"],
         "引物问题": ["引物问题", "引物失效", "引物降解", "primer"],
         "PCR体系问题": ["体系漏加", "pcr体系问题", "体系问题", "漏加试剂", "漏加"],
-        "退火温度问题": ["退火温度问题", "温度过高", "温度过低", "退火温度过高", "退火温度过低", "退火高", "退火低", "太高", "太低"],
+        "退火温度问题": ["退火温度问题", "退火温度过高", "退火温度过低", "退火高", "退火低"],
     }
 
     clues = []
@@ -2675,7 +984,10 @@ def extract_text_clues_with_bigmodel(description, api_key, base_url, model):
         return None, debug
 
     try:
-        text = str(description or "").strip()
+        text = filter_confirmed_description(description).strip()
+        if not text:
+            debug["fail_reason"] = "描述中没有可确认的事实线索"
+            return [], debug
         debug["bigmodel_called"] = True
 
         client = OpenAI(
@@ -2693,6 +1005,7 @@ def extract_text_clues_with_bigmodel(description, api_key, base_url, model):
                         "你是PCR诊断文本线索抽取器。"
                         "只允许从以下标签中选择并输出："
                         "污染, 模板量不足, 引物问题, PCR体系问题, 退火温度问题。"
+                        "只提取明确观察或核实的事实，不把猜测、提问、否定陈述或模型推断当成证据。"
                         "必须只输出一个JSON数组，不要输出任何其他文字。"
                     ),
                 },
@@ -2813,32 +1126,34 @@ def calculate_score(rule, abnormality, template_amount, annealing_temp, cycles,
     base_score = safe_to_float(rule.get('score', 0), 0)
     score = base_score
 
-    # 3. 阳性对照命中加分（any 视为可命中）
+    # 3. 后备规则仅对明确匹配的条件加分；any 不构成证据。
     rule_positive = normalize_yes_no(rule.get('positive_control_normal', 'any'))
     user_positive = normalize_yes_no(positive_control_normal)
-    positive_hit = (rule_positive == "any" or rule_positive == user_positive)
+    positive_hit = rule_positive != "any" and rule_positive == user_positive
     positive_add = 10 if positive_hit else 0
     score += positive_add
 
-    # 4. 阴性对照命中加分（any 视为可命中）
+    # 4. 阴性对照
     rule_negative = normalize_yes_no(rule.get('negative_control_band', 'any'))
     user_negative = normalize_yes_no(negative_control_band)
-    negative_hit = (rule_negative == "any" or rule_negative == user_negative)
+    negative_hit = rule_negative != "any" and rule_negative == user_negative
     negative_add = 10 if negative_hit else 0
     score += negative_add
 
     # 5. 模板量在范围内加分
-    template_hit = check_in_range(template_amount, rule.get('min_template', 'any'), rule.get('max_template', 'any'))
+    # 加入体积不是 DNA 输入量；旧表的体积阈值不再作为模板量证据。
+    template_hit = False
     template_add = 8 if template_hit else 0
     score += template_add
 
     # 6. 退火温度在范围内加分
-    temp_hit = check_in_range(annealing_temp, rule.get('min_temp', 'any'), rule.get('max_temp', 'any'))
+    # 绝对温度需结合引物 Tm 与酶说明，旧表阈值不用于定性。
+    temp_hit = False
     temp_add = 8 if temp_hit else 0
     score += temp_add
 
     # 7. 循环数在范围内加分（保留现有字段能力）
-    cycles_hit = check_in_range(cycles, rule.get('min_cycles', 'any'), rule.get('max_cycles', 'any'))
+    cycles_hit = False
     cycles_add = 4 if cycles_hit else 0
     score += cycles_add
 
@@ -2867,7 +1182,9 @@ def calculate_score(rule, abnormality, template_amount, annealing_temp, cycles,
 
 
 def diagnose(abnormality, template_amount, annealing_temp, cycles,
-             positive_control_normal, negative_control_band, description=""):
+             positive_control_normal, negative_control_band, description="",
+             extra_text_hints=None, negative_control_detail=None, band_pattern=None,
+             positive_control_detail=None):
     """
     诊断函数：根据输入的实验参数，返回可能的异常原因
     """
@@ -2878,10 +1195,11 @@ def diagnose(abnormality, template_amount, annealing_temp, cycles,
         "template_amount": template_amount,
         "annealing_temp": annealing_temp,
         "cycles": cycles,
-        "positive_control_normal": positive_control_normal,
-        "negative_control_band": negative_control_band,
+        "positive_control_normal": positive_control_detail or positive_control_normal,
+        "negative_control_band": negative_control_detail or negative_control_band,
         "description": description,
-        "text_clues": text_clues,
+        "text_clues": list(text_clues) + list(extra_text_hints or []),
+        "band_pattern": band_pattern,
     })
     try:
         api_debug["rules_v2_eval"] = evaluate_rules_v2(api_debug["normalized_case"])
@@ -3233,7 +1551,9 @@ def detect_missing_key_info(context):
     if is_missing_value(context.get("退火温度")):
         missing_items.append("未提供退火温度或程序设置相关信息")
     if is_missing_value(context.get("模板量")):
-        missing_items.append("未提供模板浓度或模板用量相关信息")
+        missing_items.append("未提供模板加入体积、浓度及反应总体积")
+    else:
+        missing_items.append("已记录模板加入体积；还需模板浓度与反应总体积才能判断输入量高低")
     if is_missing_value(context.get("学生补充描述")):
         missing_items.append("未提供学生补充描述")
     if not context.get("是否上传图片"):
@@ -3250,6 +1570,10 @@ def compute_confidence_level(ranked_results, detail=None, context=None):
 
     if not ranked_results:
         return "未知", "缺少可用的诊断结果，暂无法判断。"
+
+    top1_reason = str(ranked_results[0].get("原因") or "")
+    if any(word in top1_reason for word in ("待核查", "待区分", "需核对", "原因待", "记录矛盾", "对照失败", "对照异常")):
+        return "低", "当前结果是待核查的现象归类或记录矛盾，需补证后再判断具体原因。"
 
     top1_score = safe_to_float(ranked_results[0].get("总分"), None)
     top2_score = safe_to_float(ranked_results[1].get("总分"), None) if len(ranked_results) > 1 else None
@@ -3293,7 +1617,7 @@ def build_evidence_summary(top1_reason, detail=None, context=None):
     positive_detail = detail.get("阳性对照", {}) or {}
     if positive_value and positive_value != "-":
         if positive_value == "否":
-            evidence_points.append("阳性对照异常，说明扩增体系或程序设置存在异常的可能性较高。")
+            evidence_points.append("阳性对照异常；需先区分完全无带与弱带，再检查阳性模板、反应体系和程序。")
         elif positive_detail.get("命中") or safe_to_float(positive_detail.get("加分"), 0) > 0:
             evidence_points.append("阳性对照结果已纳入判断，可帮助区分是体系问题还是样本本身问题。")
 
@@ -3301,32 +1625,28 @@ def build_evidence_summary(top1_reason, detail=None, context=None):
     negative_detail = detail.get("阴性对照", {}) or {}
     if negative_value and negative_value != "-":
         if negative_value == "是":
-            evidence_points.append("阴性对照出现条带，提示存在污染风险，需重点关注体系污染或交叉污染。")
+            evidence_points.append("阴性对照有带；需比较条带与目标片段的位置，区分目标大小带与短片段伪产物。")
         elif negative_detail.get("命中") or safe_to_float(negative_detail.get("加分"), 0) > 0:
-            evidence_points.append("阴性对照未见异常条带，有助于排除明显污染导致的干扰。")
+            evidence_points.append("本次阴性对照未见条带，可作为判断背景扩增的对照信息。")
 
     template_value = context.get("模板量")
-    template_detail = detail.get("模板量范围", {}) or {}
     if not is_missing_value(template_value):
-        if template_detail.get("命中") or safe_to_float(template_detail.get("加分"), 0) > 0:
-            evidence_points.append(f"当前模板量为 {template_value} μL，落在该候选原因重点关注的模板量区间。")
-        elif "模板" in str(top1_reason):
-            evidence_points.append(f"当前模板量为 {template_value} μL，是判断模板相关异常的重要依据。")
+        evidence_points.append(f"模板加入体积为 {template_value} μL；单凭体积不能判断 DNA 输入量是否过高或过低。")
 
     annealing_value = context.get("退火温度")
     temp_detail = detail.get("退火温度范围", {}) or {}
     if not is_missing_value(annealing_value):
         if temp_detail.get("命中") or safe_to_float(temp_detail.get("加分"), 0) > 0:
-            evidence_points.append(f"当前退火温度为 {annealing_value}℃，与该候选原因的温度条件相匹配。")
+            evidence_points.append(f"当前退火温度为 {annealing_value}℃；温度高低应与该引物及聚合酶推荐条件比较。")
         elif "退火温度" in str(top1_reason):
-            evidence_points.append(f"当前退火温度为 {annealing_value}℃，是判断温度相关问题的重要参考。")
+            evidence_points.append(f"当前退火温度为 {annealing_value}℃，仍需与推荐条件比较后才能判断偏高或偏低。")
 
     text_section = detail.get("文本线索", {}) or {}
     hit_clues = text_section.get("命中线索", []) or []
     extracted_clues = text_section.get("抽取线索", []) or []
     context_clues = context.get("文本线索", []) or []
     if hit_clues:
-        evidence_points.append(f"学生补充描述中提到“{'、'.join(hit_clues)}”等线索，直接支持当前 Top1 判断。")
+        evidence_points.append(f"描述中提到“{'、'.join(hit_clues)}”等线索，仍需结合实验记录核实。")
     elif extracted_clues:
         evidence_points.append(f"系统从描述中抽取到“{'、'.join(extracted_clues)}”等线索，帮助缩小了候选范围。")
     elif context_clues:
@@ -3395,7 +1715,7 @@ def render_diagnosis_quality_block(
         st.markdown(f"**{title}**")
         metric_cols = st.columns(2)
         metric_cols[0].metric("置信度", confidence_level)
-        metric_cols[1].markdown(f"**判断说明：**{confidence_reason}")
+        metric_cols[1].markdown(f"**判断说明**\n\n{confidence_reason}")
 
         st.markdown("**系统主要依据如下：**")
         if evidence_points:
@@ -3430,6 +1750,7 @@ def load_recent_records(limit=10):
     for row in rows:
         data = dict(row)
         diagnosis_result = data.get("diagnosis_result", "")
+        followup_data = parse_followup_data(data.get("followup_json"))
 
         # 学生补充描述过长时截断，避免摘要区过长
         desc_full = str(data.get("description") or "").strip()
@@ -3439,15 +1760,19 @@ def load_recent_records(limit=10):
 
         # 历史“抽取线索”如果库里没存，就根据学生描述现算一次（不改库结构）
         text_clues = extract_text_clues(desc_full)
+        extra_hints = followup_data.get("extra_hints", [])
+        if not isinstance(extra_hints, list):
+            extra_hints = []
         normalized_info = explain_normalized_case({
             "abnormality": data.get("abnormality"),
             "template_amount": data.get("template_amount"),
             "annealing_temp": data.get("annealing_temp"),
             "cycles": data.get("cycles"),
-            "positive_control_normal": data.get("positive_control_normal"),
-            "negative_control_band": data.get("negative_control_band"),
+            "positive_control_normal": followup_data.get("positive_control_detail") or data.get("positive_control_normal"),
+            "negative_control_band": followup_data.get("negative_control_detail") or data.get("negative_control_band"),
             "description": desc_full,
-            "text_clues": text_clues,
+            "text_clues": text_clues + extra_hints,
+            "band_pattern": followup_data.get("band_pattern"),
         })
         normalized_case = normalized_info.get("normalized_case", {})
         rules_v2_eval = {}
@@ -3465,7 +1790,19 @@ def load_recent_records(limit=10):
         except Exception:
             rules_v2_eval = {}
 
-        top_results = primary_bundle.get("results", []) or []
+        stored_results = followup_data.get("final_results") or followup_data.get("initial_results")
+        if isinstance(stored_results, list) and stored_results:
+            top_results = stored_results
+            primary_bundle = {
+                "top1_reason": top_results[0].get("原因", ""),
+                "top1_score": top_results[0].get("总分"),
+                "candidate_texts": [
+                    f"{index}. {item.get('原因', '未知')} (总分:{item.get('总分', '-')})"
+                    for index, item in enumerate(top_results, 1)
+                ],
+            }
+        else:
+            top_results = primary_bundle.get("results", []) or []
         if top_results:
             top1_reason = primary_bundle.get("top1_reason", "")
             top1_score = primary_bundle.get("top1_score")
@@ -3497,9 +1834,14 @@ def load_recent_records(limit=10):
             "教师最终原因": data.get("teacher_final_cause") if data.get("teacher_final_cause") else "未确认",
             "教师备注": data.get("teacher_note") if data.get("teacher_note") else "-",
             "教师确认时间": data.get("teacher_confirm_time") if data.get("teacher_confirm_time") else "-",
+            "学生初判": data.get("student_initial_hypothesis") or "-",
+            "学生修订原因": data.get("student_revised_cause") or "-",
+            "学生修订依据": data.get("student_revision_reason") or "-",
+            "学生修订时间": data.get("student_revision_time") or "-",
             "凝胶图路径": gel_image_path if gel_image_path else "",
             "凝胶图": "有图" if has_image else "无图",
             "normalized_case": normalized_case,
+            "followup_data": followup_data,
         })
 
     return records
@@ -3642,6 +1984,7 @@ def build_case_review_report(payload):
     payload = payload or {}
     record_id = payload.get("record_id")
     db_record = load_record_by_id(record_id) or {}
+    followup_data = parse_followup_data(db_record.get("followup_json")) or payload.get("followup_data", {})
 
     submit_time = db_record.get("diagnosis_time") or payload.get("submit_time")
     abnormality = db_record.get("abnormality") or payload.get("abnormality")
@@ -3657,13 +2000,17 @@ def build_case_review_report(payload):
     teacher_final = db_record.get("teacher_final_cause")
     teacher_note = db_record.get("teacher_note")
     teacher_confirm_time = db_record.get("teacher_confirm_time")
+    student_initial = db_record.get("student_initial_hypothesis") or payload.get("student_initial_hypothesis")
+    student_revised = db_record.get("student_revised_cause")
+    student_revision_reason = db_record.get("student_revision_reason")
+    student_revision_time = db_record.get("student_revision_time")
     current_status = "已确认" if not is_missing_value(teacher_final) else "未确认"
 
     diagnosis_result = db_record.get("diagnosis_result", "")
     text_clues = payload.get("text_clues")
     if not text_clues and str(description or "").strip():
         text_clues = extract_text_clues(description)
-    text_clues = text_clues or []
+    text_clues = list(dict.fromkeys((text_clues or []) + followup_data.get("extra_hints", [])))
 
     rules_v2_eval = {}
     primary_bundle = {
@@ -3679,10 +2026,11 @@ def build_case_review_report(payload):
             "template_amount": template_amount,
             "annealing_temp": annealing_temp,
             "cycles": cycles,
-            "positive_control_normal": positive_control,
-            "negative_control_band": negative_control,
+            "positive_control_normal": followup_data.get("positive_control_detail") or positive_control,
+            "negative_control_band": followup_data.get("negative_control_detail") or negative_control,
             "description": description,
             "text_clues": text_clues,
+            "band_pattern": followup_data.get("band_pattern"),
         })
         rules_v2_eval = evaluate_rules_v2(normalized_case)
         if rules_v2_eval.get("status") == "ok" and rules_v2_eval.get("top1"):
@@ -3690,7 +2038,8 @@ def build_case_review_report(payload):
     except Exception:
         rules_v2_eval = {}
 
-    top_results = primary_bundle.get("results", []) or []
+    stored_results = followup_data.get("final_results") or followup_data.get("initial_results")
+    top_results = stored_results if isinstance(stored_results, list) and stored_results else primary_bundle.get("results", []) or []
     candidate_texts = primary_bundle.get("candidate_texts", []) or parse_all_candidates(diagnosis_result)
     ranked_results = build_ranked_results(top_results=top_results, candidate_texts=candidate_texts)
     if not ranked_results:
@@ -3709,7 +2058,7 @@ def build_case_review_report(payload):
         template_amount=template_amount,
         annealing_temp=annealing_temp,
         cycles=cycles,
-        description=description or "",
+        description=description or followup_data.get("answers", {}).get("operation", ""),
         text_clues=text_clues,
         gel_image_path=image_path,
         has_image=has_image,
@@ -3788,6 +2137,19 @@ def build_case_review_report(payload):
         evidence_section_lines.append("当前记录未保存完整打分明细，暂无更详细的关键证据可展示。")
     append_report_section(lines, "四、诊断依据 / 关键证据", evidence_section_lines)
 
+    if followup_data.get("final_results"):
+        first = followup_data.get("initial_results", [])
+        later = followup_data.get("final_results", [])
+        followup_lines = [
+            f"初判 Top1：{first[0].get('原因', '未识别') if first else '未识别'}",
+            f"补证后 Top1：{later[0].get('原因', '未识别') if later else '未识别'}",
+        ]
+        for question in followup_data.get("questions", []):
+            answer = followup_data.get("answers", {}).get(question.get("id"), "未补充")
+            followup_lines.append(f"追问：{question.get('text', '')}；回答：{answer or '未补充'}")
+        followup_lines.append(f"学生确认的操作线索：{normalize_report_value(followup_data.get('extra_hints', []), '无')}")
+        append_report_section(lines, "追问补证与再判断", followup_lines)
+
     teacher_review_lines = [
         f"教师最终确认原因：{normalize_report_value(teacher_final, '未确认')}",
         f"教师备注：{normalize_report_value(teacher_note)}",
@@ -3800,6 +2162,21 @@ def build_case_review_report(payload):
         teacher_review_lines.append(f"一致性状态：{consistency_status}")
         teacher_review_lines.append(f"对比说明：{feedback_summary}")
     append_report_section(lines, "五、教师复核结果", teacher_review_lines)
+
+    if student_initial:
+        learning_lines = [f"学生诊断前判断：{normalize_report_value(student_initial)}"]
+        if student_revised:
+            learning_lines.extend([
+                f"教师反馈后修订原因：{normalize_report_value(student_revised)}",
+                f"修订依据：{normalize_report_value(student_revision_reason)}",
+                f"修订时间：{normalize_report_value(student_revision_time)}",
+            ])
+        else:
+            learning_lines.append(
+                "教师反馈后修订：待教师复核。" if current_status == "未确认"
+                else "教师反馈后修订：尚未提交。"
+            )
+        append_report_section(lines, "学生判断与修订", learning_lines)
 
     append_report_section(
         lines,

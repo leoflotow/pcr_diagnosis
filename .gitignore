@@ -61,6 +61,7 @@ config/
 .streamlit/secrets.toml
 .streamlit/*.toml
 !.streamlit/secrets.toml.example
+!.streamlit/config.toml
 .claude/
 CLAUDE.md
 .python-3.10.11-installer.exe
