@@ -81,6 +81,8 @@ html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
 .st-key-pcr_app_navigation { border-bottom: 1px solid var(--ds-border); padding: 0 0 var(--ds-2); margin-bottom: 0; }
 .ds-brand { font-size: var(--ds-h3); font-weight: 700; line-height: 1.4; letter-spacing: -.3px; }
 .ds-brand span { color: var(--ds-primary); }
+.ds-brand-subtitle { font-size: var(--ds-sm); color: var(--ds-muted); line-height: 1.6; }
+.ds-module-label { font-size: var(--ds-sm); color: var(--ds-primary); line-height: 1.6; }
 .st-key-pcr_app_navigation [data-testid="stHorizontalBlock"] { gap: var(--ds-2); }
 .st-key-pcr_app_navigation button[kind] { border: none; border-radius: 0; padding: var(--ds-2) var(--ds-1); white-space: nowrap; }
 .st-key-pcr_app_navigation button[kind="primary"] { color: var(--ds-primary); background: transparent; border-bottom: 3px solid var(--ds-primary); }

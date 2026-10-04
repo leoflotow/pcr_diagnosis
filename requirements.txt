@@ -1,6 +1,6 @@
-streamlit
-pandas
-altair
-openai
-python-dotenv
-pillow
+streamlit==1.57.0
+pandas==3.0.3
+altair==6.1.0
+openai==2.38.0
+python-dotenv==1.2.2
+pillow==12.2.0

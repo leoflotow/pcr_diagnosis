@@ -23,7 +23,8 @@ def _model_client():
     return OpenAI(
         api_key=key,
         base_url=os.getenv("BIGMODEL_BASE_URL", "").strip() or MODEL_BASE_URL,
-        timeout=20,
+        timeout=8,
+        max_retries=0,
     )
 
 
@@ -45,7 +46,7 @@ def _base_questions(case, results=None):
     candidate_causes = "、".join(str(item.get("原因", "")) for item in (results or [])[:3])
     questions = []
 
-    if (abnormality == "阳性对照无带" or positive == "否"
+    if (abnormality == "阳性对照无带" or positive in {"否", "未观察", "未设置", "无法确认"}
             or abnormality in {"无条带", "条带弱"}
             or ("PCR体系" in candidate_causes and "模板" in candidate_causes)):
         questions.append({
@@ -55,7 +56,7 @@ def _base_questions(case, results=None):
             "options": ["正常清晰", "完全无带", "明显弱带", "暂无法确认"],
         })
 
-    if negative == "是" or abnormality == "阴性对照有带" or "污染" in candidate_causes:
+    if negative in {"是", "未观察", "未设置", "无法确认"} or abnormality == "阴性对照有带" or "污染" in candidate_causes:
         questions.append({
             "id": "negative_control", "kind": "choice",
             "text": "请对照 Marker 核对阴性对照泳道：条带位于什么位置？",
@@ -76,12 +77,15 @@ def _base_questions(case, results=None):
         "text": "回想配液、加样和电泳过程：有无实际发生的漏加、枪头混用、模板异常或上样问题？请只写观察到或确认过的情况。",
         "reason": "操作过程中的具体事实可补足参数和对照结果无法反映的线索。",
     })
-    return questions[:MAX_QUESTIONS]
+    # 最多三个观察问题；操作说明始终保留为可选补证入口。
+    return questions[:-1][:MAX_QUESTIONS] + questions[-1:]
 
 
 def plan_followup_questions(case, results=None):
     """问题主题与选项由程序限定；模型只能润色问句，不能修改诊断事实。"""
     questions = _base_questions(case, results=results)
+    if case.get("local_mode"):
+        return questions, "本地追问规划"
     client = _model_client()
     if client is None:
         return questions, "本地追问规划"
@@ -116,12 +120,12 @@ def plan_followup_questions(case, results=None):
         return questions, "本地追问规划"
 
 
-def interpret_operation_text(text):
+def interpret_operation_text(text, local_mode=False):
     """模型只提出候选标签，必须由学生确认后才进入规则引擎。"""
     description = str(text or "").strip()
     if not description:
         return [], "未填写操作描述"
-    client = _model_client()
+    client = None if local_mode else _model_client()
     if client is None:
         return [], "手动确认线索"
     try:

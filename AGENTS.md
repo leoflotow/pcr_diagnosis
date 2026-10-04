@@ -1,70 +1,37 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+## 项目与边界
 
-## Project Overview
+生物实验智析助手，Streamlit 教学应用。副标题：面向本科生物实验教学的智能复盘工具。当前模块：PCR 与电泳实验复盘。独立初判→补证→教师复核→学生修订→验证计划。当前参赛方向为 AI+高等教育—AI+教学，无真实课堂效果材料，勿编造成效。小程序和网页部署暂不实施。
 
-PCR电泳异常智能诊断助手 — a Streamlit multi-page app for classroom demonstration. Students input PCR experiment parameters and observations, the system diagnoses likely causes using a rule-based scoring engine with optional AI text extraction (BigModel/智谱 API). Teachers can review and confirm diagnoses.
+## 运行与验证
 
-## Running the App
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run (access at http://localhost:8501)
-streamlit run app.py
+```powershell
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+python demo_runner.py
+python -m unittest discover -s tests -v
 ```
 
-Environment variables (in `.env` or shell):
-- `BIGMODEL_API_KEY` — required for AI text extraction; system falls back to local keyword matching if unset
-- `BIGMODEL_BASE_URL` — defaults to `https://open.bigmodel.cn/api/paas/v4`
-- `BIGMODEL_MODEL` — defaults to `glm-5`
+演示使用 8513 端口、固定独立库 `data/demo/demo.db`。课堂库 `data/app.db` 与 `uploads/` 必须保留。测试用临时库，勿以课堂数据做清理或写入测试。不要读取或打包 `.env`、真实 secrets、数据库和学生照片。
 
-There are no tests, linting, or build steps.
+## 架构与业务约束
 
-## Architecture
+- `app.py` 导航入口；`core.py` 共享业务与报告；每页导入共享模块。
+- `case_storage.py` 迁移、首次升级备份、快照、教师和学生版本历史、验证计划。
+- `evidence_support.py` 事实过滤、精确原因归一化与稳定 ID、规则哈希、参数和阶段计数。
+- `diagnosis_normalization.py` 归一化 8 类现象、分型对照与手动事实线索。
+- `diagnosis_rule_engine_v2.py`：40 条主规则、2 条独立补充证据组合；同原因基础分取最强，不重复计分。`rules_v2.csv` 是保守后备。
+- `followup_agent.py`：最多三个观察问题，另保留操作入口。AI 润色与建议，学生手动确认后影响排序。
+- `course_presets.json`：真实课程条件待补充，不能用模拟值冒充。
+- `pages/` 学生、教师与开发页面；`docs/competition/` 当前参赛材料，根目录旧 DOCX 不作当前口径。
 
-**Streamlit multi-page app** with a shared business logic module:
+历史查看只读快照或保存字符串，不重新诊断、不调用模型。新案例保存原始输入、确认线索、规则版本和初判/补证结果。教师修改反馈升版本，旧记录保留；单纯评分和来源更新不要求学生重复修订。修订须私有查询码及对应版本。
 
-```
-app.py              → Entry point, initializes DB, shows navigation
-core.py             → All shared logic (DB, diagnosis, AI extraction, UI helpers)
-pages/
-  1_学生端.py        → Student workflow: input params → diagnose → view results
-  2_教师端.py        → Teacher workflow: review records → confirm cause → add notes
-  3_开发调试端.py     → Debug: system self-check, API test, rules viewer, data reset
-```
+区分真实课堂、模拟、回归、未标注来源。看板默认真实课堂。人工评价、阶段完成率、教师一致率、能力迁移与复测验证分别表述。图片仅保存及人工泳道标注。体积与绝对温度不证明模板不足或温度异常。
 
-Every page imports from `core.py` — there is no cross-page import.
+保持中文 UI 和注释，精准修改，沿用现有设计。UI 完成须新截图或 DOM 尺寸证据；HTTP 200 或编译不代表视觉通过。
 
-### Diagnosis Pipeline (core.py)
+## API
 
-1. **Load rules** from `rules.csv` via `load_rules()`
-2. **Extract text clues** from free-text description:
-   - Primary: `extract_text_clues_with_bigmodel()` — calls BigModel API using OpenAI-compatible SDK
-   - Fallback: `extract_text_clues_with_fallback()` — local keyword matching
-   - Clues are normalized to 5 labels: 污染 / 模板量不足 / 引物问题 / PCR体系问题 / 退火温度问题
-3. **Score each rule** via `calculate_score()` — additive scoring:
-   - Base score (from `rules.csv`)
-   - +10 per control match (positive control, negative control)
-   - +8 per parameter range match (template amount, annealing temp)
-   - +4 for cycle range match
-   - +5 per text clue hit
-4. **Return top 3** causes via `diagnose()`, saved to SQLite as formatted string
-
-### Data Storage
-
-- **SQLite** at `data/app.db`, table `diagnosis_records` — stores all diagnosis results, teacher confirmations, and image paths
-- **rules.csv** — 22 diagnosis rules; editable to tune diagnostic logic. Required columns listed in `core.py:REQUIRED_RULE_COLUMNS`
-- **uploads/** — saved gel electrophoresis images
-
-### Key Constants in core.py
-
-- `ABNORMALITY_OPTIONS` — the 6 abnormality types shown in the UI
-- `ALLOWED_TEXT_CLUES` — the 5 normalized text clue labels
-- `BIGMODEL_TIMEOUT_SECONDS = 20`, `BIGMODEL_TEMPERATURE = 1.0`
-
-## Language
-
-All UI text, comments, and variable names are in Chinese. Keep new UI text and comments in Chinese to stay consistent.
+`BIGMODEL_API_KEY` 可选，base URL 默认 `https://open.bigmodel.cn/api/paas/v4`，模型 `glm-5`。单次超时 8 秒、重试 0；无接口可本地整理，独立演示禁用接口。课堂教师/调试码来自环境或 secrets；固定演示码只对固定演示路径有效。

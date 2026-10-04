@@ -4,6 +4,7 @@
 """
 
 import streamlit as st
+from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, CURRENT_MODULE
 from ui_design import render_app_navigation
 
 from navigation_state import register_home_page
@@ -211,6 +212,7 @@ def build_workflow_section_html():
         ("04", "追问补证", "核对缺失或矛盾信息，再由规则引擎重新排序原因。"),
         ("05", "教师确认", "教师查看系统判断并确认最终原因。"),
         ("06", "学生修订", "学生查看教师反馈后修订判断，案例保留初判与修订记录。"),
+        ("07", "验证方案", "学生设计变量、对照和预期结果，教师反馈；计划与实际复测分别记录。"),
     ]
     cards = []
     for index, (number, title, desc) in enumerate(steps):
@@ -237,7 +239,7 @@ def build_capability_cards_html():
     items = [
         ("01", "异常信息记录", "支持记录异常现象、阳性/阴性对照、PCR 参数、学生补充描述和凝胶图片。", "blue"),
         ("02", "规则诊断", "基于基础规则与组合规则生成前三项候选原因。", "cyan"),
-        ("03", "诊断依据说明", "展示诊断依据、置信度、证据摘要和缺失信息提示，避免只给结论。", "blue"),
+        ("03", "诊断依据说明", "展示诊断依据、证据支持程度、证据摘要和缺失信息提示，避免只给结论。", "blue"),
         ("04", "教师复核与学生修订", "教师确认原因并反馈；学生凭查询码找回案例、修订判断，教师可查看全过程记录。", "cyan"),
     ]
     cards = []
@@ -309,12 +311,12 @@ def render_home_portal():
     render_home_refined_styles()
 
     st.html(
-        """
+        f"""
         <header class="pcr-ref-topbar">
             <div class="pcr-ref-topbar-inner">
                 <div class="pcr-ref-brand">
                     <div class="pcr-ref-brand-mark" aria-hidden="true"></div>
-                    <div class="pcr-ref-brand-title">PCR-电泳异常智能复盘助手</div>
+                    <div class="pcr-ref-brand-title">{PRODUCT_NAME}</div>
                 </div>
                 <nav class="pcr-ref-nav" aria-label="首页导航">
                     <a href="#problems">问题</a>
@@ -328,13 +330,13 @@ def render_home_portal():
     )
 
     st.html(
-        """
+        f"""
         <div class="pcr-home-hero-refined">
             <div class="pcr-hero-content">
                 <div class="pcr-hero-copy">
-                    <div class="pcr-home-kicker">实验教学诊断</div>
-                    <h1><span>分子生物学实验</span><span>PCR-电泳异常智能复盘助手</span></h1>
-                    <p>面向分子生物学实验教学场景，支持学生初判、追问补证、规则诊断、教师复核与学生修订。</p>
+                    <div class="pcr-home-kicker">当前模块：{CURRENT_MODULE}</div>
+                    <h1><span>{PRODUCT_NAME}</span></h1>
+                    <p>{PRODUCT_SUBTITLE}</p>
                     <div class="pcr-hero-value-strip">
                         <div class="pcr-hero-value-item">
                             <div class="pcr-hero-value-title">结构化记录</div>
@@ -420,7 +422,7 @@ def render_home_portal():
     st.html(
         f"""
         <section class="pcr-section" id="workflow">
-            {build_home_section_title_html("PCR电泳异常诊断流程", "六步流程串起学生初判、追问补证、规则判断、教师复核与学生修订。")}
+            {build_home_section_title_html("实验复盘流程", "七步流程串起学生初判、追问补证、规则判断、教师复核、修订与验证计划。")}
             {build_workflow_section_html()}
         </section>
         """,
@@ -429,7 +431,7 @@ def render_home_portal():
     st.html(
         f"""
         <section class="pcr-section" id="capabilities">
-            {build_home_section_title_html("系统主要功能", "支持诊断依据说明、教师复核和学生反馈后修订。")}
+            {build_home_section_title_html("系统主要功能", "支持诊断依据说明、教师复核、反馈后修订与验证方案。")}
             {build_capability_cards_html()}
         </section>
         """,
@@ -502,7 +504,7 @@ def handle_pending_navigation():
 
 
 def main():
-    ensure_page_config("PCR电泳异常诊断助手")
+    ensure_page_config(PRODUCT_NAME)
     init_database()
     init_access_state()
 
@@ -515,6 +517,9 @@ def main():
         active, lambda: go_home(clear_entries=False), enter_student_role,
         lambda: open_access_entry("teacher"), lambda: open_access_entry("dev"),
     )
+    import os
+    if os.getenv("PCR_DIAGNOSIS_DEMO_MODE") == "1":
+        st.info("参赛本地演示｜全部案例为模拟材料，课堂数据库独立保存，当前不调用 AI 接口。")
     navigator.run()
     render_access_dialog_if_needed()
 

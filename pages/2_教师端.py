@@ -12,6 +12,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 from ui_design import design_color
+from evidence_support import normalize_cause_label, cause_options, parse_json, learning_progress, template_mass_ng
 
 from core import (
     DB_PATH,
@@ -20,6 +21,7 @@ from core import (
     init_access_state,
     init_database,
     load_recent_records,
+    load_case_history,
     parse_all_candidates,
     parse_top1_result,
     render_diagnosis_quality_block,
@@ -156,22 +158,7 @@ def normalize_display_text(value, default="未填写"):
 
 
 def normalize_reason_label(value):
-    """对原因标签做轻量归一化，减少表述差异带来的误判"""
-    text = normalize_text(value)
-    if not text or text in {"-", "未确认", "未填写", "未知"}:
-        return ""
-
-    compact_text = re.sub(r"\s+", "", text).lower()
-    compact_text = re.sub(r"[，。；、,.;（）()\-]", "", compact_text)
-
-    for canonical_label, aliases in REASON_NORMALIZATION_RULES:
-        normalized_aliases = [re.sub(r"\s+", "", alias).lower() for alias in aliases]
-        if compact_text in normalized_aliases:
-            return canonical_label
-        if any(alias in compact_text for alias in normalized_aliases):
-            return canonical_label
-
-    return text.strip()
+    return normalize_cause_label(value)
 
 
 def is_confirmed_cause(value):
@@ -193,7 +180,7 @@ def is_confirmed_cause(value):
         return False
 
     # 4. 核心判定：排除各种未确认的占位符，务必包含 "未知" 以对齐底部列表逻辑
-    return text not in {"", "-", "未确认", "未填写", "未知"}
+    return text not in {"", "-", "未确认", "未填写", "未知"} and bool(normalize_cause_label(text))
 
 
 def parse_dashboard_time(series):
@@ -547,7 +534,7 @@ def load_teacher_dashboard_data():
         df["_class_name"] = pd.Series("", index=df.index, dtype="object")
 
     if teacher_col:
-        df["_confirmed"] = df[teacher_col].apply(is_confirmed_cause)
+        df["_confirmed"] = df[teacher_col].apply(is_confirmed_cause) & (df.get("teacher_evidence_level", pd.Series("", index=df.index)).fillna("") != "原因待核实")
     else:
         df["_confirmed"] = pd.Series(False, index=df.index, dtype="bool")
 
@@ -703,7 +690,7 @@ def build_consistency_dataframe(filtered_df, column_mapping):
     records = []
     for _, row in filtered_df.iterrows():
         teacher_reason_raw = normalize_text(row.get(teacher_col)) if teacher_col else ""
-        is_confirmed = is_confirmed_cause(teacher_reason_raw)
+        is_confirmed = is_confirmed_cause(teacher_reason_raw) and row.get("teacher_evidence_level") != "原因待核实"
         teacher_reason_normalized = normalize_reason_label(teacher_reason_raw)
 
         system_candidates = extract_system_reason_candidates(row, column_mapping)
@@ -762,7 +749,7 @@ def compute_consistency_stats(consistency_df):
 
     confirmed_count = len(confirmed_df)
     comparable_count = len(comparable_df)
-    unable_compare_count = len(consistency_df[consistency_df["是否可比较"] == False])
+    unable_compare_count = len(confirmed_df[confirmed_df["是否可比较"] == False])
 
     top1_match_count = comparable_df["Top1 是否一致"].sum() if comparable_count else 0
     top3_hit_count = comparable_df["Top3 是否命中"].sum() if comparable_count else 0
@@ -793,7 +780,7 @@ def compute_consistency_stats(consistency_df):
 def build_feedback_loop_status(record):
     """为单条历史记录生成闭环状态信息"""
     teacher_final = normalize_text(record.get("教师最终原因"))
-    is_confirmed = is_confirmed_cause(teacher_final)
+    is_confirmed = is_confirmed_cause(teacher_final) and record.get("teacher_evidence_level") != "原因待核实"
 
     top1, top2, top3 = extract_record_top_reasons(record)
     normalized_teacher = normalize_reason_label(teacher_final)
@@ -806,7 +793,7 @@ def build_feedback_loop_status(record):
     consistency_status = build_case_consistency_status(is_confirmed, comparable, top1_match, top3_hit)
 
     return {
-        "当前状态": "已确认" if is_confirmed else "未确认",
+        "当前状态": "已确认" if is_confirmed else ("已复核，原因待核实" if teacher_final else "未确认"),
         "系统 Top1": normalize_display_text(top1, default="未识别"),
         "系统 Top2": normalize_display_text(top2, default="未识别"),
         "系统 Top3": normalize_display_text(top3, default="未识别"),
@@ -885,7 +872,7 @@ def render_feedback_loop_block(record):
             st.markdown(f"- 系统 Top1：{loop_status['系统 Top1']}")
             st.markdown(f"- 系统 Top2：{loop_status['系统 Top2']}")
             st.markdown(f"- 系统 Top3：{loop_status['系统 Top3']}")
-            st.caption("系统置信度、证据摘要见上方“系统 Top1 诊断可信度解读”模块。")
+            st.caption("系统证据支持程度、证据摘要见上方“系统 Top1 诊断证据支持解读”模块。")
         with compare_right:
             st.markdown("**教师确认侧**")
             st.markdown(f"- 教师最终确认原因：{loop_status['教师最终确认原因']}")
@@ -920,7 +907,7 @@ def normalize_case_for_similarity(record):
         "annealing_temp": record.get("退火温度"),
         "has_image": bool(normalize_text(record.get("凝胶图路径"))) or normalize_text(record.get("凝胶图")) == "有图",
         "text_clues": [normalize_reason_label(item) or normalize_text(item) for item in text_clues if normalize_text(item)],
-        "is_confirmed": is_confirmed_cause(teacher_final),
+        "is_confirmed": is_confirmed_cause(teacher_final) and record.get("teacher_evidence_level") != "原因待核实",
     }
 
 
@@ -1193,23 +1180,44 @@ def render_case_detail(record, all_records, detail_key_prefix):
             candidate_causes = [extract_cause_text(x) for x in candidates if extract_cause_text(x)]
             if not candidate_causes and record.get("Top1 原因"):
                 candidate_causes = [record.get("Top1 原因")]
-            confirm_options = list(dict.fromkeys(candidate_causes + ["其他/待补充"]))
+            confirm_options = ["请选择"] + list(dict.fromkeys(candidate_causes + cause_options() + ["其他/待补充"]))
 
             with st.form(f"{detail_key_prefix}_teacher_confirm_form_{record_id}"):
-                teacher_choice = st.selectbox("最终原因", confirm_options, key=f"{detail_key_prefix}_teacher_choice_{record_id}")
+                teacher_choice = st.selectbox("最终原因", confirm_options, index=confirm_options.index(record.get("教师最终原因")) if record.get("教师最终原因") in confirm_options else 0, key=f"{detail_key_prefix}_teacher_choice_{record_id}")
                 custom_cause = ""
                 if teacher_choice == "其他/待补充":
                     custom_cause = st.text_input("请填写教师最终原因", key=f"{detail_key_prefix}_teacher_custom_{record_id}")
-                teacher_note = st.text_area("教师备注", height=100, key=f"{detail_key_prefix}_teacher_note_{record_id}")
+                teacher_note = st.text_area("教师备注", value=record.get("教师备注") if record.get("教师备注") not in (None, "-") else "", height=100, key=f"{detail_key_prefix}_teacher_note_{record_id}")
+                evidence_options = ["经验复核", "原始记录支持", "复测验证", "原因待核实"]
+                evidence_level = st.selectbox("结论证据等级", evidence_options, index=evidence_options.index(record.get("teacher_evidence_level")) if record.get("teacher_evidence_level") in evidence_options else 0, key=f"{detail_key_prefix}_evidence_{record_id}")
+                st.caption("经验判断、原始记录与复测结果分别标记；系统与教师一致率不等于实验验证准确率。")
+                verification_feedback = st.text_area("验证方案反馈", value=record.get("verification_feedback") or "", key=f"{detail_key_prefix}_verification_feedback_{record_id}")
+                source_options = ["未标注", "真实课堂", "模拟演示", "规则回归"]
+                data_origin = st.selectbox("核对记录来源", source_options, index=source_options.index(record.get("data_origin")) if record.get("data_origin") in source_options else 0, key=f"{detail_key_prefix}_source_{record_id}")
+                previous_rubric = parse_json(record.get("teacher_rubric_json"))
+                rubric = dict(previous_rubric)
+                with st.expander("人工教学评价（可选，不自动评分）"):
+                    st.caption("0：未体现；1：部分体现；2：有具体依据。未评价保留为空；同案例修订分数不等同于学习迁移。")
+                    for stage, title in [("initial", "学生初判"), ("revised", "学生修订")]:
+                        st.markdown(f"**{title}**")
+                        rubric[stage] = {}
+                        for dimension in ["对照解释", "证据引用", "替代原因", "验证方案"]:
+                            old = previous_rubric.get(stage, {}).get(dimension)
+                            rubric[stage][dimension] = st.selectbox(dimension, [None, 0, 1, 2], index=[None, 0, 1, 2].index(old) if old in [None, 0, 1, 2] else 0,
+                                format_func=lambda v: "未评价" if v is None else str(v), key=f"{detail_key_prefix}_rubric_{record_id}_{stage}_{dimension}")
                 save_confirm = st.form_submit_button("保存复核结果", type="primary")
 
             if save_confirm:
                 final_cause = custom_cause.strip() if teacher_choice == "其他/待补充" else teacher_choice
-                if not final_cause:
+                if not final_cause or final_cause == "请选择":
                     st.warning("请选择或填写教师最终原因。")
                 else:
-                    save_teacher_confirmation(record_id, final_cause, teacher_note.strip())
-                    st.success("复核结果已保存。")
+                    saved = save_teacher_confirmation(record_id, final_cause, teacher_note.strip(), evidence_level,
+                                                      verification_feedback.strip(), expected_version=int(record.get("teacher_review_version") or 0), rubric=rubric, data_origin=data_origin)
+                    if not saved:
+                        st.error("记录已被其他会话更新，请刷新后再复核。")
+                        return
+                    st.success("复核结果已保存；此前反馈和学生修订仍保留。")
                     st.cache_data.clear()  # 必须加
                     st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1229,10 +1237,31 @@ def render_case_detail(record, all_records, detail_key_prefix):
             text_clues=clues,
             gel_image_path=record.get("凝胶图路径", ""),
             has_image=bool(record.get("凝胶图路径")),
-            title="系统 Top1 诊断可信度解读",
+            experiment_parameters=record.get("input_data", {}),
+            title="系统 Top1 诊断证据支持解读",
         )
 
         render_feedback_loop_block(record)
+        history = load_case_history(record_id)
+        if history["teacher"] or history["student"]:
+            with st.expander("历次教师反馈与学生修订"):
+                for item in history["teacher"]:
+                    st.write(f"教师反馈 v{item['review_version']}｜{item['created_at']}｜{item['evidence_level']}：{item['cause']}；{item['note'] or '无备注'}")
+                for item in history["student"]:
+                    st.write(f"对应反馈 v{item['review_version']} 的学生修订｜{item['created_at']}：{item['cause']}；依据：{item['reason']}")
+        st.caption(f"记录来源：{record.get('data_origin') or '未标注'}｜规则版本：{record.get('snapshot', {}).get('rules_version', '旧记录，未保存版本')}｜复核版本：{record.get('teacher_review_version') or 0}")
+        raw_case = record.get("input_data", {})
+        if raw_case.get("lane_notes"):
+            st.write("人工泳道标注：" + raw_case["lane_notes"])
+        if template_mass_ng(raw_case) is not None:
+            st.write(f"DNA 输入质量：{template_mass_ng(raw_case):g} ng（按记录数值计算，适量范围需参照具体体系）")
+        plan = parse_json(record.get("verification_plan_json"))
+        if plan:
+            st.markdown("**学生下一步验证方案（尚未复测）**")
+            for field, label in [("hypothesis", "假设"), ("variable", "变量"), ("controls", "对照"), ("expected_result", "预期结果"), ("interpretation", "结果解释")]:
+                st.write(f"{label}：{plan.get(field, '')}")
+        if int(record.get("teacher_review_version") or 0) != int(record.get("student_revision_review_version") or 0) and record.get("学生修订时间") not in (None, "-", ""):
+            st.warning("已保存的学生修订对应之前的教师反馈，等待学生根据新版本再次修订。")
         followup_data = record.get("followup_data", {})
         if followup_data.get("final_results"):
             st.markdown("**追问补证记录**")
@@ -1718,6 +1747,21 @@ def render_consistency_distribution_visualization(distribution_df):
     st.dataframe(distribution_df, use_container_width=True, hide_index=True)
 
 
+def render_learning_progress(filtered_df):
+    st.markdown("### 学习闭环进度")
+    metrics, rows = learning_progress(filtered_df.to_dict("records"))
+    cols = st.columns(5)
+    for col, (label, item) in zip(cols, metrics.items()):
+        numerator, denominator = item["count"], item["denominator"]
+        rate = f"{numerator / denominator:.0%}" if denominator else "暂无"
+        col.metric(label, f"{numerator}/{denominator}", help=f"完成比例：{rate}。学生修订以已教师复核案例为分母，其余以当前筛选案例数为分母。")
+    st.caption("这是流程完成情况，不代表能力提升或诊断准确率；新案例上的独立分析需要另行评价。")
+    if rows:
+        with st.expander("查看阶段完成明细"):
+            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+            st.download_button("导出阶段完成明细", pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig"), "learning_progress.csv", "text/csv")
+
+
 def render_teacher_dashboard(records_by_id, all_records):
     dashboard_df, column_mapping, load_error = load_teacher_dashboard_data()
     filtered_df = pd.DataFrame()
@@ -1768,9 +1812,17 @@ def render_teacher_dashboard(records_by_id, all_records):
         if not time_filter_available:
             st.caption("未识别到可用时间字段，时间范围筛选已自动降级为“全部数据”，最近 30 天指标显示为“无法统计”。")
 
+        origins = ["真实课堂", "模拟演示", "规则回归", "未标注", "全部（混合来源）"]
+        origin = st.selectbox("统计记录来源", origins, key="teacher_dashboard_origin")
+        if "data_origin" in filtered_df.columns and origin != "全部（混合来源）":
+            filtered_df = filtered_df[filtered_df["data_origin"].fillna("未标注").replace("", "未标注") == origin].copy()
+            class_scoped_df = class_scoped_df[class_scoped_df["data_origin"].fillna("未标注").replace("", "未标注") == origin].copy()
+        st.caption("模拟演示和规则回归用于展示与技术检验，不作为真实课堂成效。旧数据须核实来源后再标注。")
         metrics = compute_dashboard_stats(filtered_df, class_scoped_df, column_mapping)
         render_teacher_kpi_cards(metrics)
         st.markdown('<div class="pcr-teacher-overview-bottom-spacer"></div>', unsafe_allow_html=True)
+
+    render_learning_progress(filtered_df)
 
     if dashboard_df.empty:
         with st.container(border=False):

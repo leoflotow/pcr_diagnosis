@@ -280,7 +280,7 @@ def main():
                 st.warning(f"- {warning}")
 
     with st.container(border=True):
-        render_card_title("测试环境管理", "清空历史数据与上传文件；不删除代码、rules.csv 或表结构。")
+        render_card_title("测试环境管理", "清理仅限 demo_runner.py 启动的独立模拟环境；课堂记录和图片受保护。")
         st.markdown(
             """
             <div class="pcr-danger-zone">
@@ -325,8 +325,18 @@ def main():
                 if not confirm_cleanup:
                     st.warning("请先勾选“我确认要清空测试数据”。")
                 else:
-                    ok_db, msg_db = clear_history_records()
-                    ok_up, msg_up = clear_uploaded_images()
+                    from demo_runner import seed_demo
+                    from core import is_demo_environment
+                    if not is_demo_environment():
+                        st.warning("请先启动独立演示模式，课堂环境不执行恢复。")
+                        return
+                    try:
+                        seed_demo(reset=True)
+                    except ValueError as exc:
+                        st.error(str(exc))
+                        return
+                    ok_db, msg_db = True, "三类固定模拟案例已恢复"
+                    ok_up, msg_up = True, "上传目录未删除"
                     st.session_state["student_last_payload"] = None
 
                     if ok_db and ok_up:

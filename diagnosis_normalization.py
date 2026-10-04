@@ -10,6 +10,7 @@
 
 import json
 import re
+from evidence_support import confirmed_description
 
 
 UNKNOWN_LABEL = "unknown"
@@ -220,7 +221,7 @@ def _extract_hints_from_text(student_text):
         "普通台面配液": ["普通台面", "台面配液", "开放台面", "普通实验台"],
         "模板低": ["模板量不足", "模板少", "模板低", "模板浓度低", "模板太少"],
         "模板差": ["模板差", "模板降解", "模板不纯", "纯度差", "有抑制物", "含抑制物"],
-        "引物问题": ["引物问题", "引物失效", "引物降解", "primer"],
+        "引物问题": ["引物问题", "引物失效", "引物降解", "primer degradation", "primer mismatch", "primer failure"],
         "漏加试剂": ["漏加试剂", "漏加", "忘加", "没加", "体系漏加"],
         "退火偏低": ["退火偏低", "退火温度低", "温度偏低", "退火低", "温度太低"],
         "退火偏高": ["退火偏高", "退火温度高", "温度偏高", "退火高", "温度太高"],
@@ -243,7 +244,7 @@ def normalize_text_hints(student_text, extracted_hints):
     normalized = []
 
     for raw_hint in _split_hint_values(extracted_hints):
-        normalized.extend(_normalize_hint_token(raw_hint, student_text=student_text))
+        normalized.extend(_normalize_hint_token(raw_hint, student_text=confirmed_description(student_text)))
 
     normalized = _dedupe_keep_order(normalized)
     return [hint for hint in normalized if hint in STANDARD_TEXT_HINTS]

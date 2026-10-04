@@ -55,6 +55,9 @@ pip-delete-this-directory.txt
 
 # Project-local runtime artifacts
 data/app.db
+data/*.bak
+data/demo/
+docs/competition/qa/
 uploads/*
 !uploads/.gitkeep
 config/

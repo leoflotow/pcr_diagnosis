@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-PCR电泳异常诊断Demo - Streamlit应用
+生物实验智析助手 - Streamlit 应用
 功能：根据实验现象和参数，诊断PCR电泳异常原因
 """
 
@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import streamlit as st
+from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, CURRENT_MODULE
 from ui_design import apply_design_system
 import pandas as pd
 import sqlite3
@@ -17,10 +18,14 @@ import re
 import json
 import uuid
 import hashlib
+from io import BytesIO
+from PIL import Image, UnidentifiedImageError
 from datetime import datetime
 from diagnosis_normalization import build_normalized_case, explain_normalized_case
 from diagnosis_rule_engine_v2 import evaluate_rules_v2
 from navigation_state import get_home_page
+import case_storage
+from evidence_support import confirmed_description, normalize_cause_label, parse_json, rules_version, template_mass_ng, positive_number
 
 try:
     # 使用兼容 OpenAI SDK 的方式调用 BigModel / GLM
@@ -35,7 +40,7 @@ DB_PATH = os.getenv("PCR_DIAGNOSIS_DB_PATH", "data/app.db")
 RULES_PATH = "rules.csv"
 LEGACY_RULES_PATH = "rules_v2.csv"
 # 上传图片保存目录
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = os.getenv("PCR_DIAGNOSIS_UPLOAD_DIR", "uploads")
 # 页面里使用的实验现象选项（也用于规则校验）
 ABNORMALITY_OPTIONS = [
     "无条带",
@@ -58,7 +63,7 @@ REQUIRED_RULE_COLUMNS = [
 # BigModel API 配置（后续如果要切换地址，只改这里）
 BIGMODEL_DEFAULT_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 BIGMODEL_MODEL = "glm-5"
-BIGMODEL_TIMEOUT_SECONDS = 20
+BIGMODEL_TIMEOUT_SECONDS = 8
 BIGMODEL_TEMPERATURE = 1.0
 
 # 文本线索标签（统一用这 5 类）
@@ -84,7 +89,7 @@ def ensure_page_config(page_title, page_icon="🧪"):
     """统一页面宽屏配置；重复调用时自动忽略。"""
     try:
         st.set_page_config(
-            page_title=page_title,
+            page_title=PRODUCT_NAME if page_title == PRODUCT_NAME else f"{PRODUCT_NAME}｜{page_title}",
             page_icon=page_icon,
             layout="wide",
             initial_sidebar_state="collapsed",
@@ -178,6 +183,8 @@ def get_current_role_label():
 
 def get_config_value(name):
     """优先从 `.streamlit/secrets.toml` 读取，失败时回退到环境变量。"""
+    if name in {"TEACHER_ACCESS_CODE", "DEV_ACCESS_CODE"} and is_demo_environment():
+        return "demo-teacher" if name == "TEACHER_ACCESS_CODE" else "demo-dev"
     try:
         secret_value = st.secrets[name]
         normalized_secret = str(secret_value).strip()
@@ -247,18 +254,6 @@ def apply_common_styles(theme="student"):
     apply_design_system()
 
 
-def render_page_hero(title, subtitle, role_label):
-    """页面顶部 Hero 区"""
-    st.markdown(
-        f"""
-        <div class="pcr-hero">
-            <span class="pcr-role-badge">{role_label}</span>
-            <h1>{title}</h1>
-            <p>{subtitle}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 def render_card_title(title, desc=""):
@@ -382,31 +377,6 @@ def run_system_self_check():
     return checks
 
 
-def render_system_self_check():
-    """渲染系统自检区域"""
-    st.markdown("### 系统自检")
-    checks = run_system_self_check()
-
-    # 固定展示顺序，方便演示时快速扫一眼
-    items = [
-        ("rules_csv", "rules.csv 读取"),
-        ("sqlite", "SQLite 数据库连接"),
-        ("uploads", "uploads 文件夹"),
-        ("bigmodel_api_key", "BIGMODEL_API_KEY"),
-        ("bigmodel_base_url", "BIGMODEL_BASE_URL"),
-        ("bigmodel_model", "当前模型名"),
-        ("extractor_strategy", "文本抽取优先方式"),
-    ]
-
-    for key, label in items:
-        item = checks.get(key, {"level": "warning", "status": "未知", "detail": ""})
-        msg = f"{label}：{item['status']}（{item['detail']}）"
-        if item["level"] == "success":
-            st.success(msg)
-        elif item["level"] == "error":
-            st.error(msg)
-        else:
-            st.warning(msg)
 
 
 def render_system_self_check():
@@ -516,11 +486,21 @@ def run_rules_library_check():
     return {"ok": len(issues) == 0, "issues": issues, "warnings": warnings}
 
 
+def is_demo_environment():
+    from pathlib import Path
+    root = Path(__file__).resolve().parent / "data" / "demo"
+    return (os.getenv("PCR_DIAGNOSIS_DEMO_MODE") == "1"
+            and Path(DB_PATH).resolve() == root / "demo.db"
+            and Path(UPLOAD_DIR).resolve() == root / "uploads")
+
+
 def clear_history_records():
     """
     清空历史诊断记录（仅清数据，不删库、不删表结构）
     返回: (是否成功, 提示信息)
     """
+    if not is_demo_environment():
+        return False, "课堂数据库受保护。请用 demo_runner.py 启动独立演示后再恢复模拟案例。"
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -528,8 +508,13 @@ def clear_history_records():
         # 删除前先统计总数（不要依赖 rowcount）
         cursor.execute("SELECT COUNT(*) FROM diagnosis_records")
         total_before = int(cursor.fetchone()[0] or 0)
+        if cursor.execute("SELECT COUNT(*) FROM diagnosis_records WHERE coalesce(data_origin,'') NOT IN ('模拟演示','规则回归')").fetchone()[0]:
+            conn.close()
+            return False, "演示库存在非模拟记录，已停止清理。"
 
         cursor.execute("DELETE FROM diagnosis_records")
+        cursor.execute("DELETE FROM teacher_review_history")
+        cursor.execute("DELETE FROM student_revision_history")
         conn.commit()
 
         # 删除后再核对一次，用前后差值作为最终删除条数
@@ -548,6 +533,8 @@ def clear_uploaded_images():
     清空 uploads 下的测试图片文件。
     返回: (是否成功, 提示信息)
     """
+    if not is_demo_environment():
+        return False, "课堂上传目录受保护；仅允许清理独立演示目录。"
     if not os.path.isdir(UPLOAD_DIR):
         return True, "uploads 文件夹不存在，无需清空。"
 
@@ -575,6 +562,7 @@ def clear_uploaded_images():
 
 def init_database():
     """初始化SQLite数据库，创建诊断记录表"""
+    case_storage.prepare_database(DB_PATH)
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     # 创建诊断记录表
@@ -623,6 +611,7 @@ def init_database():
         if column not in existing_cols:
             cursor.execute(f"ALTER TABLE diagnosis_records ADD COLUMN {column} TEXT")
 
+    case_storage.migrate(conn)
     conn.commit()
     conn.close()
 
@@ -631,78 +620,29 @@ def save_diagnosis_record(abnormality, template_amount, annealing_temp, cycles,
                           positive_control_normal, negative_control_band,
                           description, diagnosis_result, gel_image_path=None,
                           student_initial_hypothesis=None, student_access_code=None,
-                          initial_results=None):
-    """保存诊断记录到数据库"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO diagnosis_records 
-        (abnormality, template_amount, annealing_temp, cycles, 
-         positive_control_normal, negative_control_band, description, 
-         diagnosis_result, diagnosis_time, gel_image_path,
-         student_initial_hypothesis, student_access_hash, followup_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        abnormality,
-        template_amount,
-        annealing_temp,
-        cycles,
-        positive_control_normal,
-        negative_control_band,
-        description,
-        diagnosis_result,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        gel_image_path,
-        (student_initial_hypothesis or "").strip(),
-        hashlib.sha256(student_access_code.encode("utf-8")).hexdigest() if student_access_code else None,
-        json.dumps({"initial_results": initial_results}, ensure_ascii=False) if initial_results else None,
-    ))
-    # 返回本次写入记录ID，后续教师确认可复用同一条记录
-    record_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return record_id
+                          initial_results=None, raw_case=None, evidence=None):
+    return case_storage.save_record(
+        DB_PATH, abnormality, template_amount, annealing_temp, cycles,
+        positive_control_normal, negative_control_band, description, diagnosis_result,
+        gel_image_path, student_initial_hypothesis, student_access_code,
+        initial_results, raw_case, evidence,
+    )
 
 
-def save_teacher_confirmation(record_id, teacher_final_cause, teacher_note):
-    """保存教师确认结果到已有诊断记录"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE diagnosis_records
-        SET teacher_final_cause = ?, teacher_note = ?, teacher_confirm_time = ?
-        WHERE id = ?
-    """, (
-        teacher_final_cause,
-        teacher_note,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        record_id
-    ))
-    conn.commit()
-    conn.close()
+
+def save_teacher_confirmation(record_id, teacher_final_cause, teacher_note,
+                              evidence_level="经验复核", verification_feedback="", expected_version=None, rubric=None, data_origin=None):
+    """每次复核生成版本，保留之前的结论和对应的学生修订。"""
+    return case_storage.save_review(DB_PATH, record_id, teacher_final_cause, teacher_note,
+                                   evidence_level, verification_feedback, expected_version, rubric, data_origin)
+
 
 
 def save_followup_reassessment(record_id, diagnosis_result, positive_control_normal,
                                negative_control_band, followup_data):
-    """将补证后的排序和完整追问记录写回同一案例。"""
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        cursor = conn.execute("""
-            UPDATE diagnosis_records
-            SET diagnosis_result = ?, positive_control_normal = ?,
-                negative_control_band = ?, followup_json = ?
-            WHERE id = ? AND (teacher_final_cause IS NULL OR TRIM(teacher_final_cause) = '')
-        """, (
-            diagnosis_result,
-            positive_control_normal,
-            negative_control_band,
-            json.dumps(followup_data, ensure_ascii=False),
-            record_id,
-        ))
-        conn.commit()
-        return cursor.rowcount == 1
-    finally:
-        conn.close()
+    return case_storage.save_reassessment(DB_PATH, record_id, diagnosis_result,
+                                         positive_control_normal, negative_control_band, followup_data)
+
 
 
 def parse_followup_data(value):
@@ -731,28 +671,29 @@ def load_student_record(access_code):
 
 
 def save_student_revision(record_id, access_code, revised_cause, revision_reason):
-    """教师确认后允许学生提交一次有依据的修订。"""
-    cause = str(revised_cause or "").strip()
-    reason = str(revision_reason or "").strip()
-    code = str(access_code or "").strip()
-    if not (record_id and code and cause and reason):
-        return False
-    conn = sqlite3.connect(DB_PATH)
+    return case_storage.save_revision(DB_PATH, record_id, access_code, revised_cause, revision_reason)
+
+
+def save_verification_plan(record_id, access_code, plan):
+    return case_storage.save_verification_plan(DB_PATH, record_id, access_code, plan)
+
+
+
+def validate_uploaded_image(uploaded_file):
+    """预览与保存共用图片检查，避免损坏文件中断页面。"""
+    if uploaded_file is None:
+        return None
     try:
-        cursor = conn.execute("""
-            UPDATE diagnosis_records
-            SET student_revised_cause = ?, student_revision_reason = ?, student_revision_time = ?
-            WHERE id = ? AND student_access_hash = ?
-              AND teacher_final_cause IS NOT NULL AND TRIM(teacher_final_cause) != ''
-              AND (student_revision_time IS NULL OR TRIM(student_revision_time) = '')
-        """, (
-            cause, reason, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            record_id, hashlib.sha256(code.encode("utf-8")).hexdigest(),
-        ))
-        conn.commit()
-        return cursor.rowcount == 1
-    finally:
-        conn.close()
+        data = uploaded_file.getbuffer()
+        if len(data) > 10 * 1024 * 1024:
+            return "图片超过 10 MB，请缩小后再上传。"
+        with Image.open(BytesIO(data)) as picture:
+            if picture.format not in {"PNG", "JPEG"}:
+                return "请上传有效的 PNG 或 JPG 图片。"
+            picture.verify()
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return "图片无法读取或文件已损坏，请重新导出为 PNG 或 JPG 后上传。"
+    return None
 
 
 def save_uploaded_image(uploaded_file):
@@ -762,6 +703,9 @@ def save_uploaded_image(uploaded_file):
     """
     if uploaded_file is None:
         return None, None
+    error = validate_uploaded_image(uploaded_file)
+    if error:
+        return None, error
 
     try:
         # 确保上传目录存在
@@ -867,10 +811,9 @@ def mask_api_key(api_key):
 
 
 def filter_confirmed_description(description):
-    """猜测、提问和否定语句不能作为已证实的规则线索。"""
-    clauses = re.split(r"[。；;，,！？!?\n]+", str(description or ""))
-    uncertain = re.compile(r"怀疑|疑似|可能|也许|或许|估计|猜测|不确定|是否|是不是|会不会|推测|待确认|需确认|尚未确认|未确认|排除|不是|并非|未见|没有污染|没有漏加")
-    return "。".join(clause.strip() for clause in clauses if clause.strip() and not uncertain.search(clause))
+    """只保留明确的肯定事实，处理否定、疑问及中英文正常描述。"""
+    return confirmed_description(description)
+
 
 
 def extract_text_clues(description):
@@ -886,7 +829,7 @@ def extract_text_clues(description):
     clue_rules = {
         "污染": ["污染", "contam"],
         "模板量不足": ["模板量不足", "模板少", "模板浓度低", "模板太少"],
-        "引物问题": ["引物问题", "引物失效", "引物降解", "primer"],
+        "引物问题": ["引物问题", "引物失效", "引物降解", "primer degradation", "primer mismatch", "primer failure"],
         "PCR体系问题": ["体系漏加", "pcr体系问题", "体系问题", "漏加试剂", "漏加"],
         "退火温度问题": ["退火温度问题", "退火温度过高", "退火温度过低", "退火高", "退火低"],
     }
@@ -994,6 +937,7 @@ def extract_text_clues_with_bigmodel(description, api_key, base_url, model):
             api_key=api_key,
             base_url=base_url,
             timeout=BIGMODEL_TIMEOUT_SECONDS,
+            max_retries=0,
         )
         resp = client.chat.completions.create(
             model=model,
@@ -1184,13 +1128,17 @@ def calculate_score(rule, abnormality, template_amount, annealing_temp, cycles,
 def diagnose(abnormality, template_amount, annealing_temp, cycles,
              positive_control_normal, negative_control_band, description="",
              extra_text_hints=None, negative_control_detail=None, band_pattern=None,
-             positive_control_detail=None):
+             positive_control_detail=None, experiment_parameters=None, confirmed_text_hints=None):
     """
     诊断函数：根据输入的实验参数，返回可能的异常原因
     """
     # 从学生描述中抽取文本线索：优先 BigModel / GLM，失败回退本地关键词规则
-    text_clues, clue_source, api_debug = extract_text_clues_with_fallback(description)
+    if confirmed_text_hints is None:
+        text_clues, clue_source, api_debug = extract_text_clues_with_fallback(description)
+    else:
+        text_clues, clue_source, api_debug = list(confirmed_text_hints), "学生确认的事实线索", {}
     api_debug["normalized_case"] = build_normalized_case({
+        **(experiment_parameters or {}),
         "abnormality": abnormality,
         "template_amount": template_amount,
         "annealing_temp": annealing_temp,
@@ -1497,10 +1445,12 @@ def build_diagnosis_context(
     text_clues=None,
     gel_image_path="",
     has_image=None,
+    experiment_parameters=None,
 ):
     """整理诊断可信度模块所需上下文"""
     image_available = bool(has_image) if has_image is not None else bool(str(gel_image_path or "").strip())
     return {
+        "实验资料": experiment_parameters or {},
         "实验现象": abnormality,
         "阳性对照是否正常": positive_control_normal,
         "阴性对照是否有带": negative_control_band,
@@ -1544,20 +1494,20 @@ def detect_missing_key_info(context):
     context = context or {}
     missing_items = []
 
-    if is_missing_value(context.get("阳性对照是否正常")):
-        missing_items.append("阳性对照结果未填写")
-    if is_missing_value(context.get("阴性对照是否有带")):
-        missing_items.append("阴性对照结果未填写")
-    if is_missing_value(context.get("退火温度")):
-        missing_items.append("未提供退火温度或程序设置相关信息")
-    if is_missing_value(context.get("模板量")):
-        missing_items.append("未提供模板加入体积、浓度及反应总体积")
-    else:
-        missing_items.append("已记录模板加入体积；还需模板浓度与反应总体积才能判断输入量高低")
-    if is_missing_value(context.get("学生补充描述")):
-        missing_items.append("未提供学生补充描述")
-    if not context.get("是否上传图片"):
-        missing_items.append("未上传凝胶图片")
+    unknown = {"", "-", "未观察", "未设置", "无法确认", "unknown", "None", "未填写"}
+    for field, label in [("阳性对照是否正常", "阳性对照"), ("阴性对照是否有带", "阴性对照")]:
+        if str(context.get(field) or "") in unknown:
+            missing_items.append(f"{label}结果尚未确认；请核对原始泳道记录")
+    parameters = context.get("实验资料", {})
+    reason = context.get("候选原因", "")
+    if "模板" in reason:
+        if not positive_number(parameters.get("template_concentration")):
+            missing_items.append("请补充模板浓度（ng/μL），不能只凭加入体积判断输入量")
+        if not positive_number(parameters.get("reaction_volume")):
+            missing_items.append("请补充反应总体积（μL）和模板类型")
+    if "退火" in reason and not positive_number(parameters.get("recommended_temp")):
+        missing_items.append("请补充该引物及聚合酶对应的推荐退火温度")
+    # 图片和自由描述是可选复核资料，不作为通用置信度扣分项。
 
     return missing_items
 
@@ -1580,7 +1530,7 @@ def compute_confidence_level(ranked_results, detail=None, context=None):
     score_gap = (top1_score - top2_score) if top1_score is not None and top2_score is not None else None
 
     evidence_hits = count_hit_evidence(detail)
-    missing_count = len(detect_missing_key_info(context))
+    missing_count = len(detect_missing_key_info({**context, "候选原因": top1_reason}))
 
     if score_gap is not None and score_gap >= 12 and evidence_hits >= 3 and missing_count <= 1:
         return "高", f"Top1 相比 Top2 领先 {score_gap:.1f} 分，且已有 {evidence_hits} 项命中证据，关键信息缺失较少。"
@@ -1594,7 +1544,7 @@ def compute_confidence_level(ranked_results, detail=None, context=None):
         return "低", f"{gap_text}，且当前证据或关键信息仍偏少，建议补充更多实验信息后再综合判断。"
 
     if score_gap is None and not detail:
-        return "中", "历史记录缺少完整打分明细，当前按中等置信度展示。"
+        return "中", "历史记录缺少完整打分明细，当前按中等证据支持程度展示。"
 
     gap_text = f"Top1 相比 Top2 领先 {score_gap:.1f} 分" if score_gap is not None else "当前已获取部分判断依据"
     return "中", f"{gap_text}，已有 {evidence_hits} 项主要证据支撑，但仍建议结合补充信息综合判断。"
@@ -1679,7 +1629,8 @@ def render_diagnosis_quality_block(
     text_clues=None,
     gel_image_path="",
     has_image=None,
-    title="诊断可信度解读",
+    experiment_parameters=None,
+    title="诊断证据支持解读",
 ):
     """统一渲染置信度 + 证据摘要 + 缺失信息提示"""
     ranked_results = build_ranked_results(
@@ -1689,7 +1640,7 @@ def render_diagnosis_quality_block(
         top1_score=top1_score,
     )
     if not ranked_results:
-        st.info("暂无可用于展示的诊断可信度信息。")
+        st.info("暂无可用于展示的证据支持信息。")
         return
 
     top1_result = ranked_results[0]
@@ -1705,16 +1656,17 @@ def render_diagnosis_quality_block(
         text_clues=text_clues,
         gel_image_path=gel_image_path,
         has_image=has_image,
+        experiment_parameters=experiment_parameters,
     )
 
     confidence_level, confidence_reason = compute_confidence_level(ranked_results, detail=detail, context=context)
     evidence_points = build_evidence_summary(top1_result.get("原因", top1_reason), detail=detail, context=context)
-    missing_items = detect_missing_key_info(context)
+    missing_items = detect_missing_key_info({**context, "候选原因": top1_result.get("原因", top1_reason)})
 
     with st.container(border=True):
         st.markdown(f"**{title}**")
         metric_cols = st.columns(2)
-        metric_cols[0].metric("置信度", confidence_level)
+        metric_cols[0].metric("证据支持程度", confidence_level)
         metric_cols[1].markdown(f"**判断说明**\n\n{confidence_reason}")
 
         st.markdown("**系统主要依据如下：**")
@@ -1729,7 +1681,7 @@ def render_diagnosis_quality_block(
             for item in missing_items:
                 st.markdown(f"- {item}")
         else:
-            st.success("当前关键信息较完整，判断依据相对充分。")
+            st.success("当前未发现本候选要求的关键字段缺项，仍需结合实际实验复核。")
 
 
 def load_recent_records(limit=10):
@@ -1758,59 +1710,19 @@ def load_recent_records(limit=10):
         if len(desc_short) > 30:
             desc_short = desc_short[:30] + "..."
 
-        # 历史“抽取线索”如果库里没存，就根据学生描述现算一次（不改库结构）
-        text_clues = extract_text_clues(desc_full)
-        extra_hints = followup_data.get("extra_hints", [])
-        if not isinstance(extra_hints, list):
-            extra_hints = []
-        normalized_info = explain_normalized_case({
-            "abnormality": data.get("abnormality"),
-            "template_amount": data.get("template_amount"),
-            "annealing_temp": data.get("annealing_temp"),
-            "cycles": data.get("cycles"),
-            "positive_control_normal": followup_data.get("positive_control_detail") or data.get("positive_control_normal"),
-            "negative_control_band": followup_data.get("negative_control_detail") or data.get("negative_control_band"),
-            "description": desc_full,
-            "text_clues": text_clues + extra_hints,
-            "band_pattern": followup_data.get("band_pattern"),
-        })
-        normalized_case = normalized_info.get("normalized_case", {})
+        snapshot = parse_json(data.get("diagnosis_snapshot_json"))
+        raw_case = parse_json(data.get("input_json"))
+        stored_results = followup_data.get("final_results") or snapshot.get("results") or followup_data.get("initial_results")
+        top_results = stored_results if isinstance(stored_results, list) else []
+        if not top_results:
+            top_results = build_ranked_results(candidate_texts=parse_all_candidates(diagnosis_result))
+        top1_reason = top_results[0].get("原因", "") if top_results else ""
+        top1_score = top_results[0].get("总分") if top_results else None
+        all_candidates = [f"{i}. {item.get('原因', '未知')} (总分:{item.get('总分', '-')})" for i, item in enumerate(top_results, 1)]
+        text_clues = snapshot.get("evidence", {}).get("text_clues", [])
+        text_clues = list(dict.fromkeys(text_clues + followup_data.get("extra_hints", [])))
+        normalized_case = snapshot.get("evidence", {}).get("normalized_case", {})
         rules_v2_eval = {}
-        primary_bundle = {
-            "results": [],
-            "candidate_texts": [],
-            "top1_reason": "",
-            "top1_score": None,
-            "result_text": "",
-        }
-        try:
-            rules_v2_eval = evaluate_rules_v2(normalized_case)
-            if rules_v2_eval.get("status") == "ok" and rules_v2_eval.get("top1"):
-                primary_bundle = build_primary_diagnosis_from_rules_v2(rules_v2_eval)
-        except Exception:
-            rules_v2_eval = {}
-
-        stored_results = followup_data.get("final_results") or followup_data.get("initial_results")
-        if isinstance(stored_results, list) and stored_results:
-            top_results = stored_results
-            primary_bundle = {
-                "top1_reason": top_results[0].get("原因", ""),
-                "top1_score": top_results[0].get("总分"),
-                "candidate_texts": [
-                    f"{index}. {item.get('原因', '未知')} (总分:{item.get('总分', '-')})"
-                    for index, item in enumerate(top_results, 1)
-                ],
-            }
-        else:
-            top_results = primary_bundle.get("results", []) or []
-        if top_results:
-            top1_reason = primary_bundle.get("top1_reason", "")
-            top1_score = primary_bundle.get("top1_score")
-            all_candidates = primary_bundle.get("candidate_texts", [])
-        else:
-            top1_reason, top1_score = parse_top1_result(diagnosis_result)
-            all_candidates = parse_all_candidates(diagnosis_result)
-
         gel_image_path = data.get("gel_image_path")
         has_image = bool(gel_image_path)
 
@@ -1842,6 +1754,9 @@ def load_recent_records(limit=10):
             "凝胶图": "有图" if has_image else "无图",
             "normalized_case": normalized_case,
             "followup_data": followup_data,
+            "input_data": raw_case,
+            "snapshot": snapshot,
+            **{k: data.get(k) for k in case_storage.ADDITIONAL_COLUMNS},
         })
 
     return records
@@ -1859,6 +1774,19 @@ def load_record_by_id(record_id):
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def load_case_history(record_id):
+    """读取复核与修订的版本记录，不重算历史诊断。"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        return {
+            "teacher": [dict(row) for row in conn.execute("SELECT * FROM teacher_review_history WHERE record_id=? ORDER BY review_version", (record_id,))],
+            "student": [dict(row) for row in conn.execute("SELECT * FROM student_revision_history WHERE record_id=? ORDER BY review_version", (record_id,))],
+        }
+    finally:
+        conn.close()
 
 
 def normalize_report_value(value, empty_text="未填写"):
@@ -1883,25 +1811,8 @@ def append_report_section(lines, title, body_lines):
 
 
 def normalize_reason_for_report(reason):
-    """轻量归一化原因标签，便于报告中的一致性判断。"""
-    text = str(reason or "").strip().lower().replace(" ", "")
-    if not text:
-        return ""
+    return normalize_cause_label(reason)
 
-    alias_groups = {
-        "模板量不足": ["模板量不足", "模板浓度低", "模板少", "模板过低"],
-        "污染": ["污染", "气溶胶污染", "阴性对照污染"],
-        "引物问题": ["引物问题", "引物失效", "引物设计问题"],
-        "PCR体系问题": ["pcr体系问题", "体系漏加", "反应体系配置错误", "pcr体系漏加试剂"],
-        "退火温度过高": ["退火温度过高", "退火温度偏高"],
-        "退火温度过低": ["退火温度过低", "退火温度偏低"],
-        "退火温度问题": ["退火温度问题"],
-    }
-    for canonical, aliases in alias_groups.items():
-        for alias in aliases:
-            if alias in text:
-                return canonical
-    return text
 
 
 def build_report_consistency_status(teacher_final_cause, ranked_results):
@@ -1931,7 +1842,7 @@ def build_feedback_loop_summary_for_report(status_text):
     if status_text == "一致":
         return "系统首选判断与教师最终确认一致，可作为后续讲解参考。"
     if status_text == "Top3命中但Top1不一致":
-        return "系统候选结果已覆盖真实原因，但排序仍有优化空间，可作为纠偏案例参考。"
+        return "系统候选结果已覆盖教师确认原因，但排序仍有优化空间，可作为纠偏案例参考。"
     if status_text == "未命中":
         return "系统候选结果未覆盖教师最终确认原因，建议后续补充相关规则。"
     return "该案例尚未完成有效教师确认，当前报告以系统诊断结果为主。"
@@ -2005,47 +1916,19 @@ def build_case_review_report(payload):
     student_revision_reason = db_record.get("student_revision_reason")
     student_revision_time = db_record.get("student_revision_time")
     current_status = "已确认" if not is_missing_value(teacher_final) else "未确认"
+    if db_record.get("teacher_evidence_level") == "原因待核实":
+        current_status = "已复核，原因待核实"
 
     diagnosis_result = db_record.get("diagnosis_result", "")
-    text_clues = payload.get("text_clues")
-    if not text_clues and str(description or "").strip():
-        text_clues = extract_text_clues(description)
+    snapshot = parse_json(db_record.get("diagnosis_snapshot_json"))
+    raw_case = parse_json(db_record.get("input_json")) or payload
+    if followup_data.get("updated_case"):
+        raw_case = {**raw_case, **followup_data["updated_case"]}
+    text_clues = snapshot.get("evidence", {}).get("text_clues", payload.get("text_clues", []))
     text_clues = list(dict.fromkeys((text_clues or []) + followup_data.get("extra_hints", [])))
-
-    rules_v2_eval = {}
-    primary_bundle = {
-        "results": payload.get("results", []) or [],
-        "candidate_texts": [],
-        "top1_reason": "",
-        "top1_score": None,
-        "result_text": "",
-    }
-    try:
-        normalized_case = build_normalized_case({
-            "abnormality": abnormality,
-            "template_amount": template_amount,
-            "annealing_temp": annealing_temp,
-            "cycles": cycles,
-            "positive_control_normal": followup_data.get("positive_control_detail") or positive_control,
-            "negative_control_band": followup_data.get("negative_control_detail") or negative_control,
-            "description": description,
-            "text_clues": text_clues,
-            "band_pattern": followup_data.get("band_pattern"),
-        })
-        rules_v2_eval = evaluate_rules_v2(normalized_case)
-        if rules_v2_eval.get("status") == "ok" and rules_v2_eval.get("top1"):
-            primary_bundle = build_primary_diagnosis_from_rules_v2(rules_v2_eval)
-    except Exception:
-        rules_v2_eval = {}
-
-    stored_results = followup_data.get("final_results") or followup_data.get("initial_results")
-    top_results = stored_results if isinstance(stored_results, list) and stored_results else primary_bundle.get("results", []) or []
-    candidate_texts = primary_bundle.get("candidate_texts", []) or parse_all_candidates(diagnosis_result)
-    ranked_results = build_ranked_results(top_results=top_results, candidate_texts=candidate_texts)
-    if not ranked_results:
-        top1_reason, top1_score = parse_top1_result(diagnosis_result)
-        ranked_results = build_ranked_results(top1_reason=top1_reason, top1_score=top1_score)
-
+    stored_results = followup_data.get("final_results") or snapshot.get("results") or followup_data.get("initial_results")
+    top_results = stored_results if isinstance(stored_results, list) and stored_results else payload.get("results", [])
+    ranked_results = build_ranked_results(top_results=top_results, candidate_texts=parse_all_candidates(diagnosis_result))
     top1_result = ranked_results[0] if ranked_results else {}
     top1_reason = top1_result.get("原因", "未识别")
     top1_detail = top1_result.get("诊断依据", {}) or {}
@@ -2062,6 +1945,7 @@ def build_case_review_report(payload):
         text_clues=text_clues,
         gel_image_path=image_path,
         has_image=has_image,
+        experiment_parameters=raw_case,
     )
     confidence_level, confidence_reason = compute_confidence_level(
         ranked_results,
@@ -2069,8 +1953,10 @@ def build_case_review_report(payload):
         context=context,
     )
     evidence_points = build_evidence_summary(top1_reason, detail=top1_detail, context=context)
-    missing_items = detect_missing_key_info(context)
+    missing_items = detect_missing_key_info({**context, "候选原因": top1_reason})
     consistency_status = build_report_consistency_status(teacher_final, ranked_results)
+    if db_record.get("teacher_evidence_level") == "原因待核实":
+        consistency_status = "原因待核实，暂不比较"
     feedback_summary = build_feedback_loop_summary_for_report(consistency_status)
     review_suggestions = build_review_suggestions(
         top1_reason,
@@ -2079,7 +1965,7 @@ def build_case_review_report(payload):
         confidence_level=confidence_level,
     )
 
-    lines = ["《PCR-电泳异常记录报告》"]
+    lines = [f"《{PRODUCT_NAME} · 实验复盘报告》", PRODUCT_SUBTITLE, f"当前模块：{CURRENT_MODULE}"]
 
     append_report_section(
         lines,
@@ -2089,6 +1975,8 @@ def build_case_review_report(payload):
             f"提交时间：{normalize_report_value(submit_time, '未记录')}",
             f"是否有图片：{'有图片' if has_image else '无图片'}",
             f"当前状态：{current_status}",
+            f"记录来源：{db_record.get('data_origin') or raw_case.get('data_origin') or '未标注'}",
+            f"规则版本：{snapshot.get('rules_version', '旧记录，未保存版本')}",
         ],
     )
 
@@ -2096,6 +1984,7 @@ def build_case_review_report(payload):
         lines,
         "二、基本实验信息",
         [
+            f"课程／班级／实验／匿名组号：{normalize_report_value(raw_case.get('course_name'))}／{normalize_report_value(raw_case.get('class_name'))}／{normalize_report_value(raw_case.get('experiment_name'))}／{normalize_report_value(raw_case.get('group_code'))}",
             f"异常现象：{normalize_report_value(abnormality)}",
             f"阳性对照结果：{normalize_report_value(positive_control)}",
             f"阴性对照结果：{normalize_report_value(negative_control)}",
@@ -2103,6 +1992,9 @@ def build_case_review_report(payload):
             f"退火温度 / 程序设置信息：退火温度 {normalize_report_value(annealing_temp)}；循环数 {normalize_report_value(cycles)}",
             f"学生补充描述：{normalize_report_value(description)}",
             f"文本线索：{normalize_report_value(text_clues)}",
+            f"模板类型：{normalize_report_value(raw_case.get('template_type'))}；浓度：{normalize_report_value(raw_case.get('template_concentration'))} ng/μL；反应总体积：{normalize_report_value(raw_case.get('reaction_volume'))} μL",
+            f"目标片段：{normalize_report_value(raw_case.get('target_size'))} bp；推荐退火温度：{normalize_report_value(raw_case.get('recommended_temp'))} ℃；聚合酶：{normalize_report_value(raw_case.get('polymerase'))}",
+            f"泳道人工标注：{normalize_report_value(raw_case.get('lane_notes'))}",
         ],
     )
 
@@ -2112,9 +2004,9 @@ def build_case_review_report(payload):
         f"Top3 原因：{normalize_report_value(ranked_results[2].get('原因') if len(ranked_results) > 2 else '', '未识别')}",
     ]
     if confidence_level != "未知" or confidence_reason:
-        diagnosis_lines.append(f"Top1 置信度：{confidence_level}")
+        diagnosis_lines.append(f"Top1 证据支持程度：{confidence_level}")
     if confidence_reason:
-        diagnosis_lines.append(f"置信度说明：{confidence_reason}")
+        diagnosis_lines.append(f"证据支持说明：{confidence_reason}")
     if evidence_points:
         diagnosis_lines.append("证据摘要：")
         diagnosis_lines.extend([f"- {point}" for point in evidence_points[:5]])
@@ -2122,7 +2014,7 @@ def build_case_review_report(payload):
         diagnosis_lines.append("缺失信息提示：")
         diagnosis_lines.extend([f"- {item}" for item in missing_items])
     else:
-        diagnosis_lines.append("缺失信息提示：当前关键信息较完整，判断依据相对充分。")
+        diagnosis_lines.append("缺失信息提示：当前未发现本候选要求的关键字段缺项，仍需结合实际实验复核。")
     append_report_section(lines, "三、系统诊断结果", diagnosis_lines)
 
     evidence_section_lines = []
@@ -2153,6 +2045,9 @@ def build_case_review_report(payload):
     teacher_review_lines = [
         f"教师最终确认原因：{normalize_report_value(teacher_final, '未确认')}",
         f"教师备注：{normalize_report_value(teacher_note)}",
+        f"结论证据等级：{normalize_report_value(db_record.get('teacher_evidence_level'), '旧记录，未标注')}",
+        f"当前反馈版本：{db_record.get('teacher_review_version') or 0}",
+        f"验证方案反馈：{normalize_report_value(db_record.get('verification_feedback'))}",
     ]
     if not is_missing_value(teacher_confirm_time):
         teacher_review_lines.append(f"教师确认时间：{normalize_report_value(teacher_confirm_time)}")
@@ -2171,12 +2066,26 @@ def build_case_review_report(payload):
                 f"修订依据：{normalize_report_value(student_revision_reason)}",
                 f"修订时间：{normalize_report_value(student_revision_time)}",
             ])
+            if int(db_record.get('teacher_review_version') or 0) != int(db_record.get('student_revision_review_version') or 0):
+                learning_lines.append("该修订对应旧版教师反馈，待根据当前反馈再次修订。")
         else:
             learning_lines.append(
                 "教师反馈后修订：待教师复核。" if current_status == "未确认"
                 else "教师反馈后修订：尚未提交。"
             )
         append_report_section(lines, "学生判断与修订", learning_lines)
+
+    plan = parse_json(db_record.get("verification_plan_json"))
+    if plan:
+        append_report_section(lines, "下一步验证方案（计划记录，尚未复测）", [
+            f"{label}：{normalize_report_value(plan.get(field))}" for field, label in [
+                ("hypothesis", "假设"), ("variable", "变量"), ("controls", "对照"),
+                ("expected_result", "预期结果"), ("interpretation", "结果解释")]])
+    rubric = parse_json(db_record.get("teacher_rubric_json"))
+    if rubric:
+        append_report_section(lines, "教师人工教学评价", [
+            f"{stage_label}／{dimension}：{normalize_report_value(value, '未评价')}" for stage, stage_label in [("initial", "初判"), ("revised", "修订")]
+            for dimension, value in rubric.get(stage, {}).items()])
 
     append_report_section(
         lines,
@@ -2189,7 +2098,7 @@ def build_case_review_report(payload):
         "七、报告尾部说明",
         [
             "本报告由系统自动生成，供实验教学和教师确认参考。",
-            "最终结论以教师确认结果为准；若尚未确认，则当前结论仅供课堂分析使用。",
+            "排序分数和证据支持程度不是概率。教师经验复核不等于复测验证；未完成验证的原因仍需结合原始记录核查。",
         ],
     )
 
@@ -2244,7 +2153,9 @@ def _build_case_summary_legacy(payload):
     has_image = "是" if image_path else "否"
 
     lines = [
-        "【PCR异常诊断案例摘要】",
+        f"【{PRODUCT_NAME} · 案例摘要】",
+        PRODUCT_SUBTITLE,
+        f"当前模块：{CURRENT_MODULE}",
         f"记录ID：{record_id if record_id else '无'}",
         f"提交时间：{submit_time}",
         f"实验现象：{abnormality}",

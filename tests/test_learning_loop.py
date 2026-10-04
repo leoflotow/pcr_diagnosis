@@ -20,6 +20,10 @@ class LearningLoopTests(unittest.TestCase):
                     teacher_final_cause TEXT, teacher_note TEXT, teacher_confirm_time TEXT
                 )""")
             core.init_database()
+            self.assertTrue(os.path.exists(core.DB_PATH + ".before-competition-upgrade.bak"))
+            with closing(sqlite3.connect(core.DB_PATH + ".before-competition-upgrade.bak")) as backup:
+                old_columns = {row[1] for row in backup.execute("PRAGMA table_info(diagnosis_records)")}
+                self.assertNotIn("diagnosis_snapshot_json", old_columns)
 
             access_code = "private-case-code"
             record_id = core.save_diagnosis_record(

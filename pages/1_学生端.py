@@ -9,6 +9,7 @@ from datetime import datetime
 from html import escape
 
 import streamlit as st
+from branding import PRODUCT_NAME
 
 from core import (
     ABNORMALITY_OPTIONS,
@@ -33,20 +34,32 @@ from core import (
     save_followup_reassessment,
     save_student_revision,
     save_uploaded_image,
+    validate_uploaded_image,
+    save_verification_plan,
+    extract_text_clues_with_fallback,
 )
-from diagnosis_normalization import STANDARD_TEXT_HINTS
+from diagnosis_normalization import STANDARD_TEXT_HINTS, build_normalized_case
+from evidence_support import load_course_presets, parse_json, template_mass_ng, validate_experiment_parameters
+import json
+from pathlib import Path
 from followup_agent import apply_followup_choices, interpret_operation_text, plan_followup_questions
 
 
 STUDENT_FORM_DEFAULTS = {
     "student_form_abnormality": "无条带",
-    "student_form_template_amount": 1.0,
-    "student_form_annealing_temp": 60.0,
-    "student_form_cycles": 30,
-    "student_form_positive_control_normal": "是",
-    "student_form_negative_control_band": "否",
+    "student_form_template_amount": None,
+    "student_form_annealing_temp": None,
+    "student_form_cycles": None,
+    "student_form_positive_control_normal": "未观察",
+    "student_form_negative_control_band": "未观察",
     "student_form_description": "",
     "student_form_initial_hypothesis": "",
+    **{f"student_form_{k}": "" for k in ("course_name", "class_name", "experiment_name", "group_code", "polymerase", "lane_notes")},
+    **{f"student_form_{k}": None for k in ("template_concentration", "reaction_volume", "target_size", "recommended_temp")},
+    "student_form_template_type": "待确认",
+    "student_form_confirmed_hints": [],
+    "student_form_data_origin": "真实课堂",
+    "student_form_local_mode": False,
 }
 
 STUDENT_DEMO_DATA = {
@@ -60,7 +73,8 @@ STUDENT_DEMO_DATA = {
     "student_form_initial_hypothesis": "我初步认为模板量不足，因为样本泳道没有目标条带。",
 }
 
-STUDENT_FORM_STATE_VERSION = 2
+STUDENT_FORM_STATE_VERSION = 3
+DEMO_CASES = json.loads(Path(__file__).resolve().parents[1].joinpath("demo_cases.json").read_text(encoding="utf-8"))
 
 STUDENT_STEP_TITLES = [
     "实验现象与对照",
@@ -68,6 +82,11 @@ STUDENT_STEP_TITLES = [
     "描述与图片",
     "确认并诊断",
 ]
+
+
+def parameter_text(value, unit=""):
+    """参数缺失时显示待填写，保留原始输入的空值。"""
+    return "待填写" if value is None else f"{value} {unit}".strip()
 
 
 def render_student_refined_styles():
@@ -142,6 +161,9 @@ def sync_val(key):
     """组件值变化时，立刻同步到持久化字典中"""
     if key in st.session_state:
         st.session_state["student_data_storage"][key] = st.session_state[key]
+    if key == "student_form_description":
+        st.session_state["student_form_confirmed_hints"] = []
+        st.session_state["student_data_storage"]["student_form_confirmed_hints"] = []
 # ----------------------------
 
 
@@ -158,18 +180,9 @@ def init_student_wizard_state():
     if "student_data_storage" not in st.session_state:
         st.session_state["student_data_storage"] = STUDENT_FORM_DEFAULTS.copy()
 
-    if st.session_state.get("student_form_state_version") != STUDENT_FORM_STATE_VERSION:
-        legacy_default_mapping = {
-            "student_form_template_amount": (2.0, 1.0),
-            "student_form_annealing_temp": (55.0, 60.0),
-            "student_form_cycles": (30, 30),
-        }
-        for key, (legacy_value, new_value) in legacy_default_mapping.items():
-            # 这里改为更新持久化存储区
-            if st.session_state["student_data_storage"].get(key) == legacy_value:
-                st.session_state["student_data_storage"][key] = new_value
-        st.session_state["student_form_state_version"] = STUDENT_FORM_STATE_VERSION
-
+    for key, value in STUDENT_FORM_DEFAULTS.items():
+        st.session_state["student_data_storage"].setdefault(key, value)
+    st.session_state["student_form_state_version"] = STUDENT_FORM_STATE_VERSION
     # 关键修复：将被 Streamlit 自动销毁的组件数据，从持久化字典中恢复出来
     for key, value in st.session_state["student_data_storage"].items():
         if key not in st.session_state:
@@ -222,19 +235,28 @@ def reset_student_form_state(overrides=None, target_step=None):
     st.session_state.pop("student_access_code", None)
     clear_followup_widget_state()
     clear_student_uploaded_image()
+    st.session_state.pop("student_extraction_evidence", None)
 
 
 def load_student_demo_data():
-    """载入示例记录到向导状态。"""
-    reset_student_form_state(
-        STUDENT_DEMO_DATA,
-        target_step=st.session_state.get("student_current_step", 1),
-    )
+    demo = DEMO_CASES[st.session_state.get("student_demo_choice", 0)]
+    values = {f"student_form_{k}": demo[k] for k in demo if f"student_form_{k}" in STUDENT_FORM_DEFAULTS}
+    values["student_form_initial_hypothesis"] = demo["initial_hypothesis"]
+    values["student_form_lane_notes"] = demo["lane_notes"]
+    values["student_form_local_mode"] = True
+    reset_student_form_state(values, target_step=1)
+    illustration = Path(__file__).resolve().parents[1] / demo.get("image_path", "")
+    if illustration.is_file():
+        st.session_state["student_uploaded_image_bytes"] = illustration.read_bytes()
+        st.session_state["student_uploaded_image_name"] = illustration.name
+        st.session_state["student_uploaded_image_type"] = "image/png"
+
 
 
 def render_student_quick_actions():
     """渲染学生端轻量操作区，保留课堂演示入口。"""
     with st.container():
+        st.selectbox("选择模拟演示案例", range(len(DEMO_CASES)), format_func=lambda i: DEMO_CASES[i]["name"], key="student_demo_choice")
         left_col, right_col = st.columns([0.72, 0.28])
         with left_col:
             st.markdown(
@@ -254,7 +276,7 @@ def render_student_quick_actions():
         with right_col:
             if st.button("载入示例记录", key="student_load_demo", use_container_width=True):
                 load_student_demo_data()
-                st.success("已载入示例记录，可按步骤继续填写。")
+                st.success("已载入模拟案例；它不会计入真实课堂成效。")
                 st.rerun()
 
 
@@ -281,6 +303,13 @@ def persist_uploaded_file(uploaded_file):
     """把上传文件保存到 session_state，避免切步后丢失"""
     if uploaded_file is None:
         return
+    error = validate_uploaded_image(uploaded_file)
+    if error:
+        st.session_state["student_uploaded_image_bytes"] = None
+        st.session_state["student_uploaded_image_name"] = ""
+        st.session_state["student_uploaded_image_type"] = ""
+        st.warning(error)
+        return
     st.session_state["student_uploaded_image_bytes"] = uploaded_file.getvalue()
     st.session_state["student_uploaded_image_name"] = uploaded_file.name
     st.session_state["student_uploaded_image_type"] = getattr(uploaded_file, "type", "")
@@ -296,18 +325,11 @@ def get_persisted_uploaded_file():
 
 
 def collect_student_form_payload():
-    """收集当前学生端输入数据（核心修复：从安全的 storage 读取）"""
     storage = st.session_state["student_data_storage"]
-    return {
-        "abnormality": storage.get("student_form_abnormality", "无条带"),
-        "template_amount": storage.get("student_form_template_amount", 0.0),
-        "annealing_temp": storage.get("student_form_annealing_temp", 0.0),
-        "cycles": storage.get("student_form_cycles", 30),
-        "positive_control_normal": storage.get("student_form_positive_control_normal", "是"),
-        "negative_control_band": storage.get("student_form_negative_control_band", "否"),
-        "description": storage.get("student_form_description", ""),
-        "gel_image_file": get_persisted_uploaded_file(),
-    }
+    return {**{key.removeprefix("student_form_"): storage.get(key) for key in STUDENT_FORM_DEFAULTS
+               if key not in {"student_form_initial_hypothesis"}},
+            "gel_image_file": get_persisted_uploaded_file()}
+
 
 
 def render_student_readiness_panel():
@@ -321,12 +343,12 @@ def render_student_readiness_panel():
         (
             "对照结果",
             f"阳性{form_data['positive_control_normal']} / 阴性{form_data['negative_control_band']}",
-            bool(form_data["positive_control_normal"] and form_data["negative_control_band"]),
+            form_data["positive_control_normal"] in {"是", "否"} and form_data["negative_control_band"] in {"是", "否"},
         ),
         (
             "PCR 参数",
-            f"{form_data['template_amount']} μL / {form_data['annealing_temp']} ℃ / {form_data['cycles']} cycles",
-            True,
+            " / ".join(parameter_text(form_data.get(field), unit) for field, unit in [("template_amount", "μL"), ("annealing_temp", "℃"), ("cycles", "次")]),
+            all(form_data.get(k) is not None for k in ("template_amount", "annealing_temp", "cycles")),
         ),
         ("补充描述", "已填写" if has_description else "可选补充", has_description),
         ("凝胶图片", "已上传" if has_image else "未上传", has_image),
@@ -408,6 +430,8 @@ def run_student_diagnosis():
         form_data["positive_control_normal"],
         form_data["negative_control_band"],
         form_data["description"],
+        experiment_parameters=form_data,
+        confirmed_text_hints=form_data.get("confirmed_hints", []),
     )
 
     clear_followup_widget_state()
@@ -433,6 +457,7 @@ def run_student_diagnosis():
         "followup_question_source": question_source,
         "followup_completed": False,
         "student_initial_hypothesis": initial_hypothesis,
+        **{k: v for k, v in form_data.items() if k != "gel_image_file"},
     }
 
     if results:
@@ -453,6 +478,10 @@ def run_student_diagnosis():
             student_initial_hypothesis=initial_hypothesis,
             student_access_code=access_code,
             initial_results=results,
+            raw_case={k: v for k, v in form_data.items() if k != "gel_image_file"},
+            evidence={"text_clues": text_clues, "normalized_case": api_debug.get("normalized_case", {}),
+                      "initial_extraction": st.session_state.get("student_extraction_evidence", {}), "confirmed_description": form_data["description"],
+                      "model": os.getenv("BIGMODEL_MODEL", "glm-5"), "source": clue_source},
         )
         payload["record_id"] = record_id
         st.session_state["student_access_code"] = access_code
@@ -514,34 +543,60 @@ def render_step_1_basic_info():
     """第 1 步：实验现象与对照情况"""
     with st.container(border=True, key="pcr_student_form_card_step1"):
         render_card_title("记录实验现象与对照结果", "先记录凝胶中看到的主要异常，再确认阳性与阴性对照表现。")
+        with st.expander("课程、班级与匿名小组", expanded=False):
+            for field, label in [("course_name", "课程名称"), ("class_name", "班级"), ("experiment_name", "实验项目／课次"), ("group_code", "匿名小组编号")]:
+                key = "student_form_" + field
+                st.text_input(label, key=key, on_change=sync_val, args=(key,))
+            st.selectbox("记录来源", ["真实课堂", "模拟演示", "规则回归"], key="student_form_data_origin", on_change=sync_val, args=("student_form_data_origin",))
+            st.checkbox("使用本地模式（不调用 AI 接口）", key="student_form_local_mode", on_change=sync_val, args=("student_form_local_mode",))
         col_left, col_right = st.columns(2)
         with col_left:
             # 增加 on_change=sync_val 和 args 使得修改能即时保存
             st.selectbox("实验现象", ABNORMALITY_OPTIONS, key="student_form_abnormality", on_change=sync_val, args=("student_form_abnormality",))
-            st.radio("阳性对照是否正常", ["是", "否"], key="student_form_positive_control_normal", on_change=sync_val, args=("student_form_positive_control_normal",))
+            st.radio("阳性对照是否正常", ["未观察", "未设置", "无法确认", "是", "否"], key="student_form_positive_control_normal", on_change=sync_val, args=("student_form_positive_control_normal",))
         with col_right:
-            st.radio("阴性对照是否有带", ["是", "否"], key="student_form_negative_control_band", on_change=sync_val, args=("student_form_negative_control_band",))
+            st.radio("阴性对照是否有带", ["未观察", "未设置", "无法确认", "是", "否"], key="student_form_negative_control_band", on_change=sync_val, args=("student_form_negative_control_band",))
             st.caption("如还有其他现象，可在第 3 步补充描述中继续说明。")
 
 
 def render_step_2_pcr_params():
-    """第 2 步：PCR 关键参数"""
-    for key in (
-        "student_form_template_amount",
-        "student_form_cycles",
-        "student_form_annealing_temp",
-    ):
-        restore_widget_value_from_storage(key)
-
     with st.container(border=True, key="pcr_student_form_card_step2"):
-        render_card_title("填写 PCR 关键参数", "补充模板量、退火温度和循环数，帮助系统判断参数是否可能影响结果。")
-        col_left, col_right = st.columns(2)
-        with col_left:
-            st.number_input("模板量 (μL)", min_value=0.0, step=0.5, key="student_form_template_amount", on_change=sync_val, args=("student_form_template_amount",))
-            st.number_input("循环数", min_value=1, step=1, key="student_form_cycles", on_change=sync_val, args=("student_form_cycles",))
-        with col_right:
-            st.number_input("退火温度 (℃)", min_value=0.0, step=0.5, key="student_form_annealing_temp", on_change=sync_val, args=("student_form_annealing_temp",))
-            st.caption("当前项目已支持的关键参数主要包括模板量、退火温度和循环数。")
+        render_card_title("填写 PCR 条件与课程方案", "未知参数可以留空；推荐条件应来自实际实验方案或试剂说明。")
+        presets = load_course_presets()
+        if presets:
+            chosen = st.selectbox("课程方案预设", range(len(presets)), format_func=lambda i: presets[i]["name"], key="student_preset_choice")
+            st.caption(presets[chosen].get("source", ""))
+            if st.button("应用课程方案", key="student_apply_preset"):
+                for field, value in presets[chosen].items():
+                    key = "student_form_" + field
+                    if key in STUDENT_FORM_DEFAULTS:
+                        st.session_state["student_data_storage"][key] = value
+                        st.session_state[key] = value
+                st.rerun()
+        cols = st.columns(2)
+        for index, (field, label, step) in enumerate([
+            ("template_amount", "模板加入体积（μL）", 0.5),
+            ("annealing_temp", "实际退火温度（℃）", 0.5),
+            ("cycles", "循环数", 1),
+        ]):
+            key = "student_form_" + field
+            restore_widget_value_from_storage(key)
+            with cols[index % 2]:
+                st.number_input(label, min_value=1 if field == "cycles" else 0.01, value=None,
+                                step=step, key=key, on_change=sync_val, args=(key,), placeholder="未知时留空")
+        with st.expander("补充模板、目标片段与推荐条件", expanded=False):
+            st.selectbox("模板类型", ["待确认", "质粒", "基因组 DNA", "cDNA", "其他"], key="student_form_template_type", on_change=sync_val, args=("student_form_template_type",))
+            for field, label in [("template_concentration", "模板浓度（ng/μL）"), ("reaction_volume", "反应总体积（μL）"), ("target_size", "预期片段大小（bp）"), ("recommended_temp", "推荐退火温度（℃）")]:
+                key = "student_form_" + field
+                restore_widget_value_from_storage(key)
+                st.number_input(label, min_value=0.01, value=None, key=key, on_change=sync_val, args=(key,), placeholder="按实际方案填写")
+            st.text_input("聚合酶名称／推荐条件来源", key="student_form_polymerase", on_change=sync_val, args=("student_form_polymerase",))
+            mass = template_mass_ng(collect_student_form_payload())
+            if mass is not None:
+                st.info(f"记录的 DNA 输入质量为 {mass:g} ng。是否适量仍需结合模板类型和试剂说明判断。")
+        for issue in validate_experiment_parameters(collect_student_form_payload()):
+            st.warning(issue)
+
 
 
 def render_step_3_text_and_image():
@@ -558,14 +613,32 @@ def render_step_3_text_and_image():
                 on_change=sync_val,
                 args=("student_form_description",)
             )
+            if st.button("整理候选线索", key="student_extract_initial"):
+                description = st.session_state.get("student_form_description", "")
+                if st.session_state.get("student_form_local_mode"):
+                    from core import extract_text_clues
+                    clues, source = extract_text_clues(description), "本地规则抽取"
+                else:
+                    clues, source, _ = extract_text_clues_with_fallback(description)
+                proposed = build_normalized_case({"description": description, "text_clues": clues})["text_hint"]
+                st.session_state["student_extraction_evidence"] = {"description": description, "proposed": proposed, "source": source}
+                st.rerun()
+            suggestion = st.session_state.get("student_extraction_evidence", {})
+            if suggestion.get("description") == st.session_state.get("student_form_description", ""):
+                st.info(f"候选建议（{suggestion.get('source', '')}）：{'、'.join(suggestion.get('proposed', [])) or '无明确线索'}；请在下方逐项确认。")
+            st.multiselect("确认实际发生的事实线索", STANDARD_TEXT_HINTS, key="student_form_confirmed_hints", on_change=sync_val, args=("student_form_confirmed_hints",))
+            st.caption("自动整理只是候选建议；请取消未发生的项目。仅当前确认的线索影响排序，也可直接手动选择。")
         with image_col:
             uploaded_file = st.file_uploader(
-                "上传凝胶图片（可选）",
+                "上传凝胶图片（可选，PNG/JPG，不超过 10 MB）",
                 type=["png", "jpg", "jpeg"],
                 accept_multiple_files=False,
                 key="student_form_gel_image_file",
             )
             persist_uploaded_file(uploaded_file)
+            st.text_area("凝胶图泳道说明（人工标注）", key="student_form_lane_notes", on_change=sync_val, args=("student_form_lane_notes",),
+                         placeholder="例如 M：Marker；1：阳性；2：阴性；3：样本。记录位置、预期大小和观察结果。")
+            st.caption("此处为人工记录，系统不自动判读凝胶图。")
 
             image_bytes = st.session_state.get("student_uploaded_image_bytes")
             image_name = st.session_state.get("student_uploaded_image_name", "")
@@ -597,9 +670,9 @@ def render_step_4_review():
             ("实验现象", form_data["abnormality"]),
             ("阳性对照是否正常", form_data["positive_control_normal"]),
             ("阴性对照是否有带", form_data["negative_control_band"]),
-            ("模板量", f"{form_data['template_amount']} μL"),
-            ("退火温度", f"{form_data['annealing_temp']} ℃"),
-            ("循环数", form_data["cycles"]),
+            ("模板加入体积", parameter_text(form_data["template_amount"], "μL")),
+            ("退火温度", parameter_text(form_data["annealing_temp"], "℃")),
+            ("循环数", parameter_text(form_data["cycles"])),
             ("是否已上传图片", image_status),
             ("学生补充描述", description_text),
         ]
@@ -616,7 +689,7 @@ def render_step_4_review():
             f'<div class="pcr-review-grid">{"".join(cards)}</div>',
             unsafe_allow_html=True,
         )
-        st.caption("如需修改，可返回前面步骤继续调整；确认后再生成诊断结果。")
+        st.caption("已确认的事实线索：" + ("、".join(form_data.get("confirmed_hints", [])) or "无。系统按已记录的观察进行保守排查。"))
         st.text_area(
             "查看系统结果前，你认为最可能的原因是什么？依据是什么？",
             key="student_form_initial_hypothesis",
@@ -647,6 +720,10 @@ def render_student_step_navigation():
                 st.rerun()
         else:
             if st.button("生成诊断结果", key="student_run_diagnosis", type="primary", use_container_width=True):
+                issues = validate_experiment_parameters(collect_student_form_payload())
+                if issues:
+                    st.error("请先核对参数：" + "；".join(issues))
+                    return
                 if not st.session_state.get("student_form_initial_hypothesis", "").strip():
                     st.warning("请先填写你的初步判断和依据。")
                     return
@@ -675,10 +752,11 @@ def get_result_report_parts(payload):
         text_clues=payload.get("text_clues", []) + followup_data.get("extra_hints", []),
         gel_image_path=payload.get("gel_image_path", ""),
         has_image=bool(payload.get("gel_image_path")),
+        experiment_parameters=payload,
     )
     confidence_level, confidence_reason = compute_confidence_level(results, detail=detail, context=context)
     evidence_points = build_evidence_summary(top1.get("原因", ""), detail=detail, context=context)
-    missing_items = detect_missing_key_info(context)
+    missing_items = detect_missing_key_info({**context, "候选原因": top1.get("原因", "")})
     return results, top1, confidence_level, confidence_reason, evidence_points, missing_items
 
 
@@ -687,7 +765,7 @@ def render_result_overview(payload, results, top1, confidence_level):
     st.html(f'''<div class="pcr-result-overview">
         <div class="pcr-result-kicker">诊断结果总览</div>
         <h2 class="pcr-result-title">{html_text(top1.get("原因", "暂无诊断结果"))}</h2>
-        <div class="pcr-result-meta"><span>置信度：<b class="pcr-confidence-pill">{html_text(confidence_level)}</b></span>
+        <div class="pcr-result-meta"><span>证据支持程度：<b class="pcr-confidence-pill">{html_text(confidence_level)}</b></span>
         <span>总分 {html_text(top1.get("总分", "-"))}</span></div>
         <p class="pcr-result-desc">系统判断仅作为实验复盘参考，最终原因可由教师结合原始图像与操作记录确认。</p>
         </div>''')
@@ -767,9 +845,9 @@ def render_input_summary(payload):
         ("实验现象", payload.get("abnormality", "-")),
         ("阳性对照", payload.get("positive_control_normal", "-")),
         ("阴性对照", payload.get("negative_control_band", "-")),
-        ("模板量", f"{payload.get('template_amount', '-')} μL"),
-        ("退火温度", f"{payload.get('annealing_temp', '-')} ℃"),
-        ("循环数", payload.get("cycles", "-")),
+        ("模板加入体积", parameter_text(payload.get("template_amount"), "μL")),
+        ("退火温度", parameter_text(payload.get("annealing_temp"), "℃")),
+        ("循环数", parameter_text(payload.get("cycles"))),
         ("补充描述", payload.get("description") or "未填写"),
         ("凝胶图片", image_text),
     ]
@@ -812,6 +890,8 @@ def reassess_with_followup(payload, questions, answers, extra_hints):
         negative_control_detail=updated_case.get("negative_control_detail"),
         band_pattern=updated_case.get("band_pattern"),
         positive_control_detail=updated_case.get("positive_control_detail"),
+        experiment_parameters=updated_case,
+        confirmed_text_hints=payload.get("confirmed_hints", payload.get("text_clues", [])),
     )
     if not results:
         st.error("补证后没有可用的诊断结果，请返回修改原始记录。")
@@ -828,6 +908,8 @@ def reassess_with_followup(payload, questions, answers, extra_hints):
         "band_pattern": updated_case.get("band_pattern"),
         "question_source": payload.get("followup_question_source", ""),
         "hint_source": st.session_state.get("student_followup_hint_source", ""),
+        "updated_case": {k: v for k, v in updated_case.items() if k not in {"results", "followup_data", "api_debug"}},
+        "evidence": {"text_clues": text_clues, "normalized_case": api_debug.get("normalized_case", {})},
     }
     record_id = payload.get("record_id")
     if record_id and not save_followup_reassessment(
@@ -903,9 +985,10 @@ def render_followup_block(payload):
         operation_text = answers.get("operation", "")
         if operation_text and st.session_state.get("student_followup_analyzed_text") != operation_text:
             if st.button("整理操作线索", key="student_followup_extract", use_container_width=True):
-                hints, source = interpret_operation_text(operation_text)
+                hints, source = interpret_operation_text(operation_text, local_mode=payload.get("local_mode", False))
                 st.session_state["student_followup_analyzed_text"] = operation_text
-                st.session_state["student_followup_confirmed_hints"] = hints
+                st.session_state["student_followup_proposed_hints"] = hints
+                st.session_state["student_followup_confirmed_hints"] = []
                 st.session_state["student_followup_hint_source"] = source
                 st.rerun()
             st.info("请先整理操作描述，再确认哪些线索确实发生。")
@@ -913,6 +996,7 @@ def render_followup_block(payload):
 
         confirmed_hints = []
         if operation_text:
+            st.info("候选建议：" + ("、".join(st.session_state.get("student_followup_proposed_hints", [])) or "无明确线索") + "；请逐项核对后手动选择。")
             confirmed_hints = st.multiselect(
                 "请确认实际发生的操作线索（模型建议仅供核对）",
                 STANDARD_TEXT_HINTS,
@@ -944,12 +1028,13 @@ def render_student_case_lookup():
                 st.error("未找到对应案例，请核对查询码。")
                 return
             followup = parse_followup_data(record.get("followup_json"))
-            results = followup.get("final_results") or followup.get("initial_results") or [
+            results = followup.get("final_results") or parse_json(record.get("diagnosis_snapshot_json")).get("results") or followup.get("initial_results") or [
                 parse_candidate_result_item(item, index)
                 for index, item in enumerate(parse_all_candidates(record.get("diagnosis_result")), 1)
             ]
             results = [item for item in results if isinstance(item, dict)]
             case = {
+                **parse_json(record.get("input_json")),
                 "abnormality": record.get("abnormality"),
                 "template_amount": record.get("template_amount"),
                 "annealing_temp": record.get("annealing_temp"),
@@ -958,6 +1043,8 @@ def render_student_case_lookup():
                 "negative_control_band": record.get("negative_control_band"),
                 "description": record.get("description") or "",
             }
+            case.update(followup.get("updated_case", {}))
+            snapshot = parse_json(record.get("diagnosis_snapshot_json"))
             questions, source = ([], "")
             if not followup.get("final_results") and not record.get("teacher_final_cause"):
                 questions, source = plan_followup_questions(case, results=results)
@@ -966,7 +1053,7 @@ def render_student_case_lookup():
                 **case,
                 "record_id": record["id"],
                 "results": results,
-                "text_clues": [],
+                "text_clues": snapshot.get("evidence", {}).get("text_clues", case.get("confirmed_hints", [])),
                 "submit_time": record.get("diagnosis_time"),
                 "gel_image_path": record.get("gel_image_path"),
                 "followup_data": followup,
@@ -1012,9 +1099,17 @@ def render_student_learning_loop(payload):
             st.info("教师尚未复核。请保存查询码，稍后返回查看反馈并修订判断。")
             return
 
-        st.success(f"教师确认原因：{teacher_final}")
+        st.success(f"教师复核意见：{teacher_final}")
+        st.caption("结论证据等级：" + (record.get("teacher_evidence_level") or "旧记录，未标注"))
+        if record.get("teacher_evidence_level") == "原因待核实":
+            st.info("教师已给出反馈，原因仍待核实。修订应说明证据缺口，不把暂定意见当作实验验证。")
         st.write(f"教师反馈：{record.get('teacher_note') or '教师未填写补充说明。'}")
-        if record.get("student_revision_time"):
+        review_version = int(record.get("teacher_review_version") or 0)
+        revision_version = int(record.get("student_revision_review_version") or 0)
+        if record.get("student_revision_time") and revision_version != review_version:
+            st.warning("教师更新了复核结论。之前的修订已保留，请依据本次反馈再提交一次修订。")
+            st.write(f"上一版修订：{record.get('student_revised_cause')}；依据：{record.get('student_revision_reason')}")
+        if record.get("student_revision_time") and revision_version == review_version:
             st.write(f"你修订后的原因：{record.get('student_revised_cause')}")
             st.write(f"修订依据：{record.get('student_revision_reason')}")
             st.caption(f"提交时间：{record.get('student_revision_time')}。本案例的学习复盘已完成。")
@@ -1032,6 +1127,31 @@ def render_student_learning_loop(payload):
                 st.rerun()
             else:
                 st.error("修订未保存。请刷新案例并确认教师已经复核，且此前没有提交过修订。")
+
+
+def render_student_verification_plan(payload):
+    record_id = payload.get("record_id")
+    code = st.session_state.get("student_access_code")
+    record = load_student_record(code) if code else None
+    if not record or record.get("id") != record_id:
+        return
+    plan = parse_json(record.get("verification_plan_json"))
+    with st.expander("下一步验证方案", expanded=not plan):
+        st.caption("这是待实施的验证计划，保存方案不代表已完成复测。请说明如何区分候选原因。")
+        with st.form(f"student_verification_{record_id}"):
+            values = {}
+            for field, label in [("hypothesis", "要验证的原因／假设"), ("variable", "改变哪个变量，其余条件如何保持一致？"),
+                                 ("controls", "设置哪些对照？"), ("expected_result", "预期观察到什么结果？"), ("interpretation", "不同结果分别支持或削弱哪个原因？")]:
+                values[field] = st.text_area(label, value=plan.get(field, ""), key=f"verification_{record_id}_{field}", height=85)
+            submitted = st.form_submit_button("保存验证方案", type="primary")
+        if submitted:
+            if save_verification_plan(record_id, code, values):
+                st.success("验证方案已保存，教师可以查看并反馈。")
+                st.rerun()
+            else:
+                st.warning("请填写全部五项，并核对案例查询码。")
+        if record.get("verification_feedback"):
+            st.write("教师对验证方案的反馈：" + record["verification_feedback"])
 
 
 def render_student_results(payload):
@@ -1070,9 +1190,9 @@ def render_student_results(payload):
             items = [("实验现象", payload.get("abnormality", "-")),
                      ("阳性对照", payload.get("positive_control_normal", "-")),
                      ("阴性对照", payload.get("negative_control_band", "-")),
-                     ("模板", f"{payload.get('template_amount', '-')} μL"),
-                     ("退火", f"{payload.get('annealing_temp', '-')} ℃"),
-                     ("循环", payload.get("cycles", "-"))]
+                     ("模板", parameter_text(payload.get("template_amount"), "μL")),
+                     ("退火", parameter_text(payload.get("annealing_temp"), "℃")),
+                     ("循环", parameter_text(payload.get("cycles")))]
             st.html('<h3>本次输入摘要</h3><div class="ds-input-strip">' + ''.join(
                 f'<div><span>{html_text(label)}</span><b>{html_text(value)}</b></div>'
                 for label, value in items) + '</div>')
@@ -1082,6 +1202,7 @@ def render_student_results(payload):
             elif teacher_confirmed:
                 st.success("教师已完成复核。请在下方查看反馈并修订你的判断。")
     render_student_learning_loop(payload)
+    render_student_verification_plan(payload)
 
     status = "已保存" if payload.get("record_id") else "未保存"
     hints = list(dict.fromkeys(payload.get("text_clues", []) + payload.get("followup_data", {}).get("extra_hints", [])))
@@ -1102,7 +1223,7 @@ def render_student_results(payload):
     with st.expander("查看本次输入摘要", expanded=False):
         render_input_summary(payload)
         if gel_image_path and os.path.exists(gel_image_path):
-            st.image(gel_image_path, caption=f"已上传：{gel_image_path}", use_container_width=True)
+            st.image(gel_image_path, caption="凝胶图资料（人工核对；示意图以图内标注为准）", use_container_width=True)
 
     st.markdown(
         """
@@ -1123,9 +1244,9 @@ def render_student_results(payload):
             return_to_student_editing()
 
     if record_id:
-        download_name = f"pcr_review_report_case_{record_id}.txt"
+        download_name = f"{PRODUCT_NAME}_实验复盘报告_案例{record_id}.txt"
     else:
-        download_name = f"pcr_review_report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+        download_name = f"{PRODUCT_NAME}_实验复盘报告_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
 
     with action_cols[1]:
         st.download_button(

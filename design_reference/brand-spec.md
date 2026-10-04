@@ -1,4 +1,10 @@
-# Brand Spec — PCR-Electrophoresis Diagnostic Assistant
+# Brand Spec — 生物实验智析助手
+
+产品名称：生物实验智析助手
+
+副标题：面向本科生物实验教学的智能复盘工具
+
+当前模块：PCR 与电泳实验复盘
 
 ## Direction
 IBM Carbon Design System inspired, with a lab-science domain accent.

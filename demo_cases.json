@@ -1,0 +1,77 @@
+[
+  {
+    "name": "阳性对照失败：先核查批次反应",
+    "data_origin": "模拟演示",
+    "abnormality": "无条带",
+    "template_amount": 1.0,
+    "annealing_temp": 60.0,
+    "cycles": 30,
+    "positive_control_normal": "否",
+    "negative_control_band": "否",
+    "description": "样本与阳性对照都没有目标条带。尚未核对配液记录。",
+    "initial_hypothesis": "我认为模板量不足，因为样本没有目标条带。",
+    "answers": {
+      "positive_control": "完全无带",
+      "operation": "核对模拟配液单后，确认漏加聚合酶。"
+    },
+    "confirmed_hints": [
+      "漏加试剂"
+    ],
+    "teacher_cause": "PCR体系漏加或关键试剂失活",
+    "teacher_note": "模拟配液单中聚合酶未加入，且同批阳性对照无带；需重配体系验证。",
+    "student_revision": "PCR体系漏加或关键试剂失活",
+    "revision_reason": "阳性对照同样失败，补证发现漏加聚合酶，因此不能先把原因归于样本模板。",
+    "lane_notes": "M：Marker正常；1：阳性对照无带；2：阴性对照无带；3：样本无带。",
+    "expected": "补证后优先排查反应体系；该案例为模拟材料，不是教学效果证据。",
+    "image_path": "demo_assets/case_1.png"
+  },
+  {
+    "name": "阴性对照有带：目标大小与短片段的区别",
+    "data_origin": "模拟演示",
+    "abnormality": "阴性对照有带",
+    "template_amount": 1.0,
+    "annealing_temp": 60.0,
+    "cycles": 30,
+    "positive_control_normal": "是",
+    "negative_control_band": "是",
+    "description": "阴性对照出现条带，尚未比较它与目标条带的位置。",
+    "initial_hypothesis": "我认为污染，因为阴性对照出现条带。",
+    "answers": {
+      "negative_control": "明显小于目标条带"
+    },
+    "confirmed_hints": [],
+    "teacher_cause": "引物二聚体或短片段非特异扩增",
+    "teacher_note": "模拟泳道记录中阴性对照只有明显短于目标的片段，需要结合引物及重复反应继续区分。",
+    "student_revision": "引物二聚体或短片段非特异扩增",
+    "revision_reason": "阴性对照有带不足以直接证明污染；其条带远短于目标，改变了优先排查方向。",
+    "lane_notes": "M：Marker；1：阳性对照目标大小带；2：阴性对照短片段；3：样本目标大小带。",
+    "expected": "改选目标大小相近时污染优先；改选短片段时短片段产物优先。",
+    "image_path": "demo_assets/case_2.png"
+  },
+  {
+    "name": "学生修订初判：从温度猜测到上样证据",
+    "data_origin": "模拟演示",
+    "abnormality": "条带拖尾或弥散",
+    "template_amount": 1.0,
+    "annealing_temp": 60.0,
+    "cycles": 30,
+    "positive_control_normal": "是",
+    "negative_control_band": "否",
+    "description": "样本条带拖尾。怀疑退火温度偏低。",
+    "initial_hypothesis": "我认为退火温度过低，因为样本泳道出现拖尾。",
+    "answers": {
+      "sample_band": "拖尾或弥散",
+      "operation": "核对模拟加样单，确认本泳道上样过量。"
+    },
+    "confirmed_hints": [
+      "上样过量"
+    ],
+    "teacher_cause": "电泳或上样问题",
+    "teacher_note": "上样记录支持过载；先减少上样量并保持其余电泳条件一致进行验证。",
+    "student_revision": "电泳或上样问题",
+    "revision_reason": "原先只是对温度的猜测；上样单提供了可核对的过载事实，因此改为优先检查上样。",
+    "lane_notes": "M：Marker正常；1：阳性对照清晰；2：阴性无带；3：样本拖尾。",
+    "expected": "显示证据如何改变判断，不将系统分数当作原因概率。",
+    "image_path": "demo_assets/case_3.png"
+  }
+]
