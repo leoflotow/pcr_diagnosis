@@ -337,15 +337,15 @@ def run_system_self_check():
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
         conn.close()
-        checks["sqlite"] = {"level": "success", "status": "正常", "detail": f"{DB_PATH} 可连接"}
+        checks["sqlite"] = {"level": "success", "status": "正常", "detail": "数据库连接正常"}
     except Exception as e:
         checks["sqlite"] = {"level": "error", "status": "失败", "detail": str(e)[:120]}
 
     # 3) uploads 目录检查
     if os.path.isdir(UPLOAD_DIR):
-        checks["uploads"] = {"level": "success", "status": "正常", "detail": f"{UPLOAD_DIR} 已存在"}
+        checks["uploads"] = {"level": "success", "status": "正常", "detail": "上传目录可用"}
     else:
-        checks["uploads"] = {"level": "warning", "status": "未创建", "detail": f"{UPLOAD_DIR} 目录不存在"}
+        checks["uploads"] = {"level": "warning", "status": "未创建", "detail": "上传目录尚未创建"}
 
     # 4) 环境变量检查
     api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
@@ -486,6 +486,11 @@ def run_rules_library_check():
     return {"ok": len(issues) == 0, "issues": issues, "warnings": warnings}
 
 
+def is_classroom_record(record):
+    """课堂页面排除内部示例和规则校验记录，不改写历史来源。"""
+    return record.get("data_origin") not in {"模拟演示", "规则回归"}
+
+
 def is_demo_environment():
     from pathlib import Path
     root = Path(__file__).resolve().parent / "data" / "demo"
@@ -500,7 +505,7 @@ def clear_history_records():
     返回: (是否成功, 提示信息)
     """
     if not is_demo_environment():
-        return False, "课堂数据库受保护。请用 demo_runner.py 启动独立演示后再恢复模拟案例。"
+        return False, "课堂数据库受保护，当前环境不允许清空记录。"
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -510,7 +515,7 @@ def clear_history_records():
         total_before = int(cursor.fetchone()[0] or 0)
         if cursor.execute("SELECT COUNT(*) FROM diagnosis_records WHERE coalesce(data_origin,'') NOT IN ('模拟演示','规则回归')").fetchone()[0]:
             conn.close()
-            return False, "演示库存在非模拟记录，已停止清理。"
+            return False, "存在受保护的课堂记录，已停止清理。"
 
         cursor.execute("DELETE FROM diagnosis_records")
         cursor.execute("DELETE FROM teacher_review_history")
@@ -534,7 +539,7 @@ def clear_uploaded_images():
     返回: (是否成功, 提示信息)
     """
     if not is_demo_environment():
-        return False, "课堂上传目录受保护；仅允许清理独立演示目录。"
+        return False, "课堂上传目录受保护，当前环境不允许清空图片。"
     if not os.path.isdir(UPLOAD_DIR):
         return True, "uploads 文件夹不存在，无需清空。"
 

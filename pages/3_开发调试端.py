@@ -20,8 +20,6 @@ from core import (
     append_rule_to_csv,
     check_rule_conflict,
     check_rule_duplicate,
-    clear_history_records,
-    clear_uploaded_images,
     ensure_page_config,
     init_access_state,
     init_database,
@@ -127,14 +125,14 @@ def get_self_check_items():
         items.append(("error", "规则文件（rules.csv）", f"读取失败：{exc}"))
 
     if os.path.exists(DB_PATH):
-        items.append(("success", "SQLite 数据库", f"连接文件可用：{DB_PATH}"))
+        items.append(("success", "SQLite 数据库", "数据库文件可用"))
     else:
-        items.append(("warning", "SQLite 数据库", f"未找到数据库文件：{DB_PATH}"))
+        items.append(("warning", "SQLite 数据库", "尚未创建数据库文件"))
 
     if os.path.isdir(UPLOAD_DIR):
-        items.append(("success", "上传目录", f"目录可用：{UPLOAD_DIR}"))
+        items.append(("success", "上传目录", "上传目录可用"))
     else:
-        items.append(("warning", "上传目录", f"未找到目录：{UPLOAD_DIR}"))
+        items.append(("warning", "上传目录", "上传目录尚未创建"))
 
     api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
     items.append(("success" if api_key_exists else "warning", "模型访问凭据", "已配置 BIGMODEL_API_KEY" if api_key_exists else "未配置 BIGMODEL_API_KEY"))
@@ -237,7 +235,7 @@ def main():
     st.session_state["current_role"] = "dev"
     render_page_hero(
         "开发调试端控制台",
-        "集中查看系统状态、规则健康度与演示环境清理能力。",
+        "集中查看系统状态、规则健康度与模型接口配置。",
         "开发调试端",
     )
 
@@ -278,73 +276,6 @@ def main():
                 st.error(f"- {issue}")
             for warning in check_result.get("warnings", []):
                 st.warning(f"- {warning}")
-
-    with st.container(border=True):
-        render_card_title("测试环境管理", "清理仅限 demo_runner.py 启动的独立模拟环境；课堂记录和图片受保护。")
-        st.markdown(
-            """
-            <div class="pcr-danger-zone">
-                <b>危险操作区</b>
-                <span>以下操作会清空测试记录或上传图片，仅用于课堂演示环境复位；执行前必须勾选确认。</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        if "dev_confirm_cleanup" not in st.session_state:
-            st.session_state["dev_confirm_cleanup"] = False
-        confirm_cleanup = st.checkbox("我确认要清空测试数据", key="dev_confirm_cleanup")
-
-        col_a, col_b, col_c = st.columns(3)
-
-        with col_a:
-            if st.button("清空历史诊断记录", key="dev_clear_history"):
-                if not confirm_cleanup:
-                    st.warning("请先勾选“我确认要清空测试数据”。")
-                else:
-                    ok, msg = clear_history_records()
-                    st.session_state["student_last_payload"] = None
-                    if ok:
-                        st.success(msg)
-                    else:
-                        st.error(msg)
-
-        with col_b:
-            if st.button("清空上传图片", key="dev_clear_uploads"):
-                if not confirm_cleanup:
-                    st.warning("请先勾选“我确认要清空测试数据”。")
-                else:
-                    ok, msg = clear_uploaded_images()
-                    if ok:
-                        st.success(msg)
-                    else:
-                        st.warning(msg)
-
-        with col_c:
-            if st.button("恢复演示环境", key="dev_reset_demo"):
-                if not confirm_cleanup:
-                    st.warning("请先勾选“我确认要清空测试数据”。")
-                else:
-                    from demo_runner import seed_demo
-                    from core import is_demo_environment
-                    if not is_demo_environment():
-                        st.warning("请先启动独立演示模式，课堂环境不执行恢复。")
-                        return
-                    try:
-                        seed_demo(reset=True)
-                    except ValueError as exc:
-                        st.error(str(exc))
-                        return
-                    ok_db, msg_db = True, "三类固定模拟案例已恢复"
-                    ok_up, msg_up = True, "上传目录未删除"
-                    st.session_state["student_last_payload"] = None
-
-                    if ok_db and ok_up:
-                        st.success("演示环境已重置")
-                    else:
-                        st.warning("演示环境重置完成，但有部分项目需要关注。")
-                    st.info(msg_db)
-                    st.info(msg_up)
 
     # ---------- 新增：规则库在线编辑器 ----------
     with st.container():

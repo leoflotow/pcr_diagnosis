@@ -16,6 +16,7 @@ from evidence_support import normalize_cause_label, cause_options, parse_json, l
 
 from core import (
     DB_PATH,
+    is_classroom_record,
     apply_common_styles,
     ensure_page_config,
     init_access_state,
@@ -510,6 +511,9 @@ def load_teacher_dashboard_data():
     finally:
         if conn is not None:
             conn.close()
+
+    if "data_origin" in df.columns:
+        df = df[~df["data_origin"].isin(["模拟演示", "规则回归"])].copy()
 
     column_mapping = {
         key: find_compatible_column(df.columns, aliases)
@@ -1192,8 +1196,8 @@ def render_case_detail(record, all_records, detail_key_prefix):
                 evidence_level = st.selectbox("结论证据等级", evidence_options, index=evidence_options.index(record.get("teacher_evidence_level")) if record.get("teacher_evidence_level") in evidence_options else 0, key=f"{detail_key_prefix}_evidence_{record_id}")
                 st.caption("经验判断、原始记录与复测结果分别标记；系统与教师一致率不等于实验验证准确率。")
                 verification_feedback = st.text_area("验证方案反馈", value=record.get("verification_feedback") or "", key=f"{detail_key_prefix}_verification_feedback_{record_id}")
-                source_options = ["未标注", "真实课堂", "模拟演示", "规则回归"]
-                data_origin = st.selectbox("核对记录来源", source_options, index=source_options.index(record.get("data_origin")) if record.get("data_origin") in source_options else 0, key=f"{detail_key_prefix}_source_{record_id}")
+                source_options = ["未标注", "真实课堂"]
+                data_origin = st.selectbox("核对记录来源", source_options, format_func=lambda v: "课堂记录" if v == "真实课堂" else "待核实", index=source_options.index(record.get("data_origin")) if record.get("data_origin") in source_options else 0, key=f"{detail_key_prefix}_source_{record_id}")
                 previous_rubric = parse_json(record.get("teacher_rubric_json"))
                 rubric = dict(previous_rubric)
                 with st.expander("人工教学评价（可选，不自动评分）"):
@@ -1812,12 +1816,12 @@ def render_teacher_dashboard(records_by_id, all_records):
         if not time_filter_available:
             st.caption("未识别到可用时间字段，时间范围筛选已自动降级为“全部数据”，最近 30 天指标显示为“无法统计”。")
 
-        origins = ["真实课堂", "模拟演示", "规则回归", "未标注", "全部（混合来源）"]
-        origin = st.selectbox("统计记录来源", origins, key="teacher_dashboard_origin")
+        origins = ["真实课堂", "未标注", "全部（混合来源）"]
+        origin = st.selectbox("统计记录来源", origins, format_func=lambda v: {"真实课堂": "课堂记录", "未标注": "待核实", "全部（混合来源）": "全部记录"}[v], key="teacher_dashboard_origin")
         if "data_origin" in filtered_df.columns and origin != "全部（混合来源）":
             filtered_df = filtered_df[filtered_df["data_origin"].fillna("未标注").replace("", "未标注") == origin].copy()
             class_scoped_df = class_scoped_df[class_scoped_df["data_origin"].fillna("未标注").replace("", "未标注") == origin].copy()
-        st.caption("模拟演示和规则回归用于展示与技术检验，不作为真实课堂成效。旧数据须核实来源后再标注。")
+        st.caption("统计仅反映课堂记录；历史记录的来源可在复核时确认。")
         metrics = compute_dashboard_stats(filtered_df, class_scoped_df, column_mapping)
         render_teacher_kpi_cards(metrics)
         st.markdown('<div class="pcr-teacher-overview-bottom-spacer"></div>', unsafe_allow_html=True)
@@ -1917,7 +1921,7 @@ def main():
 
     # 强制清空缓存 + 重新加载最新记录（根治状态错乱）
 
-    records = load_recent_records(limit=5000)
+    records = [record for record in load_recent_records(limit=5000) if is_classroom_record(record)]
     records_by_id = build_records_by_id(records)
 
     render_teacher_page_header(len(records))

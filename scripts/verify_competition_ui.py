@@ -1,8 +1,9 @@
-"""在临时库验证参赛版学生、教师、查询和验证方案流程。"""
+"""在临时库验证正式教学页面、查询和验证方案流程。"""
 
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 from io import BytesIO
@@ -21,6 +22,13 @@ from PIL import Image
 
 def check(app):
     assert not app.exception, [item.message for item in app.exception]
+    messages = []
+    for kind in ("markdown", "caption", "info", "success", "warning", "error", "text"):
+        messages.extend(str(item.value) for item in app.get(kind))
+    for item in app.selectbox:
+        messages.extend(str(option) for option in item.options)
+    text = "\n".join(messages)
+    assert not re.search(r"比赛|竞赛|参赛|演示|demo|虚拟|模拟", text, re.IGNORECASE), text
     return app
 
 
@@ -38,7 +46,22 @@ def main(with_image=True):
         stack.enter_context(patch.object(core, "UPLOAD_DIR", str(Path(directory) / "uploads")))
         stack.enter_context(patch.dict(os.environ, {"BIGMODEL_API_KEY": "", "PCR_DIAGNOSIS_DEMO_MODE": "0"}))
         app = check(AppTest.from_file("pages/1_学生端.py", default_timeout=15).run())
-        app.button(key="student_load_demo").click().run()
+        values = {
+            "student_form_abnormality": "无条带", "student_form_template_amount": 1.0,
+            "student_form_annealing_temp": 60.0, "student_form_cycles": 30,
+            "student_form_positive_control_normal": "否", "student_form_negative_control_band": "否",
+            "student_form_description": "样本与阳性对照都没有目标条带，尚未核对配液记录。",
+            "student_form_initial_hypothesis": "我认为模板量不足，因为样本没有目标条带。",
+            "student_form_local_mode": True,
+        }
+        storage = dict(app.session_state["student_data_storage"])
+        storage.update(values)
+        app.session_state["student_data_storage"] = storage
+        for key, value in values.items():
+            app.session_state[key] = value
+        check(app.run())
+        assert "student_load_demo" not in [item.key for item in app.button]
+
         if not with_image:
             app.session_state["student_uploaded_image_bytes"] = None
             app.session_state["student_uploaded_image_name"] = ""
@@ -48,13 +71,13 @@ def main(with_image=True):
                 buffer = BytesIO()
                 Image.new("RGB", (20, 20), "white").save(buffer, format="PNG")
                 app.session_state["student_uploaded_image_bytes"] = buffer.getvalue()
-                app.session_state["student_uploaded_image_name"] = "模拟测试.png"
+                app.session_state["student_uploaded_image_name"] = "流程校验.png"
                 check(app.run())
         check(app.button(key="student_run_diagnosis").click().run())
         payload = app.session_state["student_last_payload"]
         record_id = payload["record_id"]
         code = app.session_state["student_access_code"]
-        assert core.load_student_record(code)["data_origin"] == "模拟演示"
+        assert core.load_student_record(code)["data_origin"] == "真实课堂"
         saved_image = core.load_student_record(code)["gel_image_path"]
         assert bool(saved_image) == with_image
         if with_image:
@@ -64,7 +87,7 @@ def main(with_image=True):
                 item.select("完全无带")
             elif item.key == "student_followup_negative_control":
                 item.select("无带")
-        app.text_area(key="student_followup_operation").set_value("核对模拟配液单，确认漏加聚合酶")
+        app.text_area(key="student_followup_operation").set_value("核对配液单，确认漏加聚合酶")
         check(app.run())
         check(app.button(key="student_followup_extract").click().run())
         assert app.multiselect(key="student_followup_confirmed_hints").value == []
@@ -72,19 +95,26 @@ def main(with_image=True):
         check(app.button(key="student_followup_reassess").click().run())
         assert app.session_state["student_last_payload"]["results"][0]["原因"] == "PCR体系漏加或关键试剂失活"
 
+        hidden_id = core.save_diagnosis_record(
+            "无条带", 1.0, 60.0, 30, "否", "否", "内部案例不得展示", "",
+            student_access_code="internal-case", raw_case={"data_origin": "模拟演示", "class_name": "内部案例不得展示"})
+        assert not core.is_classroom_record(core.load_record_by_id(hidden_id))
         teacher = AppTest.from_file("pages/2_教师端.py", default_timeout=15)
         teacher.session_state["teacher_verified"] = True
         check(teacher.run())
         assert teacher.selectbox(key="teacher_dashboard_origin").value == "真实课堂"
+        assert "内部案例不得展示" not in "\n".join(str(item.value) for item in teacher.markdown)
+        assert "内部案例不得展示" not in teacher.selectbox(key="teacher_dashboard_class_filter").options
         labelled(teacher.selectbox, "最终原因").select("PCR体系漏加或关键试剂失活")
-        labelled(teacher.text_area, "教师备注").set_value("核对模拟配液单，确认遗漏；请设计验证")
+        labelled(teacher.text_area, "教师备注").set_value("核对配液单，确认遗漏；请设计验证")
         labelled(teacher.selectbox, "结论证据等级").select("原始记录支持")
         check(labelled(teacher.button, "保存复核结果").click().run())
         assert core.load_record_by_id(record_id)["teacher_review_version"] == 1
-        teacher.selectbox(key="teacher_dashboard_origin").select("模拟演示").run()
-        check(teacher)
 
         restored = check(AppTest.from_file("pages/1_学生端.py", default_timeout=15).run())
+        labelled(restored.text_input, "案例查询码").set_value("internal-case")
+        check(labelled(restored.button, "找回案例").click().run())
+        assert any("未找到对应案例" in item.value for item in restored.error)
         labelled(restored.text_input, "案例查询码").set_value(code)
         check(labelled(restored.button, "找回案例").click().run())
         labelled(restored.text_input, "看到教师反馈后，你现在认为最可能的原因是什么？").set_value("PCR体系漏加或关键试剂失活")
@@ -98,6 +128,7 @@ def main(with_image=True):
         assert json.loads(record["verification_plan_json"])["kind"] == "计划，尚未复测"
         report = core.build_case_review_report({"record_id": record_id})
         assert "下一步验证方案（计划记录，尚未复测）" in report
+        assert "生物实验智析助手" in report
         assert core.load_case_history(record_id)["student"]
 
         for page, flags in [("app.py", {}), ("pages/3_开发调试端.py", {"dev_verified": True})]:
@@ -105,6 +136,7 @@ def main(with_image=True):
             for name, value in flags.items():
                 test.session_state[name] = value
             check(test.run())
+            assert "dev_reset_demo" not in [item.key for item in test.button]
     if before:
         assert hashlib.sha256(original.read_bytes()).hexdigest() == before
     print(f"{'有图' if with_image else '无图'}流程：四页、向导、手动确认、补证、教师复核、跨会话查询、学生修订、验证计划与报告通过；课堂库未改动。")

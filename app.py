@@ -517,9 +517,6 @@ def main():
         active, lambda: go_home(clear_entries=False), enter_student_role,
         lambda: open_access_entry("teacher"), lambda: open_access_entry("dev"),
     )
-    import os
-    if os.getenv("PCR_DIAGNOSIS_DEMO_MODE") == "1":
-        st.info("参赛本地演示｜全部案例为模拟材料，课堂数据库独立保存，当前不调用 AI 接口。")
     navigator.run()
     render_access_dialog_if_needed()
 

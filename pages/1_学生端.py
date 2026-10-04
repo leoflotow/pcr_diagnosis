@@ -24,6 +24,7 @@ from core import (
     format_diagnosis_result_text,
     init_database,
     load_student_record,
+    is_classroom_record,
     parse_candidate_result_item,
     parse_all_candidates,
     parse_followup_data,
@@ -40,8 +41,6 @@ from core import (
 )
 from diagnosis_normalization import STANDARD_TEXT_HINTS, build_normalized_case
 from evidence_support import load_course_presets, parse_json, template_mass_ng, validate_experiment_parameters
-import json
-from pathlib import Path
 from followup_agent import apply_followup_choices, interpret_operation_text, plan_followup_questions
 
 
@@ -62,19 +61,7 @@ STUDENT_FORM_DEFAULTS = {
     "student_form_local_mode": False,
 }
 
-STUDENT_DEMO_DATA = {
-    "student_form_abnormality": "无条带",
-    "student_form_template_amount": 1.0,
-    "student_form_annealing_temp": 60.0,
-    "student_form_cycles": 30,
-    "student_form_positive_control_normal": "否",
-    "student_form_negative_control_band": "否",
-    "student_form_description": "怀疑模板量不足，PCR体系可能漏加。",
-    "student_form_initial_hypothesis": "我初步认为模板量不足，因为样本泳道没有目标条带。",
-}
-
-STUDENT_FORM_STATE_VERSION = 3
-DEMO_CASES = json.loads(Path(__file__).resolve().parents[1].joinpath("demo_cases.json").read_text(encoding="utf-8"))
+STUDENT_FORM_STATE_VERSION = 4
 
 STUDENT_STEP_TITLES = [
     "实验现象与对照",
@@ -217,7 +204,7 @@ def clear_student_uploaded_image():
 
 
 def reset_student_form_state(overrides=None, target_step=None):
-    """按默认值或演示数据重置学生端表单状态。"""
+    """按默认值重置学生端表单状态。"""
     form_values = dict(STUDENT_FORM_DEFAULTS)
     if overrides:
         form_values.update(overrides)
@@ -238,46 +225,20 @@ def reset_student_form_state(overrides=None, target_step=None):
     st.session_state.pop("student_extraction_evidence", None)
 
 
-def load_student_demo_data():
-    demo = DEMO_CASES[st.session_state.get("student_demo_choice", 0)]
-    values = {f"student_form_{k}": demo[k] for k in demo if f"student_form_{k}" in STUDENT_FORM_DEFAULTS}
-    values["student_form_initial_hypothesis"] = demo["initial_hypothesis"]
-    values["student_form_lane_notes"] = demo["lane_notes"]
-    values["student_form_local_mode"] = True
-    reset_student_form_state(values, target_step=1)
-    illustration = Path(__file__).resolve().parents[1] / demo.get("image_path", "")
-    if illustration.is_file():
-        st.session_state["student_uploaded_image_bytes"] = illustration.read_bytes()
-        st.session_state["student_uploaded_image_name"] = illustration.name
-        st.session_state["student_uploaded_image_type"] = "image/png"
-
-
-
 def render_student_quick_actions():
-    """渲染学生端轻量操作区，保留课堂演示入口。"""
-    with st.container():
-        st.selectbox("选择模拟演示案例", range(len(DEMO_CASES)), format_func=lambda i: DEMO_CASES[i]["name"], key="student_demo_choice")
-        left_col, right_col = st.columns([0.72, 0.28])
-        with left_col:
-            st.markdown(
-                """
-                <div class="pcr-student-guide">
-                    <div>
-                        <div class="pcr-student-guide-title">按步骤填写实验信息</div>
-                        <p class="pcr-student-guide-desc">
-                            可随时返回前一步调整信息，确认后再生成诊断结果。
-                        </p>
-                    </div>
-                    <span class="pcr-student-guide-chip">信息核对</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        with right_col:
-            if st.button("载入示例记录", key="student_load_demo", use_container_width=True):
-                load_student_demo_data()
-                st.success("已载入模拟案例；它不会计入真实课堂成效。")
-                st.rerun()
+    """渲染学生端实验记录指引。"""
+    st.markdown(
+        """
+        <div class="pcr-student-guide">
+            <div>
+                <div class="pcr-student-guide-title">按步骤填写实验信息</div>
+                <p class="pcr-student-guide-desc">可随时返回前一步调整信息，确认后再生成诊断结果。</p>
+            </div>
+            <span class="pcr-student-guide-chip">信息核对</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_student_topbar():
@@ -547,7 +508,6 @@ def render_step_1_basic_info():
             for field, label in [("course_name", "课程名称"), ("class_name", "班级"), ("experiment_name", "实验项目／课次"), ("group_code", "匿名小组编号")]:
                 key = "student_form_" + field
                 st.text_input(label, key=key, on_change=sync_val, args=(key,))
-            st.selectbox("记录来源", ["真实课堂", "模拟演示", "规则回归"], key="student_form_data_origin", on_change=sync_val, args=("student_form_data_origin",))
             st.checkbox("使用本地模式（不调用 AI 接口）", key="student_form_local_mode", on_change=sync_val, args=("student_form_local_mode",))
         col_left, col_right = st.columns(2)
         with col_left:
@@ -1024,7 +984,7 @@ def render_student_case_lookup():
             submitted = st.form_submit_button("找回案例")
         if submitted:
             record = load_student_record(access_code)
-            if not record:
+            if not record or not is_classroom_record(record):
                 st.error("未找到对应案例，请核对查询码。")
                 return
             followup = parse_followup_data(record.get("followup_json"))

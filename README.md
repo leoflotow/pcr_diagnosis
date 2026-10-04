@@ -19,15 +19,15 @@ python -m streamlit run app.py
 
 访问 http://localhost:8501 。有虚拟环境时可用 `.venv\Scripts\python.exe` 替代 `python`。`streamlit_launcher.py` 按项目相对目录启动，支持移动路径。
 
-## 独立参赛演示
+## 内部流程验证
 
 ```powershell
 .venv\Scripts\python.exe demo_runner.py
 ```
 
-访问 http://127.0.0.1:8513 。教师码 `demo-teacher`、调试码 `demo-dev`，三个案例查询码 `demo-case-1`、`demo-case-2`、`demo-case-3`。固定码仅对独立演示库有效。演示明确标为模拟、禁用 AI 请求，使用 `data/demo/demo.db` 与独立上传目录；课堂库不参与。
+此命令只用于内部流程验证：使用 `data/demo/demo.db` 和独立上传目录，禁用在线 AI 请求，不读写课堂库。教师和调试入口的固定验证码仅对该隔离环境有效。历史内部案例保留在库中，不进入正式教学页面，也不提供固定案例查询或自动载入入口。
 
-`--reset-demo` 恢复三个固定案例，遇到非模拟记录会拒绝清理；`--prepare-only` 只准备数据。当前不做小程序、线上部署和平台迁移。
+正常教学按前面的 `streamlit run app.py` 启动，并配置自己的教师与调试访问码。`--reset-demo` 和 `--prepare-only` 仅供后台验证，不是产品页面功能。当前不做小程序、线上部署和平台迁移。
 
 ## 学生与教师流程
 
