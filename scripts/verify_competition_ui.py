@@ -16,6 +16,8 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
 import core
+import ai_config
+import case_storage
 from streamlit.testing.v1 import AppTest
 from PIL import Image
 
@@ -44,7 +46,7 @@ def main(with_image=True):
     with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
         stack.enter_context(patch.object(core, "DB_PATH", str(Path(directory) / "ui.db")))
         stack.enter_context(patch.object(core, "UPLOAD_DIR", str(Path(directory) / "uploads")))
-        stack.enter_context(patch.dict(os.environ, {"BIGMODEL_API_KEY": "", "PCR_DIAGNOSIS_DEMO_MODE": "0"}))
+        stack.enter_context(patch.dict(os.environ, {"DEEPSEEK_API_KEY": "", "PCR_DIAGNOSIS_DEMO_MODE": "0"}))
         app = check(AppTest.from_file("pages/1_学生端.py", default_timeout=15).run())
         values = {
             "student_form_abnormality": "无条带", "student_form_template_amount": 1.0,
@@ -82,6 +84,31 @@ def main(with_image=True):
         assert bool(saved_image) == with_image
         if with_image:
             assert Path(saved_image).exists()
+            candidate = {"quality": "部分可辨", "quality_issues": ["弱带不清"], "lanes": [
+                {"lane_id": 1, "band_count": 1, "pattern": "单条", "position": "中部", "brightness": "较弱"}]}
+            response = {"status": "success", "observations": candidate, "raw_response": json.dumps(candidate),
+                        "model_returned": "deepseek-flash", "usage": {"total_tokens": 10}}
+            case_before_image = core.load_record_by_id(record_id)
+            stack.enter_context(patch.object(ai_config, "api_key", return_value="fake-ui-test"))
+            mocked_image = stack.enter_context(patch("gel_image_ui.request_observation", return_value=response))
+            check(app.run())
+            consent = labelled(app.checkbox, "我已确认发送区域不含姓名等身份信息，同意发送至 DeepSeek 辅助观察")
+            check(consent.check().run())
+            check(app.button(key=f"gel_student_{record_id}_request").click().run())
+            mocked_image.assert_called_once()
+            history = case_storage.load_gel_history(core.DB_PATH, record_id, code)
+            run = history["runs"][0]
+            editor_key = f"gel_student_{record_id}_check_{run['id']}_0_0_editor"
+            app.session_state[editor_key] = {"edited_rows": {0: {"state": "已修正", "band_count": 2, "pattern": "多条"}},
+                                            "added_rows": [], "deleted_rows": []}
+            check(labelled(app.button, "保存核对记录").click().run())
+            history = case_storage.load_gel_history(core.DB_PATH, record_id, code)
+            assert history["checks"][0]["entries"][0]["state"] == "已修正", history
+            assert history["checks"][0]["entries"][0]["band_count"] == 2
+            assert core.load_record_by_id(record_id) == case_before_image
+            check(app.run())
+            check(app.button(key=f"gel_student_{record_id}_request").click().run())
+            mocked_image.assert_called_once()
         for item in app.selectbox:
             if item.key == "student_followup_positive_control":
                 item.select("完全无带")
@@ -105,6 +132,17 @@ def main(with_image=True):
         assert teacher.selectbox(key="teacher_dashboard_origin").value == "真实课堂"
         assert "内部案例不得展示" not in "\n".join(str(item.value) for item in teacher.markdown)
         assert "内部案例不得展示" not in teacher.selectbox(key="teacher_dashboard_class_filter").options
+        if with_image:
+            case_before_image = core.load_record_by_id(record_id)
+            history = case_storage.load_gel_history(core.DB_PATH, record_id, code)
+            student_check = history["checks"][0]
+            key = f"gel_teacher_{record_id}_check_{run['id']}_0_{student_check['id']}_editor"
+            teacher.session_state[key] = {"edited_rows": {0: {"state": "无法确认"}}, "added_rows": [], "deleted_rows": []}
+            check(labelled(teacher.button, "保存图像复核").click().run())
+            assert core.load_record_by_id(record_id) == case_before_image
+            history = case_storage.load_gel_history(core.DB_PATH, record_id, code)
+            assert history["checks"][0]["actor"] == "teacher"
+            assert history["checks"][0]["entries"][0]["band_count"] is None
         labelled(teacher.selectbox, "最终原因").select("PCR体系漏加或关键试剂失活")
         labelled(teacher.text_area, "教师备注").set_value("核对配液单，确认遗漏；请设计验证")
         labelled(teacher.selectbox, "结论证据等级").select("原始记录支持")

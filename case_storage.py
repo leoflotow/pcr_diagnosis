@@ -38,6 +38,12 @@ def prepare_database(path):
             if not backup.exists():
                 with closing(sqlite3.connect(backup)) as target, target:
                     conn.backup(target)
+        has_gel_table = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='gel_observation_runs'").fetchone()
+        if columns and not has_gel_table:
+            backup = path.with_name(path.name + ".before-gel-observation.bak")
+            if not backup.exists():
+                with closing(sqlite3.connect(backup)) as target:
+                    conn.backup(target)
 
 
 def migrate(conn):
@@ -57,10 +63,159 @@ def migrate(conn):
             review_version INTEGER NOT NULL, cause TEXT, reason TEXT, created_at TEXT,
             UNIQUE(record_id, review_version)
         );
+        CREATE TABLE IF NOT EXISTS gel_observation_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, record_id INTEGER NOT NULL,
+            context_key TEXT NOT NULL, image_sha TEXT NOT NULL, sent_sha TEXT NOT NULL,
+            mapping_json TEXT NOT NULL, settings_json TEXT NOT NULL,
+            prompt_version TEXT NOT NULL, model_requested TEXT NOT NULL, model_returned TEXT,
+            status TEXT NOT NULL, error TEXT, observations_json TEXT, raw_response TEXT,
+            usage_json TEXT, created_at TEXT NOT NULL,
+            FOREIGN KEY(record_id) REFERENCES diagnosis_records(id)
+        );
+        CREATE INDEX IF NOT EXISTS gel_run_context ON gel_observation_runs(record_id, context_key, id);
+        CREATE TABLE IF NOT EXISTS gel_observation_checks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INTEGER NOT NULL,
+            record_id INTEGER NOT NULL, actor TEXT NOT NULL, source_student_check_id INTEGER,
+            entries_json TEXT NOT NULL, created_at TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES gel_observation_runs(id),
+            FOREIGN KEY(record_id) REFERENCES diagnosis_records(id)
+        );
     """)
     history_columns = {r[1] for r in conn.execute("PRAGMA table_info(teacher_review_history)")}
     if "rubric_json" not in history_columns:
         conn.execute("ALTER TABLE teacher_review_history ADD COLUMN rubric_json TEXT")
+
+
+def authorized_gel_record(path, record_id, code=None, teacher_authorized=False):
+    """学生必须持有对应查询码；教师调用由已验证页面授权。"""
+    with closing(sqlite3.connect(path)) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM diagnosis_records WHERE id=?", (record_id,)).fetchone()
+    if not row or row["data_origin"] in {"模拟演示", "规则回归"}:
+        return None
+    if not teacher_authorized:
+        digest = hashlib.sha256(str(code or "").strip().encode()).hexdigest()
+        if not code or row["student_access_hash"] != digest:
+            return None
+    return dict(row)
+
+
+def load_gel_history(path, record_id, code=None, teacher_authorized=False):
+    if not authorized_gel_record(path, record_id, code, teacher_authorized):
+        return {"runs": [], "checks": []}
+    with closing(sqlite3.connect(path)) as conn:
+        conn.row_factory = sqlite3.Row
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='gel_observation_runs'").fetchone():
+            return {"runs": [], "checks": []}
+        runs = [dict(row) for row in conn.execute(
+            "SELECT * FROM gel_observation_runs WHERE record_id=? ORDER BY id DESC", (record_id,))]
+        checks = [dict(row) for row in conn.execute(
+            "SELECT * FROM gel_observation_checks WHERE record_id=? ORDER BY id DESC", (record_id,))]
+    for run in runs:
+        for source, target in [("mapping_json", "mapping"), ("settings_json", "settings"),
+                               ("observations_json", "observations"), ("usage_json", "usage")]:
+            run[target] = json.loads(run[source]) if run[source] else None
+    for check in checks:
+        check["entries"] = json.loads(check["entries_json"])
+    return {"runs": runs, "checks": checks}
+
+
+def save_gel_run(path, record_id, code, prepared, response):
+    from gel_image_assistant import prepare_image, validate_observations, PROMPT_VERSION
+    import ai_config
+    record = authorized_gel_record(path, record_id, code)
+    if not record or not record["gel_image_path"]:
+        raise ValueError("无权更新该案例，或案例未保存图片。")
+    current = prepare_image(record["gel_image_path"], prepared["mapping"], prepared["settings"])
+    if current["context_key"] != prepared["context_key"]:
+        raise ValueError("图片已变化，请重新核对后再识别。")
+    status = response.get("status")
+    if status not in {"success", "failed"}:
+        raise ValueError("本次未进行有效请求，无需保存观察记录。")
+    observations = None
+    raw = None
+    if status == "success":
+        observations = validate_observations(response["observations"], current["mapping"])
+        # 原始候选须通过同一白名单校验，不把模型的原因或自由说明写入库。
+        from gel_image_assistant import parse_response
+        raw = response["raw_response"]
+        if parse_response(raw, current["mapping"]) != observations:
+            raise ValueError("模型原始候选与解析观察不一致。")
+    with closing(sqlite3.connect(path, timeout=10)) as conn, conn:
+        cursor = conn.execute("""INSERT INTO gel_observation_runs
+            (record_id,context_key,image_sha,sent_sha,mapping_json,settings_json,prompt_version,
+             model_requested,model_returned,status,error,observations_json,raw_response,usage_json,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                record_id,current["context_key"],current["image_sha"],current["sent_sha"],
+                json.dumps(current["mapping"], ensure_ascii=False), json.dumps(current["settings"]),
+                PROMPT_VERSION,ai_config.MODEL,response.get("model_returned", ""),status,
+                response.get("error", ""),json.dumps(observations, ensure_ascii=False) if observations else None,
+                raw,json.dumps(response.get("usage", {})),now()))
+        return cursor.lastrowid
+
+
+def save_gel_check(path, record_id, run_id, context_key, entries, actor, code=None,
+                   teacher_authorized=False, source_student_check_id=None):
+    from gel_image_assistant import prepare_image, validate_checks
+    if actor not in {"student", "teacher"} or actor == "teacher" and not teacher_authorized:
+        raise ValueError("图像核对权限无效。")
+    record = authorized_gel_record(path, record_id, code, teacher_authorized if actor == "teacher" else False)
+    if not record:
+        raise ValueError("无权更新该案例。")
+    with closing(sqlite3.connect(path, timeout=10)) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.row_factory = sqlite3.Row
+        run = conn.execute("SELECT * FROM gel_observation_runs WHERE id=? AND record_id=? AND status='success'",
+                           (run_id,record_id)).fetchone()
+        if not run or run["context_key"] != context_key:
+            raise ValueError("观察记录已变化，请刷新。")
+        latest_run = conn.execute("SELECT id FROM gel_observation_runs WHERE record_id=? AND status='success' ORDER BY id DESC LIMIT 1", (record_id,)).fetchone()
+        if not latest_run or latest_run["id"] != run_id:
+            raise ValueError("已有新的图像观察版本，旧版本只读，请刷新。")
+        prepared = prepare_image(record["gel_image_path"], json.loads(run["mapping_json"]), json.loads(run["settings_json"]))
+        if prepared["context_key"] != context_key:
+            raise ValueError("原图或观察配置已经改变，请重新识别。")
+        if actor == "teacher":
+            latest = conn.execute("SELECT id FROM gel_observation_checks WHERE run_id=? AND actor='student' ORDER BY id DESC LIMIT 1", (run_id,)).fetchone()
+            if (latest["id"] if latest else None) != source_student_check_id:
+                raise ValueError("学生核对记录已更新，请刷新后复核。")
+        clean = validate_checks(entries, json.loads(run["observations_json"]))
+        cursor = conn.execute("""INSERT INTO gel_observation_checks
+            (run_id,record_id,actor,source_student_check_id,entries_json,created_at) VALUES (?,?,?,?,?,?)""",
+            (run_id,record_id,actor,source_student_check_id,json.dumps(clean,ensure_ascii=False),now()))
+        return cursor.lastrowid
+
+
+def gel_report_lines(path, record_id):
+    """导出已保存候选与人工核对，绝不请求模型或生成诊断。"""
+    history = load_gel_history(path, record_id, teacher_authorized=True)
+    run = next((item for item in history["runs"] if item["status"] == "success"), None)
+    if not run:
+        return []
+    lines = ["AI 图像观察及人工核对均不直接参与诊断、原因排序或评分。",
+             f"观察版本：#{run['id']}；时间：{run['created_at']}；模型：{run['model_requested']}；提示词：{run['prompt_version']}",
+             f"对应原图指纹：{run['image_sha']}；处理图指纹：{run['sent_sha']}",
+             "AI 原始候选（需对照原图核对）：",
+             f"候选可读性：{run['observations']['quality']}；需核对问题：{'、'.join(run['observations']['quality_issues']) or '未提出'}"]
+    record = authorized_gel_record(path, record_id, teacher_authorized=True)
+    current_path = Path(record["gel_image_path"] or "")
+    if not current_path.is_file() or hashlib.sha256(current_path.read_bytes()).hexdigest() != run["image_sha"]:
+        lines.insert(1, "当前原图缺失或已改变；以下为历史图像记录，不能套用于当前图片。")
+    roles = {item["lane_id"]: item["role"] for item in run["mapping"]}
+    for item in run["observations"]["lanes"]:
+        lines.append(f"泳道 {item['lane_id']}（人工指定：{roles[item['lane_id']]}）：候选数量 {item['band_count'] if item['band_count'] is not None else '未知'}；{item['pattern']}；{item['position']}；{item['brightness']}")
+    student = next((item for item in history["checks"] if item["run_id"] == run["id"] and item["actor"] == "student"), None)
+    teacher = next((item for item in history["checks"] if item["run_id"] == run["id"] and item["actor"] == "teacher"), None)
+    for check, label in [(student, "学生核对"), (teacher, "教师图像复核")]:
+        if not check:
+            lines.append(label + "：未保存。")
+            continue
+        lines.append(f"{label}版本 #{check['id']}；时间：{check['created_at']}")
+        if label == "教师图像复核" and check["source_student_check_id"] != (student["id"] if student else None):
+            lines.append("此教师图像复核对应旧版学生核对，待重新查看。")
+        for item in check["entries"]:
+            lines.append(f"泳道 {item['lane_id']}：{item['state']}；数量 {item['band_count'] if item['band_count'] is not None else '未知'}；{item['pattern']}；{item['position']}；{item['brightness']}；人工备注：{item['note'] or '无'}")
+    return lines
 
 
 def snapshot(results, raw_case=None, evidence=None):

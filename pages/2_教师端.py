@@ -11,6 +11,7 @@ import html
 import altair as alt
 import pandas as pd
 import streamlit as st
+from gel_image_ui import render_teacher_panel
 from ui_design import design_color
 from evidence_support import normalize_cause_label, cause_options, parse_json, learning_progress, template_mass_ng
 
@@ -1281,6 +1282,7 @@ def render_case_detail(record, all_records, detail_key_prefix):
                     st.write(f"{question.get('text', '')} 回答：{answer}")
             hints = followup_data.get("extra_hints", [])
             st.write(f"学生确认的操作线索：{'、'.join(hints) if hints else '无'}")
+        render_teacher_panel(DB_PATH, record_id)
         render_similar_case_block(record, all_records)
 
         st.markdown(f"- 教师最终原因：{record.get('教师最终原因', '未确认')}")
@@ -1298,10 +1300,8 @@ def render_case_detail(record, all_records, detail_key_prefix):
 
         img_path = record.get("凝胶图路径", "")
         if img_path and os.path.exists(img_path):
-            st.markdown(f"- 图片路径：{img_path}")
             st.image(img_path, caption="历史凝胶图片", use_container_width=True)
         elif img_path:
-            st.markdown(f"- 图片路径：{img_path}")
             st.info("图片文件不存在")
         else:
             st.info("无图片")

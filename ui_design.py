@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 import streamlit as st
-from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, CURRENT_MODULE
+from branding import PRODUCT_NAME, PRODUCT_SUBTITLE
 
 
 def design_color(token):
@@ -30,7 +30,6 @@ def render_app_navigation(active, on_home, on_student, on_teacher, on_dev):
             st.html(
                 f'<div class="ds-brand">{PRODUCT_NAME}</div>'
                 f'<div class="ds-brand-subtitle">{PRODUCT_SUBTITLE}</div>'
-                f'<div class="ds-module-label">当前模块：{CURRENT_MODULE}</div>'
             )
         with links:
             columns = st.columns(4)

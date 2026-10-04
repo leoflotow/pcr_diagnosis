@@ -25,10 +25,11 @@ from diagnosis_normalization import build_normalized_case, explain_normalized_ca
 from diagnosis_rule_engine_v2 import evaluate_rules_v2
 from navigation_state import get_home_page
 import case_storage
+import ai_config
 from evidence_support import confirmed_description, normalize_cause_label, parse_json, rules_version, template_mass_ng, positive_number
 
 try:
-    # 使用兼容 OpenAI SDK 的方式调用 BigModel / GLM
+    # 兼容客户端仅请求 DeepSeek 官方接口。
     from openai import OpenAI
 except:
     OpenAI = None
@@ -60,9 +61,9 @@ REQUIRED_RULE_COLUMNS = [
     "base_score", "evidence_text", "suggestion", "enabled"
 ]
 
-# BigModel API 配置（后续如果要切换地址，只改这里）
-BIGMODEL_DEFAULT_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
-BIGMODEL_MODEL = "glm-5"
+# 保留旧常量名以兼容既有导入；所有实际请求统一为 DeepSeek。
+BIGMODEL_DEFAULT_BASE_URL = ai_config.BASE_URL
+BIGMODEL_MODEL = ai_config.MODEL
 BIGMODEL_TIMEOUT_SECONDS = 8
 BIGMODEL_TEMPERATURE = 1.0
 
@@ -348,30 +349,29 @@ def run_system_self_check():
         checks["uploads"] = {"level": "warning", "status": "未创建", "detail": "上传目录尚未创建"}
 
     # 4) 环境变量检查
-    api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
-    base_url_exists = bool(os.getenv("BIGMODEL_BASE_URL", "").strip())
-    model_exists = bool(os.getenv("BIGMODEL_MODEL", "").strip())
+    api_key_exists = bool(ai_config.api_key())
+    base_url_exists = True
     checks["bigmodel_api_key"] = {
         "level": "success" if api_key_exists else "warning",
         "status": "正常" if api_key_exists else "未检测到",
-        "detail": "BIGMODEL_API_KEY"
+        "detail": "DEEPSEEK_API_KEY"
     }
     checks["bigmodel_base_url"] = {
         "level": "success" if base_url_exists else "warning",
         "status": "正常" if base_url_exists else "未检测到",
-        "detail": "BIGMODEL_BASE_URL"
+        "detail": ai_config.BASE_URL
     }
     checks["bigmodel_model"] = {
         "level": "success",
         "status": "正常",
-        "detail": os.getenv("BIGMODEL_MODEL", BIGMODEL_MODEL)
+        "detail": ai_config.MODEL
     }
 
     # 6) 文本抽取优先方式（当前代码逻辑）
     checks["extractor_strategy"] = {
         "level": "success",
         "status": "正常",
-        "detail": "优先调用 BigModel / GLM 接口，失败时回退本地关键词规则"
+        "detail": "优先调用 DeepSeek 接口，失败时回退本地关键词规则"
     }
 
     return checks
@@ -387,8 +387,8 @@ def render_system_self_check():
         ("rules_csv", "rules.csv 读取"),
         ("sqlite", "SQLite 数据库连接"),
         ("uploads", "uploads 文件夹"),
-        ("bigmodel_api_key", "BIGMODEL_API_KEY"),
-        ("bigmodel_base_url", "BIGMODEL_BASE_URL"),
+        ("bigmodel_api_key", "DEEPSEEK_API_KEY"),
+        ("bigmodel_base_url", "DeepSeek 接口"),
         ("bigmodel_model", "当前模型"),
         ("extractor_strategy", "文本抽取优先方式"),
     ]
@@ -940,12 +940,12 @@ def extract_text_clues_with_bigmodel(description, api_key, base_url, model):
 
         client = OpenAI(
             api_key=api_key,
-            base_url=base_url,
+            base_url=ai_config.BASE_URL,
             timeout=BIGMODEL_TIMEOUT_SECONDS,
             max_retries=0,
         )
         resp = client.chat.completions.create(
-            model=model,
+            **ai_config.request_options(),
             temperature=BIGMODEL_TEMPERATURE,
             messages=[
                 {
@@ -977,22 +977,22 @@ def extract_text_clues_with_bigmodel(description, api_key, base_url, model):
         debug["bigmodel_success"] = True
         return parsed, debug
     except Exception as e:
-        debug["fail_reason"] = "BigModel API 请求失败"
-        debug["error_detail"] = str(e)[:200]
+        debug["fail_reason"] = "DeepSeek API 请求失败"
+        debug["error_detail"] = "接口未完成请求，请核对密钥、余额及网络。"
         return None, debug
 
 
 def extract_text_clues_with_fallback(description):
     """
     抽取入口：
-    1) 先走 BigModel API
+    1) 先走 DeepSeek 官方 API（保留旧函数名兼容调用）
     2) 失败后自动回退本地关键词抽取器
     返回：(线索列表, 抽取来源文案, 调试信息)
     """
-    api_key = os.getenv("BIGMODEL_API_KEY", "").strip()
-    base_url_env = os.getenv("BIGMODEL_BASE_URL", "").strip()
-    base_url = base_url_env or BIGMODEL_DEFAULT_BASE_URL
-    model = os.getenv("BIGMODEL_MODEL", BIGMODEL_MODEL)
+    api_key = ai_config.api_key()
+    base_url_env = ""
+    base_url = ai_config.BASE_URL
+    model = ai_config.MODEL
 
     debug_info = {
         "api_key_exists": bool(api_key),
@@ -1008,23 +1008,23 @@ def extract_text_clues_with_fallback(description):
     # 没有学生描述时，直接本地抽取（通常为空线索）
     text = str(description or "").strip()
     if not text:
-        debug_info["fail_reason"] = "学生描述为空，未调用 BigModel"
+        debug_info["fail_reason"] = "学生描述为空，未调用 DeepSeek"
         local_clues = extract_text_clues(description)
         return local_clues, "本地规则抽取", debug_info
 
     # 没有 key，直接本地兜底
     if not api_key:
-        debug_info["fail_reason"] = "未读取到 BIGMODEL_API_KEY"
+        debug_info["fail_reason"] = "未读取到 DEEPSEEK_API_KEY"
         local_clues = extract_text_clues(description)
         return local_clues, "本地规则抽取", debug_info
 
     bigmodel_clues, bigmodel_debug = extract_text_clues_with_bigmodel(description, api_key, base_url, model)
     if bigmodel_clues is not None:
-        debug_info["extractor_used"] = "AI（BigModel）抽取"
-        return bigmodel_clues, "AI（BigModel）抽取", debug_info
+        debug_info["extractor_used"] = "AI（DeepSeek）抽取"
+        return bigmodel_clues, "AI（DeepSeek）抽取", debug_info
 
-    # BigModel 调用失败，记录失败原因并回退
-    debug_info["fail_reason"] = bigmodel_debug.get("fail_reason", "BigModel 调用失败")
+    # DeepSeek 调用失败，记录失败原因并回退
+    debug_info["fail_reason"] = bigmodel_debug.get("fail_reason", "DeepSeek 调用失败")
     debug_info["error_detail"] = bigmodel_debug.get("error_detail", "")
 
     local_clues = extract_text_clues(description)
@@ -2097,6 +2097,11 @@ def build_case_review_report(payload):
         "六、改进建议 / 后续建议",
         [f"- {item}" for item in review_suggestions] if review_suggestions else ["- 建议结合更多实验记录继续复核当前案例。"],
     )
+
+    if record_id:
+        image_lines = case_storage.gel_report_lines(DB_PATH, record_id)
+        if image_lines:
+            append_report_section(lines, "图像辅助观察与人工核对（独立记录）", image_lines)
 
     append_report_section(
         lines,

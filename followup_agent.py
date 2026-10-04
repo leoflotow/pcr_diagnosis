@@ -1,10 +1,10 @@
 """针对初判缺口生成追问，并把学生补充描述整理为待确认线索。"""
 
 import json
-import os
 import re
 
 from diagnosis_normalization import STANDARD_TEXT_HINTS
+import ai_config
 
 try:
     from openai import OpenAI
@@ -12,17 +12,17 @@ except ImportError:
     OpenAI = None
 
 
-MODEL_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+MODEL_BASE_URL = ai_config.BASE_URL
 MAX_QUESTIONS = 3
 
 
 def _model_client():
-    key = os.getenv("BIGMODEL_API_KEY", "").strip()
+    key = ai_config.api_key()
     if not key or OpenAI is None:
         return None
     return OpenAI(
         api_key=key,
-        base_url=os.getenv("BIGMODEL_BASE_URL", "").strip() or MODEL_BASE_URL,
+        base_url=MODEL_BASE_URL,
         timeout=8,
         max_retries=0,
     )
@@ -93,7 +93,7 @@ def plan_followup_questions(case, results=None):
     request = [{"id": item["id"], "text": item["text"], "reason": item["reason"]} for item in questions]
     try:
         response = client.chat.completions.create(
-            model=os.getenv("BIGMODEL_MODEL", "glm-5"),
+            **ai_config.request_options(),
             temperature=0.2,
             messages=[
                 {"role": "system", "content": "你是PCR实验教学追问助手。只润色给定问题的中文问句，不改变问题主题，不添加诊断结论或实验事实。输出JSON对象，键为原id，值为一个问句；不要输出其他文字。"},
@@ -130,7 +130,7 @@ def interpret_operation_text(text, local_mode=False):
         return [], "手动确认线索"
     try:
         response = client.chat.completions.create(
-            model=os.getenv("BIGMODEL_MODEL", "glm-5"),
+            **ai_config.request_options(),
             temperature=0.1,
             messages=[
                 {"role": "system", "content": "你是PCR实验记录线索整理助手。仅提取学生明确表示实际发生的事实；否定、猜测、提问和未确认的情况均不提取。只能从给定标签选，输出JSON数组。不得推断诊断结论。标签：" + "、".join(STANDARD_TEXT_HINTS)},

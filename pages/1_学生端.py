@@ -9,9 +9,12 @@ from datetime import datetime
 from html import escape
 
 import streamlit as st
+import ai_config
+from gel_image_ui import render_student_panel
 from branding import PRODUCT_NAME
 
 from core import (
+    DB_PATH,
     ABNORMALITY_OPTIONS,
     apply_common_styles,
     build_diagnosis_context,
@@ -442,7 +445,7 @@ def run_student_diagnosis():
             raw_case={k: v for k, v in form_data.items() if k != "gel_image_file"},
             evidence={"text_clues": text_clues, "normalized_case": api_debug.get("normalized_case", {}),
                       "initial_extraction": st.session_state.get("student_extraction_evidence", {}), "confirmed_description": form_data["description"],
-                      "model": os.getenv("BIGMODEL_MODEL", "glm-5"), "source": clue_source},
+                      "model": ai_config.MODEL, "source": clue_source},
         )
         payload["record_id"] = record_id
         st.session_state["student_access_code"] = access_code
@@ -598,7 +601,7 @@ def render_step_3_text_and_image():
             persist_uploaded_file(uploaded_file)
             st.text_area("凝胶图泳道说明（人工标注）", key="student_form_lane_notes", on_change=sync_val, args=("student_form_lane_notes",),
                          placeholder="例如 M：Marker；1：阳性；2：阴性；3：样本。记录位置、预期大小和观察结果。")
-            st.caption("此处为人工记录，系统不自动判读凝胶图。")
+            st.caption("此处为人工记录。完成独立初判后，可在结果页主动使用 AI 辅助观察；图像观察不直接参与诊断。")
 
             image_bytes = st.session_state.get("student_uploaded_image_bytes")
             image_name = st.session_state.get("student_uploaded_image_name", "")
@@ -1007,7 +1010,7 @@ def render_student_case_lookup():
             snapshot = parse_json(record.get("diagnosis_snapshot_json"))
             questions, source = ([], "")
             if not followup.get("final_results") and not record.get("teacher_final_cause"):
-                questions, source = plan_followup_questions(case, results=results)
+                questions, source = plan_followup_questions({**case, "local_mode": True}, results=results)
             st.session_state["student_access_code"] = access_code.strip()
             st.session_state["student_last_payload"] = {
                 **case,
@@ -1183,7 +1186,10 @@ def render_student_results(payload):
     with st.expander("查看本次输入摘要", expanded=False):
         render_input_summary(payload)
         if gel_image_path and os.path.exists(gel_image_path):
-            st.image(gel_image_path, caption="凝胶图资料（人工核对；示意图以图内标注为准）", use_container_width=True)
+            st.image(gel_image_path, caption="凝胶图资料（请对照原图人工核对）", use_container_width=True)
+
+    if record_id:
+        render_student_panel(DB_PATH, record_id, st.session_state.get("student_access_code"))
 
     st.markdown(
         """

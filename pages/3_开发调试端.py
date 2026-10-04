@@ -4,10 +4,14 @@
 """
 
 import os
+import json
+import sqlite3
+from contextlib import closing
 from html import escape
 
 import pandas as pd
 import streamlit as st
+import ai_config
 
 from core import (
     BIGMODEL_DEFAULT_BASE_URL,
@@ -134,8 +138,8 @@ def get_self_check_items():
     else:
         items.append(("warning", "上传目录", "上传目录尚未创建"))
 
-    api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
-    items.append(("success" if api_key_exists else "warning", "模型访问凭据", "已配置 BIGMODEL_API_KEY" if api_key_exists else "未配置 BIGMODEL_API_KEY"))
+    api_key_exists = bool(ai_config.api_key())
+    items.append(("success" if api_key_exists else "warning", "模型访问凭据", "已配置 DEEPSEEK_API_KEY" if api_key_exists else "未配置 DEEPSEEK_API_KEY"))
     return items
 
 
@@ -164,32 +168,44 @@ def inject_dev_console_styles():
 
 def render_api_debug_panel():
     """渲染 API 调试信息面板。"""
-    api_key_exists = bool(os.getenv("BIGMODEL_API_KEY", "").strip())
-    base_url_env = os.getenv("BIGMODEL_BASE_URL", "").strip()
-    base_url_exists = bool(base_url_env)
-    base_url = base_url_env or BIGMODEL_DEFAULT_BASE_URL
-    model = os.getenv("BIGMODEL_MODEL", BIGMODEL_MODEL)
+    api_key_exists = bool(ai_config.api_key())
+    base_url = ai_config.BASE_URL
+    model = ai_config.MODEL
 
     render_card_title("API 调试信息", "用于核验文本线索抽取是否实际调用模型接口，并查看最近一次接口调试记录。")
     render_soft_notice(
         "当前接口配置概览",
-        f"BIGMODEL_API_KEY：{'已检测到' if api_key_exists else '未检测到'}；BIGMODEL_BASE_URL：{'已检测到' if base_url_exists else '未检测到'}。",
+        f"DEEPSEEK_API_KEY：{'已检测到' if api_key_exists else '未检测到'}；文字与图片共用同一模型配置。",
     )
     st.markdown(f"- 当前接口地址：{base_url}")
     st.markdown(f"- 当前模型标识：{model}")
     st.markdown("- 文本线索抽取策略：优先调用大模型接口，失败时自动回退本地规则。")
+    st.markdown(f"- 图像辅助观察：{'已开启' if ai_config.vision_enabled() else '已关闭'}；学生主动点击才请求，超时 30 秒，自动重试 0 次。")
+    st.caption("API Key 在项目根目录 .env 或 Streamlit secrets 中设置，重启服务后生效；不在页面输入或显示密钥。")
 
     last_api_debug = st.session_state.get("last_api_debug", {})
     if last_api_debug:
         st.markdown("#### 最近一次抽取记录")
         st.markdown(f"- 抽取方式：{last_api_debug.get('extractor_used', '未知')}")
-        st.markdown(f"- API Key 掩码：{last_api_debug.get('api_key_masked', '-') or '-'}")
         st.markdown(f"- 失败原因摘要：{last_api_debug.get('fail_reason', '-') or '-'}")
         error_detail = (last_api_debug.get("error_detail", "") or "").strip()
         if error_detail:
             st.markdown(f"- 异常详情：{error_detail}")
     else:
         st.info("当前暂无最近一次接口调试记录。请先在“学生端”完成一次诊断，以生成抽取日志。")
+
+    with closing(sqlite3.connect(DB_PATH)) as conn:
+        rows = conn.execute("""SELECT g.id,g.record_id,g.created_at,g.status,g.model_requested,g.usage_json
+            FROM gel_observation_runs g JOIN diagnosis_records r ON r.id=g.record_id
+            WHERE coalesce(r.data_origin,'') NOT IN ('模拟演示','规则回归') ORDER BY g.id DESC LIMIT 20""").fetchall()
+    if rows:
+        st.markdown("#### 最近图像调用")
+        st.dataframe(pd.DataFrame([{
+            "观察版本": row[0], "案例": row[1], "请求时间": row[2],
+            "状态": "已保存候选" if row[3] == "success" else "请求未完成",
+            "模型": row[4], "已记录 Token": json.loads(row[5] or "{}").get("total_tokens"),
+        } for row in rows]), hide_index=True, width="stretch")
+        st.caption("Token 为接口返回的使用记录，空白不代表没有计费；实际费用以 DeepSeek 账号账单为准。")
 
 
 def run_rules_library_check():

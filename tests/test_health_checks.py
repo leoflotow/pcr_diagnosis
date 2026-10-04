@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import core
+import ai_config
 
 
 class HealthCheckRegressionTests(unittest.TestCase):
@@ -20,7 +21,8 @@ class HealthCheckRegressionTests(unittest.TestCase):
         self.assertTrue(callable(module.check_rule_conflict))
 
     def test_system_checks_read_current_rules_encoding(self):
-        checks = core.run_system_self_check()
+        with tempfile.TemporaryDirectory() as directory, patch.object(core, "DB_PATH", os.path.join(directory, "health.db")):
+            checks = core.run_system_self_check()
         self.assertEqual(checks["rules_csv"]["level"], "success")
 
         rules_check = core.run_rules_library_check()
@@ -28,25 +30,25 @@ class HealthCheckRegressionTests(unittest.TestCase):
         self.assertEqual(rules_check["warnings"], [])
 
     def test_bigmodel_uses_default_base_url_when_env_is_missing(self):
-        original_key = os.environ.get("BIGMODEL_API_KEY")
+        original_key = os.environ.get("DEEPSEEK_API_KEY")
         original_base_url = os.environ.get("BIGMODEL_BASE_URL")
         try:
-            os.environ["BIGMODEL_API_KEY"] = "fake-key-for-test"
+            os.environ["DEEPSEEK_API_KEY"] = "fake-key-for-test"
             os.environ.pop("BIGMODEL_BASE_URL", None)
 
             with patch.object(core, "extract_text_clues_with_bigmodel", return_value=(["污染"], {})) as mocked:
                 clues, source, debug = core.extract_text_clues_with_fallback("阴性对照有带，怀疑污染")
 
             self.assertEqual(clues, ["污染"])
-            self.assertEqual(source, "AI（BigModel）抽取")
+            self.assertEqual(source, "AI（DeepSeek）抽取")
             mocked.assert_called_once()
             self.assertEqual(mocked.call_args.args[2], core.BIGMODEL_DEFAULT_BASE_URL)
             self.assertEqual(debug["base_url"], core.BIGMODEL_DEFAULT_BASE_URL)
         finally:
             if original_key is None:
-                os.environ.pop("BIGMODEL_API_KEY", None)
+                os.environ.pop("DEEPSEEK_API_KEY", None)
             else:
-                os.environ["BIGMODEL_API_KEY"] = original_key
+                os.environ["DEEPSEEK_API_KEY"] = original_key
 
             if original_base_url is None:
                 os.environ.pop("BIGMODEL_BASE_URL", None)
