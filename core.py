@@ -2102,6 +2102,11 @@ def build_case_review_report(payload):
         image_lines = case_storage.gel_report_lines(DB_PATH, record_id)
         if image_lines:
             append_report_section(lines, "图像辅助观察与人工核对（独立记录）", image_lines)
+        if is_classroom_record(db_record):
+            from teaching_workflow import teaching_report_lines
+            teaching_lines = teaching_report_lines(DB_PATH, record_id)
+            if teaching_lines:
+                append_report_section(lines, "课堂任务、独立复核与实际复测", teaching_lines)
 
     append_report_section(
         lines,

@@ -53,13 +53,16 @@ def make_pdf(source):
 
 def make_support_zip():
     # 明确白名单；不遍历 .env、secrets、data、uploads、.venv、Git 或用户原稿。
-    names = ["branding.py", "README.md", "AGENTS.md", "RULE_AUDIT.md", "DESIGN_SYSTEM.md", "requirements.txt", "app.py", "core.py", "case_storage.py",
+    names = ["branding.py", "README.md", "AGENTS.md", "ai_config.py", "gel_image_assistant.py", "gel_image_ui.py", "teaching_workflow.py", "teaching_ui.py", ".env.example", ".streamlit/config.toml", ".streamlit/secrets.toml.example", "RULE_AUDIT.md", "DESIGN_SYSTEM.md", "requirements.txt", "app.py", "core.py", "case_storage.py",
              "diagnosis_normalization.py", "diagnosis_rule_engine_v2.py", "evidence_support.py", "followup_agent.py", "navigation_state.py",
              "ui_design.py", "ui_design.css", "streamlit_launcher.py", "demo_runner.py", "demo_cases.json", "course_presets.json",
              "rules.csv", "rule_combos.csv", "rules_v2.csv"]
     files = [ROOT / name for name in names]
     files += list((ROOT / "pages").glob("*.py")) + list((ROOT / "tests").glob("*.py"))
-    files += [ROOT / "scripts" / "verify_competition_ui.py", ROOT / "scripts" / "build_competition_materials.py", ROOT / "scripts" / "generate_demo_diagrams.py"]
+    files += [ROOT / "scripts" / "verify_competition_ui.py", ROOT / "scripts" / "verify_teaching_ui.py", ROOT / "scripts" / "build_competition_materials.py", ROOT / "scripts" / "generate_demo_diagrams.py", ROOT / "scripts" / "verify_deepseek_live.py"]
+    files += [ROOT / "docs" / "电泳图AI辅助观察使用说明.md", ROOT / "docs" / "电泳图AI辅助识别升级方案_2026-10-04.md", ROOT / "docs" / "教学功能升级使用说明.md"]
+    files += [ROOT / "启动生物实验智析助手.bat", ROOT / "创建桌面快捷方式.bat", ROOT / "scripts" / "build_windows_installer.py", ROOT / "scripts" / "verify_windows_package.py", ROOT / "docs" / "Windows安装与启动说明.md"]
+    files += [path for path in (ROOT / "desktop").iterdir() if path.is_file() and path.suffix in {".ps1", ".vbs"}]
     files += [ROOT / "demo_assets" / f"case_{index}.png" for index in range(1, 4)]
     files += [path for path in MATERIALS.iterdir() if path.is_file() and path.suffix in {".md", ".pdf", ".csv"}]
     manifest = []

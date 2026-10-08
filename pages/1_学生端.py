@@ -8,8 +8,11 @@ import secrets
 from datetime import datetime
 from html import escape
 
+import json
 import streamlit as st
 import ai_config
+import teaching_ui
+import teaching_workflow
 from gel_image_ui import render_student_panel
 from branding import PRODUCT_NAME
 
@@ -166,6 +169,7 @@ def restore_widget_value_from_storage(key):
 
 def init_student_wizard_state():
     """初始化学生端向导状态"""
+    st.session_state["student_scheme_confirm"] = st.session_state.get("student_scheme_confirm", False)
     # 新增：建立独立于组件生命周期的持久化存储区
     if "student_data_storage" not in st.session_state:
         st.session_state["student_data_storage"] = STUDENT_FORM_DEFAULTS.copy()
@@ -226,6 +230,7 @@ def reset_student_form_state(overrides=None, target_step=None):
     clear_followup_widget_state()
     clear_student_uploaded_image()
     st.session_state.pop("student_extraction_evidence", None)
+    st.session_state.pop("student_scheme_snapshot", None)
 
 
 def render_student_quick_actions():
@@ -292,7 +297,9 @@ def collect_student_form_payload():
     storage = st.session_state["student_data_storage"]
     return {**{key.removeprefix("student_form_"): storage.get(key) for key in STUDENT_FORM_DEFAULTS
                if key not in {"student_form_initial_hypothesis"}},
-            "gel_image_file": get_persisted_uploaded_file()}
+            "gel_image_file": get_persisted_uploaded_file(),
+            "teaching_task_code": st.session_state.get("teaching_task", {}).get("code", ""),
+            "course_scheme_snapshot": st.session_state.get("student_scheme_snapshot", {})}
 
 
 
@@ -522,14 +529,25 @@ def render_step_1_basic_info():
             st.caption("如还有其他现象，可在第 3 步补充描述中继续说明。")
 
 
+def reset_scheme_confirmation():
+    st.session_state["student_scheme_confirm"] = False
+
+
 def render_step_2_pcr_params():
     with st.container(border=True, key="pcr_student_form_card_step2"):
         render_card_title("填写 PCR 条件与课程方案", "未知参数可以留空；推荐条件应来自实际实验方案或试剂说明。")
-        presets = load_course_presets()
+        presets = teaching_ui.course_presets(DB_PATH, load_course_presets())
         if presets:
-            chosen = st.selectbox("课程方案预设", range(len(presets)), format_func=lambda i: presets[i]["name"], key="student_preset_choice")
+            chosen = st.selectbox("课程方案预设", range(len(presets)), format_func=lambda i: presets[i]["name"], key="student_preset_choice", on_change=reset_scheme_confirmation)
             st.caption(presets[chosen].get("source", ""))
-            if st.button("应用课程方案", key="student_apply_preset"):
+            if presets[chosen].get("controls"):
+                st.write("对照设置：" + presets[chosen]["controls"])
+            if presets[chosen].get("protocol_notes"):
+                with st.expander("所选方案的完整条件与待确认项"):
+                    st.write(presets[chosen]["protocol_notes"])
+            confirmed = st.checkbox("我已核对所选方案与本次实验实际采用的条件一致", key="student_scheme_confirm")
+            if st.button("应用课程方案", key="student_apply_preset", disabled=not confirmed):
+                st.session_state["student_scheme_snapshot"] = presets[chosen].get("_snapshot", {"name":presets[chosen]["name"],"source":presets[chosen].get("source",""),"version":"课程预设","payload_json":json.dumps(presets[chosen],ensure_ascii=False)})
                 for field, value in presets[chosen].items():
                     key = "student_form_" + field
                     if key in STUDENT_FORM_DEFAULTS:
@@ -690,7 +708,11 @@ def render_student_step_navigation():
                 if not st.session_state.get("student_form_initial_hypothesis", "").strip():
                     st.warning("请先填写你的初步判断和依据。")
                     return
-                run_student_diagnosis()
+                try:
+                    run_student_diagnosis()
+                except ValueError as exc:
+                    st.warning(str(exc))
+                    return
                 st.session_state["student_show_result_report"] = True
                 st.success("诊断已完成，本次记录已保存，可在教师端继续复核。")
                 st.rerun()
@@ -1190,6 +1212,9 @@ def render_student_results(payload):
 
     if record_id:
         render_student_panel(DB_PATH, record_id, st.session_state.get("student_access_code"))
+        teaching_ui.render_transfer(DB_PATH, record_id, st.session_state.get("student_access_code"))
+        teaching_ui.render_retests(DB_PATH, record_id, st.session_state.get("student_access_code"))
+    teaching_ui.render_basis_cards(payload)
 
     st.markdown(
         """
@@ -1254,6 +1279,7 @@ def main():
         return
 
     render_student_case_lookup()
+    teaching_ui.render_task_entry(DB_PATH)
     render_student_quick_actions()
     render_student_wizard_header()
 

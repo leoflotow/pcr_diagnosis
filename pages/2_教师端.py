@@ -11,9 +11,11 @@ import html
 import altair as alt
 import pandas as pd
 import streamlit as st
+import teaching_ui
+import teaching_workflow
 from gel_image_ui import render_teacher_panel
 from ui_design import design_color
-from evidence_support import normalize_cause_label, cause_options, parse_json, learning_progress, template_mass_ng
+from evidence_support import normalize_cause_label, cause_id, cause_options, parse_json, learning_progress, template_mass_ng
 
 from core import (
     DB_PATH,
@@ -1182,6 +1184,10 @@ def render_case_detail(record, all_records, detail_key_prefix):
         with st.container(border=True):
             st.markdown('<div class="pcr-teacher-review-form">', unsafe_allow_html=True)
             render_card_title("教师复核确认", "请选择最终原因并补充备注，保存后将作为本条案例的教师确认结论。")
+            independent = teaching_workflow.independent_record(DB_PATH, record_id, True)["review"]
+            if independent:
+                st.write("此前独立判断：" + independent["cause"])
+                st.caption("如最终判断改变，请在教师备注中说明原因。独立原稿保留。")
             candidate_causes = [extract_cause_text(x) for x in candidates if extract_cause_text(x)]
             if not candidate_causes and record.get("Top1 原因"):
                 candidate_causes = [record.get("Top1 原因")]
@@ -1216,6 +1222,8 @@ def render_case_detail(record, all_records, detail_key_prefix):
                 final_cause = custom_cause.strip() if teacher_choice == "其他/待补充" else teacher_choice
                 if not final_cause or final_cause == "请选择":
                     st.warning("请选择或填写教师最终原因。")
+                elif independent and not teacher_note.strip() and cause_id(independent["cause"]) != cause_id(final_cause):
+                    st.warning("最终判断与此前独立判断不同，请在教师备注中填写改变判断的依据。")
                 else:
                     saved = save_teacher_confirmation(record_id, final_cause, teacher_note.strip(), evidence_level,
                                                       verification_feedback.strip(), expected_version=int(record.get("teacher_review_version") or 0), rubric=rubric, data_origin=data_origin)
@@ -1926,6 +1934,12 @@ def main():
 
     render_teacher_page_header(len(records))
 
+    workspace = st.radio("教师工作区", ["独立复核", "课堂任务", "课程方案", "复测记录", "教学建议", "图像评估", "常规案例复核"], horizontal=True, key="teacher_workspace")
+    if workspace != "常规案例复核":
+        teaching_ui.render_teacher_workspace(DB_PATH, workspace, records)
+        return
+    teaching_workflow.mark_many_exposed(DB_PATH, [r["id"] for r in records], True)
+    st.caption("本工作区显示系统建议；进入后已有案例不再补记为未看建议的独立判断。")
     render_teacher_dashboard(records_by_id, records)
 
     with st.container(border=True):

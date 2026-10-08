@@ -69,6 +69,7 @@ html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
 .stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) { background: var(--ds-danger-bg); color: var(--ds-danger-text); }
 .stApp [data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) { background: var(--ds-success-bg); color: var(--ds-success-text); }
 .stApp [data-baseweb="radio"] input:checked + div { background: var(--ds-primary); border-color: var(--ds-primary); }
+.stApp .st-key-teacher_workspace [data-baseweb="radio"] input:checked + div { background: transparent; border-color: transparent; color: var(--ds-primary); font-weight: 700; }
 .stApp [data-baseweb="checkbox"] input:checked + div { background: var(--ds-primary); border-color: var(--ds-primary); }
 .stApp [data-testid="stExpander"] { border: 1px solid var(--ds-border); border-radius: var(--ds-radius); background: transparent; }
 .stApp [data-testid="stExpander"] summary { min-height: var(--ds-control-height); color: var(--ds-text); padding: var(--ds-3) var(--ds-4); }

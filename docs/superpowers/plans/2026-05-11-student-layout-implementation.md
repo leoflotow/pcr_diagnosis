@@ -1,5 +1,7 @@
 # Student Layout Optimization Implementation Plan
 
+> 历史设计/实施记录，保留原方案供追溯，不作为当前界面或功能要求。现行设计以项目根目录 `DESIGN_SYSTEM.md` 与 `ui_design.css` 为准，当前功能以 `README.md` 为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Convert the student page into a focused 4-step wizard layout while preserving the existing diagnosis workflow and data handling.

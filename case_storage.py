@@ -44,6 +44,12 @@ def prepare_database(path):
             if not backup.exists():
                 with closing(sqlite3.connect(backup)) as target:
                     conn.backup(target)
+        has_teaching = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='teaching_tasks'").fetchone()
+        if columns and not has_teaching:
+            backup = path.with_name(path.name + ".before-teaching-workflow.bak")
+            if not backup.exists():
+                with closing(sqlite3.connect(backup)) as target:
+                    conn.backup(target)
 
 
 def migrate(conn):
@@ -84,6 +90,8 @@ def migrate(conn):
     history_columns = {r[1] for r in conn.execute("PRAGMA table_info(teacher_review_history)")}
     if "rubric_json" not in history_columns:
         conn.execute("ALTER TABLE teacher_review_history ADD COLUMN rubric_json TEXT")
+    from teaching_workflow import migrate as migrate_teaching
+    migrate_teaching(conn)
 
 
 def authorized_gel_record(path, record_id, code=None, teacher_authorized=False):
@@ -244,6 +252,8 @@ def save_record(path, abnormality, template_amount, annealing_temp, cycles,
     }
     with closing(sqlite3.connect(path, timeout=10)) as conn, conn:
         cursor = conn.execute(f"INSERT INTO diagnosis_records ({','.join(values)}) VALUES ({','.join('?' for _ in values)})", tuple(values.values()))
+        from teaching_workflow import link_new_record
+        link_new_record(conn, cursor.lastrowid, raw_case)
         return cursor.lastrowid
 
 
@@ -257,6 +267,10 @@ def save_review(path, record_id, cause, note, evidence_level="经验复核", ver
         if not row or (expected_version is not None and int(row["teacher_review_version"] or 0) != expected_version):
             return False
         version = int(row["teacher_review_version"] or 0)
+        independent = conn.execute("SELECT cause FROM independent_reviews WHERE record_id=?", (record_id,)).fetchone()
+        if independent and cause_id(independent["cause"]) != cause_id(cause) and not str(note or "").strip():
+            # 改变独立判断时必须留下理由，原独立判断始终保留。
+            return False
         rubric_text = json.dumps(rubric or {}, ensure_ascii=False)
         if (row["teacher_final_cause"] == cause.strip() and (row["teacher_note"] or "") == note
                 and row["teacher_evidence_level"] == evidence_level

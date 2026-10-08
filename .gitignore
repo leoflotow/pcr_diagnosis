@@ -67,4 +67,5 @@ config/
 !.streamlit/config.toml
 .claude/
 CLAUDE.md
+.launcher/
 .python-3.10.11-installer.exe

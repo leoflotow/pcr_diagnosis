@@ -42,7 +42,7 @@ def labelled(elements, label):
 
 def main(with_image=True):
     original = ROOT / "data" / "app.db"
-    before = hashlib.sha256(original.read_bytes()).hexdigest() if original.exists() else None
+    before = (original.stat().st_size, original.stat().st_mtime_ns) if original.exists() else None
     with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
         stack.enter_context(patch.object(core, "DB_PATH", str(Path(directory) / "ui.db")))
         stack.enter_context(patch.object(core, "UPLOAD_DIR", str(Path(directory) / "uploads")))
@@ -129,6 +129,7 @@ def main(with_image=True):
         teacher = AppTest.from_file("pages/2_教师端.py", default_timeout=15)
         teacher.session_state["teacher_verified"] = True
         check(teacher.run())
+        check(teacher.radio(key="teacher_workspace").set_value("常规案例复核").run())
         assert teacher.selectbox(key="teacher_dashboard_origin").value == "真实课堂"
         assert "内部案例不得展示" not in "\n".join(str(item.value) for item in teacher.markdown)
         assert "内部案例不得展示" not in teacher.selectbox(key="teacher_dashboard_class_filter").options
@@ -176,7 +177,7 @@ def main(with_image=True):
             check(test.run())
             assert "dev_reset_demo" not in [item.key for item in test.button]
     if before:
-        assert hashlib.sha256(original.read_bytes()).hexdigest() == before
+        assert (original.stat().st_size, original.stat().st_mtime_ns) == before
     print(f"{'有图' if with_image else '无图'}流程：四页、向导、手动确认、补证、教师复核、跨会话查询、学生修订、验证计划与报告通过；课堂库未改动。")
 
 

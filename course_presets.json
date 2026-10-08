@@ -1,14 +1,18 @@
 [
   {
-    "name": "我的课程方案（待补充）",
+    "name": "pET-28a(+) 质粒 PCR 与梯度退火",
     "course_name": "",
     "experiment_name": "PCR 与琼脂糖凝胶电泳",
-    "template_type": "待确认",
+    "template_type": "质粒",
+    "template_amount": 1.0,
     "template_concentration": null,
-    "reaction_volume": null,
+    "reaction_volume": 50.0,
     "target_size": null,
     "recommended_temp": null,
-    "polymerase": "",
-    "source": "待教师提供实际实验方案；未设置任何推荐数值"
+    "cycles": 30,
+    "polymerase": "Taq DNA聚合酶；2× Taq PCR Mix（品牌型号待确认）",
+    "controls": "同一样品分两管采用不同退火温度；阳性对照与无模板阴性对照是否设置待确认。两温度样本不是阳性/阴性对照。",
+    "protocol_notes": "先配100 μL，再分装2管，每管50 μL；每管2× Taq PCR Mix 25 μL、10 μM上下游引物各1 μL、模板1 μL、ddH₂O 22 μL。讲义要求每100 μL约100 ng模板，此为配制要求；原液浓度未知，不能据1 μL认定实际质量。95℃3 min；95℃20 s、50–63℃梯度20 s、72℃30 s，30循环；72℃2 min。最佳退火温度待电泳判定。1.2%琼脂糖、1×TAE、DL5000 Ladder 5 μL、120 V 30–40 min。28F：5′-TAATACGACTCACTATAGGG-3′；28R：5′-TGCTAGTTATTGCTCAGCGG-3′。目的基因名称与扩增长度待确认。",
+    "source": "2026-10-08 教师提供的当前讲义条件；反应体积按每管50 μL填写。浓度、片段、最佳温度及对照设置未核定。"
   }
 ]
