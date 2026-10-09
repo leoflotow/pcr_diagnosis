@@ -51,7 +51,9 @@ python -m unittest discover -s tests -v
 
 ## Windows 桌面启动与分发
 
-`streamlit_launcher.py` 为双击入口，自动等待本机服务并打开浏览器，单实例锁防止同项目重复启动，控制窗口退出停止其自有服务。项目模式保留原库和配置；安装模式使用 `%LOCALAPPDATA%/BioLabReview` 数据与个人配置，程序在 Programs/BioLabReview，禁止把作者真实数据和 secrets 放入安装包。`desktop/` 管理快捷方式、安装和卸载脚本；PowerShell中文脚本须UTF-8 BOM。`scripts/build_windows_installer.py` 仅打包应用白名单和基础Python/项目依赖，产物在忽略的dist，临时文件在build。更新保留旧程序备份，卸载先核对路径，仅移除程序，个人数据保留。不要运行卸载脚本清理课堂数据。新验证 `tests/test_desktop_launcher.py` 与 `scripts/verify_windows_package.py` 使用隔离数据，不读取真实配置。
+`streamlit_launcher.py` 为双击入口，自动等待本机服务并打开浏览器，单实例锁防止同项目重复启动，控制窗口退出停止其自有服务。启动窗口提供“本机使用｜局域网使用｜远程使用”三种模式，默认本机；局域网须用户主动切换且不自动修改防火墙。远程使用采用 Cloudflare Quick Tunnel 临时 HTTPS 地址，显示二维码与复制入口；关闭窗口、切换离开远程模式或退出隧道后地址失效，重新启动会生成新地址。安装包未附带 `cloudflared.exe` 时，首次远程使用从 Cloudflare 官方 GitHub 获取固定版本并校验 SHA-256；安装包可仅包含通过校验的官方工具。工具版权说明随包提供。远程隧道由应用启动并只管理本应用自有的进程，不读个人 Cloudflare 配置、不建系统服务。
+
+项目模式保留原库和配置；安装模式使用 `%LOCALAPPDATA%/BioLabReview` 数据与个人配置，程序在 Programs/BioLabReview，禁止把作者真实数据和 secrets 放入安装包。`desktop/` 管理快捷方式、安装和卸载脚本；PowerShell中文脚本须UTF-8 BOM。`scripts/build_windows_installer.py` 仅打包应用白名单和基础Python/项目依赖，产物在忽略的dist，临时文件在build。更新保留旧程序备份，卸载先核对路径，仅移除程序，个人数据保留。不要运行卸载脚本清理课堂数据。新验证 `tests/test_desktop_launcher.py` 与 `scripts/verify_windows_package.py` 使用隔离数据，不读取真实配置。
 
 ## 统一教学平台
 
@@ -59,4 +61,14 @@ python -m unittest discover -s tests -v
 
 服务端验证教师会话与私有查询码，图片和报告同样鉴权。任务冻结知识快照及课程方案，修改发布新版本。文本草稿限当前标签页，收藏限当前浏览器且支持导入导出。API 不信任前端已授权标记。图像只观察，主动预览同意，人工核对独立保存。
 
-构建 npm ci --prefix frontend、npm run build --prefix frontend；运行 python platform_server.py。启动器默认本机，主动切换 LAN，不能自动改防火墙。Windows 包含已构建网页，不要求用户安装 Node.js。验证 tests/test_unified_platform.py、scripts/verify_unified_browser.cjs 和 scripts/verify_windows_package.py 只用隔离库、生成图片、BIO_CONFIG_DISABLED=1、PYTHON_DOTENV_DISABLED=1 与空密钥，不得读写课堂资源。实际手机验收与另一台电脑安装需单独如实记录。
+
+## 远程使用实现与最新验证（2026-10-09）
+
+- 远程连接由新增 `remote_tunnel.py` 管理，Cloudflare 官方 `cloudflared` 固定版本、SHA-256 校验、首次下载缓存、Quick Tunnel 生命周期管理和独立日志均已实现。只有检测到临时域名且日志确认 `Registered tunnel connection` 后，启动器才显示远程地址。下载失败、网络预检失败、隧道退出或用户取消时停止本应用自有进程并回到本机模式；日志位于个人数据目录 `.launcher/remote.log`。不要求 Cloudflare 账号、自己的域名或入站端口。
+- 诊断发现先前连接失败时，Windows 正运行 Clash Verge，DNS 将 Cloudflare Edge 解析到 `198.18.0.0/15` 虚拟 Fake-IP 地址；cloudflared 对 QUIC 与 HTTP/2 的握手均失败。用户关闭 TUN／虚拟网卡模式后，两种预检协议均报告可用，QUIC 注册成功。启动器遇到相同 Fake-IP 失败日志时提示暂时关闭 TUN；不能替用户更改代理、路由、防火墙或 DNS。
+- 本次隔离远程验证没有读取课堂数据库、学生图片或 API Key，DeepSeek 调用数为 0。远程完整网页的首页、知识查询、关联图谱及教师区、私有报告未授权访问检查通过。先由电脑代理访问成功，之后电脑不经过代理访问健康接口和 Playwright 浏览器流程也通过。浏览器在 390 像素宽度验证首页、pyruvate 查询结果与图谱，内容宽度为 390 像素，无页面错误。
+- 手机验收证据为用户报告：按请求使用手机移动网络、关闭 Wi-Fi 和手机代理后，首页及生物功能图谱均正常打开。该结果只代表本次使用的网络和手机，不代表所有运营商、校园网策略或并发负载。20–30 人并发性能、跨网络可用率及长期稳定性均未验证；Quick Tunnel 是临时访问方式，无可用性保证。公网运行电脑须保持开机、联网及启动器运行；不要把本次临时地址当作固定地址使用。任何持有新地址的人都能访问公开网页，教师操作和私有案例仍应由服务端验证身份和查询码。
+- 最新 Windows 安装包为 `dist/生物实验智学助手安装程序.exe`（2026-10-09 构建，约114 MiB；用目录中的 `.sha256` 文件复核当前实际摘要）。`scripts/verify_windows_package.py` 已以隔离数据完成安装、统一网页和知识查询启动、旧版 Streamlit 三页检查、更新保留测试数据及再次启动检查；未修改用户正式安装。构建和测试不得读取 `.env`、真实 `secrets.toml`、`data/app.db`、`uploads/` 或真实课堂记录。
+- 本机 UI 实测已用内置浏览器在 390×844 视口查看。远程连接脚本 `scripts/verify_remote_connection.py` 会实际建立公网临时隧道：仅当用户要求远程验证时才运行，必须用隔离数据库、空密钥与无教学数据服务，并在验证后关闭隧道；不能用其临时网址或生成的隔离数据代替正式教学数据。`scripts/verify_remote_browser.cjs` 仅用于用户授权的公网隔离页面检查。自动化 TUN 诊断覆盖见 `tests/test_remote_tunnel.py`；配合旧桌面用例共14项通过。
+
+上述是截至 2026-10-09 的已知状态。新任务如更改远程模式、启动器、安装包或网络诊断，应重新检查源码和实际包；用户手机通过记录是本次实际回报，不应扩写成全网或全班验收。若状态改变，同步更新此节和对应使用说明，保持事实与证据类型清楚。
