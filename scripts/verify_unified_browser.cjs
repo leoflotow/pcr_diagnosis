@@ -4,7 +4,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
 const base=process.env.BIO_QA_URL||'http://127.0.0.1:8521';
 const output=path.resolve(__dirname,'../build/qa/browser');fs.mkdirSync(output,{recursive:true});
 async function post(context,url,body){const response=await context.request.post(base+'/api/v1'+url,{headers:{'X-Teaching-Request':'1'},data:body});assert(response.ok(),await response.text());return response.json()}
-async function size(page,name){const measurements=await page.evaluate(()=>({width:innerWidth,body:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll('button,input,textarea,.panel')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.right>innerWidth+1||r.left< -1)}).map(e=>e.outerHTML.slice(0,120))}));assert(measurements.body<=measurements.width+1,JSON.stringify(measurements));assert(!measurements.overflow.length,JSON.stringify(measurements));await page.screenshot({path:path.join(output,name+'.png'),fullPage:true});return measurements}
+async function size(page,name){const measurements=await page.evaluate(()=>({width:innerWidth,body:document.documentElement.scrollWidth,overflow:[...document.querySelectorAll('button,input,textarea,.panel,nav a')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.right>innerWidth+1||r.left< -1)}).map(e=>e.outerHTML.slice(0,120))}));assert(measurements.body<=measurements.width+1,JSON.stringify(measurements));assert(!measurements.overflow.length,JSON.stringify(measurements));await page.screenshot({path:path.join(output,name+'.png'),fullPage:true});return measurements}
 (async()=>{
  const browser=await chromium.launch({channel:'msedge',headless:true});const context=await browser.newContext({viewport:{width:1366,height:900}}),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e)));const teacher=await browser.newContext({viewport:{width:1366,height:900}});
@@ -13,7 +13,7 @@ async function size(page,name){const measurements=await page.evaluate(()=>({widt
  const task=await post(teacher,'/teacher/tasks',{title:'梯度退火实验任务',instructions:'先理解知识关联，再记录真实实验观察。',transfer_prompt:'阳性对照正常而样本无带时，还需要什么证据？',knowledge_ids:[entries.items[0].id],knowledge_note:'注意区分自动匹配与已核实关系。'});
  const measures=[];
  for(const width of [360,390,430,1366,1920]){
-  await page.setViewportSize({width,height:900});await page.goto(base);await page.getByRole('heading',{name:'生物知识网络',exact:true}).waitFor();measures.push({page:'home',...await size(page,'home-'+width)});
+  await page.setViewportSize({width,height:900});await page.goto(base);await page.getByRole('heading',{name:'生物功能图谱',exact:true}).waitFor();assert.equal(await page.title(),'生物实验智学平台');await page.getByText('探索基因、蛋白与代谢物的通路关联',{exact:true}).waitFor();await page.getByText('记录实验现象，在证据与反馈中改进判断',{exact:true}).waitFor();measures.push({page:'home',...await size(page,'home-'+width)});
   await page.goto(base+'/knowledge/'+entries.items[0].id);await page.getByRole('heading',{name:entries.items[0].name,exact:true}).waitFor();measures.push({page:'knowledge',...await size(page,'knowledge-'+width)});
  }
  await page.setViewportSize({width:390,height:900});

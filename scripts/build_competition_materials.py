@@ -61,7 +61,7 @@ def make_support_zip():
     files += list((ROOT / "pages").glob("*.py")) + list((ROOT / "tests").glob("*.py"))
     files += [ROOT / "scripts" / "verify_competition_ui.py", ROOT / "scripts" / "verify_teaching_ui.py", ROOT / "scripts" / "build_competition_materials.py", ROOT / "scripts" / "generate_demo_diagrams.py", ROOT / "scripts" / "verify_deepseek_live.py"]
     files += [ROOT / "docs" / "电泳图AI辅助观察使用说明.md", ROOT / "docs" / "电泳图AI辅助识别升级方案_2026-10-04.md", ROOT / "docs" / "教学功能升级使用说明.md"]
-    files += [ROOT / "启动生物实验智析助手.bat", ROOT / "创建桌面快捷方式.bat", ROOT / "scripts" / "build_windows_installer.py", ROOT / "scripts" / "verify_windows_package.py", ROOT / "docs" / "Windows安装与启动说明.md"]
+    files += [ROOT / "启动生物实验智学平台.bat", ROOT / "创建桌面快捷方式.bat", ROOT / "scripts" / "build_windows_installer.py", ROOT / "scripts" / "verify_windows_package.py", ROOT / "docs" / "Windows安装与启动说明.md"]
     files += [path for path in (ROOT / "desktop").iterdir() if path.is_file() and path.suffix in {".ps1", ".vbs"}]
     files += [ROOT / "demo_assets" / f"case_{index}.png" for index in range(1, 4)]
     files += [path for path in MATERIALS.iterdir() if path.is_file() and path.suffix in {".md", ".pdf", ".csv"}]

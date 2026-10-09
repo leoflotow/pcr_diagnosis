@@ -4,7 +4,7 @@ import re
 import sqlite3
 import pandas as pd
 import case_storage
-from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, CURRENT_MODULE
+from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, CURRENT_MODULE, CURRENT_EXPERIMENT
 from evidence_support import parse_json, normalize_cause_label, template_mass_ng, positive_number
 
 
@@ -572,7 +572,7 @@ def build_case_review_report(payload, db_path=None):
         confidence_level=confidence_level,
     )
 
-    lines = [f"《{PRODUCT_NAME} · 实验复盘报告》", PRODUCT_SUBTITLE, f"当前模块：{CURRENT_MODULE}"]
+    lines = [f"《{PRODUCT_NAME} · 实验复盘报告》", PRODUCT_SUBTITLE, f"当前模块：{CURRENT_MODULE}", f"实验专题：{CURRENT_EXPERIMENT}"]
 
     append_report_section(
         lines,

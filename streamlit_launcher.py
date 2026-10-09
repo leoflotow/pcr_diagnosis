@@ -242,7 +242,7 @@ def main():
     if not lock:
         url=existing_url()
         if url:webbrowser.open(url)
-        else:messagebox.showinfo('生物实验智析助手','系统仍在启动或未正常退出，请检查已打开的启动窗口。',parent=window)
+        else:messagebox.showinfo('生物实验智学平台','系统仍在启动或未正常退出，请检查已打开的启动窗口。',parent=window)
         window.destroy();return
     try:
         DesktopApp(window);window.deiconify();window.mainloop()

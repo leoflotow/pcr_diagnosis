@@ -167,7 +167,7 @@ def main(with_image=True):
         assert json.loads(record["verification_plan_json"])["kind"] == "计划，尚未复测"
         report = core.build_case_review_report({"record_id": record_id})
         assert "下一步验证方案（计划记录，尚未复测）" in report
-        assert "生物实验智析助手" in report
+        assert "生物实验智学平台" in report
         assert core.load_case_history(record_id)["student"]
 
         for page, flags in [("app.py", {}), ("pages/3_开发调试端.py", {"dev_verified": True})]:

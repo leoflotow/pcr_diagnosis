@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 
 import streamlit as st
-from branding import PRODUCT_NAME, PRODUCT_SUBTITLE
+from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, EXPERIMENT_MODULE_NAME
 
 
 def design_color(token):
@@ -33,7 +33,7 @@ def render_app_navigation(active, on_home, on_student, on_teacher, on_dev):
             )
         with links:
             columns = st.columns(4)
-            entries = [("home", "首页", on_home), ("student", "实验诊断", on_student),
+            entries = [("home", "首页", on_home), ("student", EXPERIMENT_MODULE_NAME, on_student),
                        ("teacher", "教师复核", on_teacher), ("dev", "开发调试", on_dev)]
             for column, (role, label, action) in zip(columns, entries):
                 with column:

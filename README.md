@@ -1,10 +1,12 @@
-# 生物实验智析助手
+# 生物实验智学平台
 
-产品名称：生物实验智析助手
+平台名称：**生物实验智学平台**。模块一：**生物功能图谱**——探索基因、蛋白与代谢物的通路关联。模块二：**实验探因与复盘**——记录实验现象，在证据与反馈中改进判断。
+
+产品名称：生物实验智学平台
 
 副标题：面向本科生物实验教学的知识探索与智能复盘平台
 
-模块：生物知识网络；实验分析与复盘（PCR 与电泳）
+模块：生物功能图谱；实验探因与复盘（PCR 与电泳）
 
 面向本科实验教学：独立初判 → 追问补证 → 教师复核 → 学生修订 → 验证计划 → 实际复测。主要面向每班 20 多人的本科生物实验教学，另按 AI+高等教育—AI+教学整理参赛材料；真实课堂效果尚待验证。
 
@@ -12,7 +14,7 @@
 
 ## 双击启动与 Windows 安装版
 
-当前项目可双击根目录“启动生物实验智析助手.bat”；双击“创建桌面快捷方式.bat”后可从桌面启动。启动窗口自动打开浏览器，结束时点击“退出系统”。原有命令方式仍适用。
+当前项目可双击根目录“启动生物实验智学平台.bat”；双击“创建桌面快捷方式.bat”后可从桌面启动。启动窗口自动打开浏览器，结束时点击“退出系统”。原有命令方式仍适用。
 
 给其他电脑使用的离线安装包由 `scripts/build_windows_installer.py` 构建，包含独立 Python 运行环境。安装版把数据库、图片及配置放在用户数据目录，首次配置可在启动窗口填写。详见 [Windows安装与启动说明](docs/Windows安装与启动说明.md)。
 
@@ -43,7 +45,7 @@ python platform_server.py
 
 新平台使用 Vue 3 + TypeScript 网页、FastAPI 接口及 SQLite；知识数据为独立只读资源。`experiment_business.py` 与原版共用诊断、归一化和报告逻辑，`teaching_platform/` 负责服务端权限、任务知识关联与接口。品牌集中在 `teaching_platform/config.py`。
 
-完整用法见 [统一教学平台使用说明](docs/统一教学平台使用说明.md)。旧版可双击“启动旧版实验复盘.bat”或运行 `python -m streamlit run app.py`；原生物网络助手不修改。知识数据构建使用 `python scripts/build_knowledge.py`，从原工作簿重建先运行 `python scripts/build_knowledge_source.py --input 工作簿路径`。
+完整用法见 [统一教学平台使用说明](docs/统一教学平台使用说明.md)。旧版可双击“启动旧版实验复盘.bat”或运行 `python -m streamlit run app.py`；原生物功能图谱不修改。知识数据构建使用 `python scripts/build_knowledge.py`，从原工作簿重建先运行 `python scripts/build_knowledge_source.py --input 工作簿路径`。
 
 验证使用 `python -m unittest discover -s tests -v`；浏览器验收脚本 `scripts/verify_unified_browser.cjs` 仅连接隔离服务，禁止直接连接课堂环境。安装前先构建网页，再运行 `python scripts/build_windows_installer.py`。
 
@@ -91,7 +93,7 @@ AI 模式会将必要文字或处理后的图片发送到 DeepSeek；图像请�
 
 2026-10-09 统一平台回归：90 项测试通过，包含 20 人并发提交与上传。五种屏幕宽度的真实浏览器交互脚本为 `node scripts/verify_unified_browser.cjs`，仅连接隔离服务。旧版完整页面流程脚本为 `python scripts/verify_competition_ui.py`，使用临时库与受控图像响应；主动在线联调脚本为 `python scripts/verify_deepseek_live.py`，会发送固定匿名文本与程序生成图片并产生用量。两者均不能证明真实课堂图片识别准确率。
 
-配置示例见 `.env.example` 和 `.streamlit/secrets.toml.example`，保留已有入口码，勿提交真实密钥。统一网页顶部显示集中配置的产品名和副标题，提供知识网络、实验复盘和教师工作区。旧版模块标识仅保留在其正文和报告中。
+配置示例见 `.env.example` 和 `.streamlit/secrets.toml.example`，保留已有入口码，勿提交真实密钥。统一网页顶部显示集中配置的产品名和副标题，提供生物功能图谱、实验复盘和教师工作区。旧版模块标识仅保留在其正文和报告中。
 
 依赖锁定为本机验证版本。视觉规范见 [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)，本次新增流程核验见参赛目录。根目录旧 DOCX 保留原稿，但不作为当前技术口径。
 

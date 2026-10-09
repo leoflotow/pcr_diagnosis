@@ -28,6 +28,11 @@ def initialize_environment():
 
 
 def brand():
-    from branding import PRODUCT_NAME
-    return {'name': setting('BIO_PLATFORM_NAME', PRODUCT_NAME),
-            'subtitle': setting('BIO_PLATFORM_SUBTITLE', '面向本科生物实验教学的知识探索与智能复盘平台')}
+    from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, KNOWLEDGE_MODULE_NAME, KNOWLEDGE_MODULE_DESCRIPTION, EXPERIMENT_MODULE_NAME, EXPERIMENT_MODULE_DESCRIPTION
+    name = setting('BIO_PLATFORM_NAME', PRODUCT_NAME)
+    if name == '生物实验' + '智析助手':name = PRODUCT_NAME
+    return {'name': name,
+            'subtitle': setting('BIO_PLATFORM_SUBTITLE', PRODUCT_SUBTITLE),
+            'modules': {
+                'knowledge': {'name': KNOWLEDGE_MODULE_NAME, 'description': KNOWLEDGE_MODULE_DESCRIPTION},
+                'experiment': {'name': EXPERIMENT_MODULE_NAME, 'description': EXPERIMENT_MODULE_DESCRIPTION}}}

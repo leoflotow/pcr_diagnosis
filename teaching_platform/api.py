@@ -76,7 +76,7 @@ def create_app(db_path=None,upload_dir=None,knowledge_path=None):
         service.initialize();yield
         sessions.clear()
 
-    app=FastAPI(title='生物实验教学平台',lifespan=lifespan,docs_url=None,redoc_url=None)
+    app=FastAPI(title=brand()['name'],lifespan=lifespan,docs_url=None,redoc_url=None)
     app.state.service=service
 
     @app.exception_handler(ValueError)
@@ -463,4 +463,3 @@ def create_app(db_path=None,upload_dir=None,knowledge_path=None):
         return FileResponse(assets/'index.html',headers={'Cache-Control':'no-cache'})
 
     return app
-

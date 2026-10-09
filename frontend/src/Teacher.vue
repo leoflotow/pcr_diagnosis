@@ -8,7 +8,7 @@ const access=ref(''),tab=ref('cases'),cases=ref<any[]>([]),filter=ref(''),select
 const visibleCases=computed(()=>cases.value.filter(c=>`${c.id} ${c.class_name} ${c.group_code} ${c.course_name}`.includes(filter.value)))
 async function load(){await run(async()=>{cases.value=await api('/teacher/cases');tasks.value=await api('/teacher/tasks');schemes.value=await api('/schemes');for(const d of ui.config.dimensions??[])evaluation.rubric[d]=null},'')}
 async function login(){await run(async()=>{await api('/session',{role:'teacher',code:access.value});access.value='';ui.role='teacher';await load()},'已进入教师工作区')}
-async function logout(){await run(async()=>{await api('/logout');ui.role='';ui.caseIds=[];selected.value=null},'已退出教师身份')}
+async function logout(){await run(async()=>{await api('/logout',{},'POST');ui.role='';ui.caseIds=[];selected.value=null},'已退出教师身份')}
 async function select(rid:number){selected.value=rid;regular.value=false;independent.value=null;await run(async()=>{independent.value=await api(`/teacher/cases/${rid}/independent`);Object.assign(judgment,{cause:'',reason:'',evidence_level:'原因待核实'})},'')}
 async function showRegular(){await run(async()=>{const record=await api('/cases/'+selected.value);Object.assign(review,{cause:record.teacher_final_cause??'',note:record.teacher_note??'',evidence_level:record.teacher_evidence_level??'原因待核实',verification_feedback:record.verification_feedback??'',version:record.teacher_review_version??0});regular.value=true},'')}
 async function saveReview(){await run(async()=>{await api(`/teacher/cases/${selected.value}/review`,review);await showRegular()},'教师反馈已保存，学生需针对当前反馈版本修订')}

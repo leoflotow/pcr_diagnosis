@@ -4,7 +4,7 @@
 """
 
 import streamlit as st
-from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, CURRENT_MODULE
+from branding import PRODUCT_NAME, PRODUCT_SUBTITLE, CURRENT_MODULE, CURRENT_EXPERIMENT
 from ui_design import render_app_navigation
 
 from navigation_state import register_home_page
@@ -334,7 +334,7 @@ def render_home_portal():
         <div class="pcr-home-hero-refined">
             <div class="pcr-hero-content">
                 <div class="pcr-hero-copy">
-                    <div class="pcr-home-kicker">当前模块：{CURRENT_MODULE}</div>
+                    <div class="pcr-home-kicker">{CURRENT_MODULE} · {CURRENT_EXPERIMENT}</div>
                     <h1><span>{PRODUCT_NAME}</span></h1>
                     <p>{PRODUCT_SUBTITLE}</p>
                     <div class="pcr-hero-value-strip">
@@ -395,7 +395,7 @@ def render_home_portal():
     with st.container(key="pcr_hero_action_row"):
         col_student, col_teacher, col_dev = st.columns([1.28, 1, 0.9])
         with col_student:
-            if st.button("实验诊断入口", key="home_enter_student", type="primary", use_container_width=True):
+            if st.button("进入实验探因与复盘", key="home_enter_student", type="primary", use_container_width=True):
                 enter_student_role()
                 st.rerun()
         with col_teacher:
