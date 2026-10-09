@@ -73,3 +73,4 @@ CLAUDE.md
 /frontend/dist/
 /build/
 /dist/
+.rule-backups/

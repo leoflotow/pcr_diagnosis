@@ -63,12 +63,14 @@ class CaseInput(BaseModel):
     gel_notes: str=Field(default='',max_length=2000)
 
 
-def create_app(db_path=None,upload_dir=None,knowledge_path=None):
+def create_app(db_path=None,upload_dir=None,knowledge_path=None,dev_rules_path=None):
     os.environ['BIO_WEB_MODE']='1'
     initialize_environment()
     knowledge=Knowledge(knowledge_path)
     service=Service(db_path or setting('PCR_DIAGNOSIS_DB_PATH',str(ROOT/'data/app.db')),
                     upload_dir or setting('PCR_DIAGNOSIS_UPLOAD_DIR',str(ROOT/'uploads')),knowledge)
+    from .developer import DeveloperTools
+    developer_tools=DeveloperTools(service,dev_rules_path)
     sessions={};gate=threading.RLock();attempts={};observation_locks={}
 
     @asynccontextmanager
@@ -113,6 +115,10 @@ def create_app(db_path=None,upload_dir=None,knowledge_path=None):
         if state['role']!='teacher':raise HTTPException(403,'此操作需要教师权限。')
         return state
 
+    def developer(state=Depends(session)):
+        if state['role']!='dev':raise HTTPException(403,'此操作需要独立的开发调试权限。')
+        return state
+
     def student(rid,state):
         code=state['codes'].get(rid)
         if not code:raise HTTPException(403,'请先用对应的私有查询码找回案例。')
@@ -149,6 +155,10 @@ def create_app(db_path=None,upload_dir=None,knowledge_path=None):
             expected=setting('TEACHER_ACCESS_CODE')
             if not expected or not hmac.compare_digest(body.code,expected):raise HTTPException(401,'教师访问码不正确或尚未配置。')
             codes={}
+        elif body.role=='dev':
+            expected=setting('DEV_ACCESS_CODE')
+            if not expected or not hmac.compare_digest(body.code,expected):raise HTTPException(401,'开发访问码不正确或尚未配置 DEV_ACCESS_CODE。')
+            codes={}
         elif body.role=='student':
             record=service.student(body.code);codes={record['id']:body.code}
         else:raise HTTPException(400,'访问身份无效。')
@@ -182,6 +192,23 @@ def create_app(db_path=None,upload_dir=None,knowledge_path=None):
         with gate:sessions.pop(hashlib.sha256(request.cookies.get('bio_session','').encode()).hexdigest(),None)
         response=JSONResponse({'ok':True});response.delete_cookie('bio_session');return response
 
+    @app.get('/api/v1/dev/status')
+    def dev_status(state=Depends(developer)):
+        return developer_tools.status()
+
+    @app.get('/api/v1/dev/rules')
+    def dev_rules(state=Depends(developer)):
+        return developer_tools.rules()
+
+    @app.post('/api/v1/dev/rules/check')
+    def dev_rule_check(body:dict,state=Depends(developer)):
+        _,rule,warnings=developer_tools.prepare(body.get('rule'),body.get('version'))
+        return {'rule':rule,'warnings':warnings,'version':body.get('version')}
+
+    @app.post('/api/v1/dev/rules')
+    def dev_rule_add(body:dict,state=Depends(developer)):
+        return developer_tools.add(body.get('rule'),body.get('version'),body.get('confirmed'))
+
     @app.get('/api/v1/knowledge')
     def search(q:str=Query('',max_length=200),kind:str='',offset:int=Query(0,ge=0),limit:int=Query(30,ge=1,le=100)):
         return knowledge.search(q,kind,offset,limit)
@@ -213,7 +240,7 @@ def create_app(db_path=None,upload_dir=None,knowledge_path=None):
             if fresh:
                 token=secrets.token_urlsafe(32);digest=hashlib.sha256(token.encode()).hexdigest()
                 state={'role':'student','codes':{},'expires':time.time()+8*3600,'requests':{}};sessions[digest]=state
-            if state['role']=='teacher':raise ValueError('请退出教师身份后提交学生案例。')
+            if state['role'] in {'teacher','dev'}:raise ValueError('请退出教师或开发调试身份后提交学生案例。')
             payload_hash=hashlib.sha256(json.dumps(raw,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
             cached=state['requests'].get(body.request_id)
             if cached:
