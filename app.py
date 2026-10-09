@@ -348,7 +348,7 @@ def render_home_portal():
                         </div>
                         <div class="pcr-hero-value-item">
                             <div class="pcr-hero-value-title">师生反馈复盘</div>
-                            <div class="pcr-hero-value-desc">初判与修订留在同一案例</div>
+                            <div class="pcr-hero-value-desc">保留初步判断、教师反馈和学生修订</div>
                         </div>
                     </div>
                 </div>
@@ -422,7 +422,7 @@ def render_home_portal():
     st.html(
         f"""
         <section class="pcr-section" id="workflow">
-            {build_home_section_title_html("实验复盘流程", "七步流程串起学生初判、追问补证、规则判断、教师复核、修订与验证计划。")}
+            {build_home_section_title_html("实验复盘流程", "流程包括学生初步判断、补充证据、规则分析、教师复核、学生修订和验证计划。")}
             {build_workflow_section_html()}
         </section>
         """,

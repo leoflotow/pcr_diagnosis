@@ -6,5 +6,5 @@ onMounted(async()=>{await run(async()=>{ui.config=await api('/config');document.
 <template>
 <header class="site-header"><div class="brand"><RouterLink to="/">{{ui.config.brand?.name??'生物实验智学平台'}}</RouterLink><span>{{ui.config.brand?.subtitle??'面向本科生物实验教学的知识探索与智能复盘平台'}}</span></div><nav aria-label="主导航"><RouterLink to="/">首页</RouterLink><RouterLink to="/knowledge">生物功能图谱</RouterLink><RouterLink to="/experiment">实验探因与复盘</RouterLink><RouterLink to="/teacher">教师工作区</RouterLink></nav></header>
 <main class="workspace"><div v-if="ui.message" :class="['notification',{error:ui.error}]" role="status"><span>{{ui.message}}</span><button class="quiet" @click="ui.message=''" aria-label="关闭提示">×</button></div><RouterView/></main>
-<footer>面向实验课程的知识探索、证据记录与师生反馈 · AI 观察与建议需人工核对 <RouterLink to="/dev" class="developer-entry">开发调试</RouterLink></footer>
+<footer>面向实验课程的知识探索、证据记录与师生反馈 · AI 提供的观察和建议须经人工核对 <RouterLink to="/dev" class="developer-entry">开发调试</RouterLink></footer>
 </template>

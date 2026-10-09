@@ -341,7 +341,7 @@ def render_student_readiness_panel():
         f"""
         <div class="pcr-readiness-panel">
             <div class="pcr-readiness-title">诊断准备度</div>
-            <p class="pcr-readiness-desc">系统将根据已填写信息生成候选原因。</p>
+            <p class="pcr-readiness-desc">系统会根据已填写的信息列出待排查原因。</p>
             <div class="pcr-readiness-grid">{''.join(cards)}</div>
         </div>
         """,
@@ -608,7 +608,7 @@ def render_step_3_text_and_image():
             if suggestion.get("description") == st.session_state.get("student_form_description", ""):
                 st.info(f"候选建议（{suggestion.get('source', '')}）：{'、'.join(suggestion.get('proposed', [])) or '无明确线索'}；请在下方逐项确认。")
             st.multiselect("确认实际发生的事实线索", STANDARD_TEXT_HINTS, key="student_form_confirmed_hints", on_change=sync_val, args=("student_form_confirmed_hints",))
-            st.caption("自动整理只是候选建议；请取消未发生的项目。仅当前确认的线索影响排序，也可直接手动选择。")
+            st.caption("自动整理的线索仅供参考。请取消未发生的项目，只有确认的事实会影响原因排序。你也可以手动选择线索。")
         with image_col:
             uploaded_file = st.file_uploader(
                 "上传凝胶图片（可选，PNG/JPG，不超过 10 MB）",
@@ -780,7 +780,7 @@ def render_candidate_results(results):
         suggestion = result_item.get("建议") or "可结合诊断依据进一步复核。"
         cards.append(
             '<div class="pcr-candidate-card">'
-            f'<div class="pcr-candidate-rank">Top{index} 候选原因</div>'
+            f'<div class="pcr-candidate-rank">第 {index} 位候选原因</div>'
             f'<h4>{html_text(result_item.get("原因", "-"))}</h4>'
             f'<p>总分 {html_text(result_item.get("总分", "-"))}</p>'
             f'<p>{html_text(suggestion)}</p>'
@@ -798,7 +798,7 @@ def render_candidate_results(results):
     )
 
     for index, result_item in enumerate(secondary, 2):
-        with st.expander(f"查看 Top{index} 候选原因详情"):
+        with st.expander(f"查看第 {index} 位候选原因详情"):
             render_scoring_detail(result_item.get("诊断依据", {}), result_item.get("总分", "-"))
 
 
@@ -814,7 +814,7 @@ def render_result_evidence(missing_items):
         <div class="pcr-result-evidence">
             <h3 class="pcr-result-section-title">系统依据与补充建议</h3>
             <p>系统根据异常现象、对照结果、PCR 参数和补充描述生成候选原因。</p>
-            <p>为了提高判断稳定性，可继续补充或核对以下信息：</p>
+            <p>请补充或核对以下信息，以便进一步比较候选原因：</p>
             <ul>{missing_html}</ul>
             <p class="pcr-result-note">教师复核时建议结合凝胶原图、上样量、模板浓度测定结果和实际操作记录综合判断。</p>
         </div>
@@ -930,10 +930,10 @@ def render_followup_block(payload):
         first = followup_data.get("initial_results", [])
         latest = followup_data.get("final_results", [])
         with st.container(border=True):
-            st.markdown("### 追问补证与再判断")
+            st.markdown("### 补充证据并重新分析")
             st.write(
-                f"初判 Top1：{first[0].get('原因', '未识别') if first else '未识别'} → "
-                f"补证后 Top1：{latest[0].get('原因', '未识别') if latest else '未识别'}"
+                f"初步判断首位候选原因：{first[0].get('原因', '未识别') if first else '未识别'} → "
+                f"补充证据后首位候选原因：{latest[0].get('原因', '未识别') if latest else '未识别'}"
             )
             for question in followup_data.get("questions", []):
                 answer = followup_data.get("answers", {}).get(question["id"], "")
@@ -948,7 +948,7 @@ def render_followup_block(payload):
         return
     with st.container(key="pcr_followup_form"):
         st.markdown("### 追问补证")
-        st.write("以下问题用于核对初判中尚不充分或可能矛盾的证据。无法确认的项目可保持原记录。")
+        st.write("请回答以下问题，核对初步判断中尚不充分或相互矛盾的证据。无法确认的项目可暂不修改。")
         st.caption(f"问法来源：{payload.get('followup_question_source', '本地追问规划')}；问题主题和选项由程序限定。")
         answers = {}
         for question_number, question in enumerate(questions, 1):
@@ -1164,9 +1164,9 @@ def render_student_results(payload):
     if teacher_confirmed:
         st.success("教师已完成复核。请在下方查看反馈并修订你的判断。")
     elif payload.get("followup_completed"):
-        st.success("补充证据后已重新排序，教师端可查看初判与再判断记录。")
+        st.success("已根据补充证据更新候选原因顺序。教师可查看学生的初步判断和补证记录。")
     else:
-        st.info("当前为初步判断。请完成下方定向追问，补充证据后重新排序。", icon=":material/info:")
+        st.info("当前结果为初步判断。请回答下方问题并补充证据，再查看更新后的候选原因顺序。", icon=":material/info:")
     with st.container(key="pcr_diagnosis_split"):
         diagnosis_col, followup_col = st.columns([0.49, 0.51])
         with diagnosis_col:
@@ -1193,7 +1193,7 @@ def render_student_results(payload):
     hints = list(dict.fromkeys(payload.get("text_clues", []) + payload.get("followup_data", {}).get("extra_hints", [])))
     with st.expander("记录状态与文本线索"):
         st.write(f"记录状态：{status} · 诊断时间：{payload.get('submit_time', '-')}")
-        st.write(f"候选原因：{' / '.join(f'Top{i}' for i in range(1, len(results) + 1))}")
+        st.write(f"候选原因：{'、'.join(f'第{i}位' for i in range(1, len(results) + 1))}")
         st.write(f"文本线索：{'、'.join(hints) if hints else '未抽取'}")
 
     with st.expander("主要判断说明"):

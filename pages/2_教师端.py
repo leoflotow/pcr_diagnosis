@@ -104,7 +104,7 @@ def render_teacher_page_header(record_count):
                     f"""
                     <div class="pcr-teacher-hero-copy">
                         <h1>教师复核与案例看板</h1>
-                        <p>查看学生实验记录，复核系统诊断结果，并沉淀可用于教学改进的异常案例。</p>
+                        <p>查看学生实验记录，复核系统给出的候选原因，并记录教师意见，供后续教学参考。</p>
                         <div class="pcr-teacher-hero-meta">
                             <span class="pcr-teacher-status-tag ok">教师已验证</span>
                             <span class="pcr-teacher-status-tag">当前记录 {record_count} 条</span>
@@ -825,7 +825,7 @@ def build_feedback_loop_summary(loop_status):
     if consistency_status == "一致":
         return "该记录中，系统首选判断与教师最终确认一致。"
     if consistency_status == "Top3命中但Top1不一致":
-        return "该记录中，系统 Top1 判断与教师确认不一致，但前三个候选原因里包含了教师确认的原因。"
+        return "系统给出的首位候选原因与教师确认结果不一致，但教师确认的原因列在前三位候选中。"
     if consistency_status == "未命中":
         return "该记录中，系统候选结果没有覆盖教师确认的原因，后续可以补充规则。"
     return "该记录已有教师确认信息，但当前字段不足，暂时无法完成对比。"
@@ -1050,7 +1050,7 @@ def render_similar_case_block(current_record, all_records):
         render_card_title("可参考的相似历史案例", "基于当前数据库中的结构化字段进行轻量匹配，优先展示已确认案例。")
 
         if not similar_cases:
-            st.info("暂无足够相似的历史案例")
+            st.info("暂无相似度较高的历史案例")
             return
 
         # 修复点：直接展示卡片，不使用 expander，彻底解决嵌套问题
@@ -1760,7 +1760,7 @@ def render_consistency_distribution_visualization(distribution_df):
 
 
 def render_learning_progress(filtered_df):
-    st.markdown("### 学习闭环进度")
+    st.markdown("### 教学流程完成情况")
     metrics, rows = learning_progress(filtered_df.to_dict("records"))
     cols = st.columns(5)
     for col, (label, item) in zip(cols, metrics.items()):
@@ -1812,7 +1812,7 @@ def render_teacher_dashboard(records_by_id, all_records):
             with filter_cols[1]:
                 class_filter = st.selectbox("班级筛选", class_options, key="teacher_dashboard_class_filter")
         with filter_cols[-1]:
-            st.caption("筛选只影响本页概览和洞察，不会改动历史记录。")
+            st.caption("筛选仅影响本页统计和案例列表，不会修改历史记录。")
 
         class_scoped_df, filtered_df, time_filter_available = apply_dashboard_filters(
             dashboard_df,
@@ -1839,20 +1839,20 @@ def render_teacher_dashboard(records_by_id, all_records):
     if dashboard_df.empty:
         with st.container(border=False):
             render_teacher_section_header(
-                "教学诊断洞察",
+                "教学诊断概览",
                 "当学生提交更多记录后，这里会展示一致性和高频失败原因。",
             )
             insight_left, insight_right = st.columns(2)
             with insight_left:
                 render_dashboard_empty_state(
                     "暂无可展示数据",
-                    "当前还没有历史诊断记录，待学生提交后自动生成统计洞察。",
+                    "暂无历史诊断记录。学生提交记录后，此处将显示统计结果。",
                     min_height_rem=7.2,
                 )
             with insight_right:
                 render_dashboard_empty_state(
                     "暂无可展示数据",
-                    "有记录后，这里会展示高频失败原因 Top 5。",
+                    "积累记录后，此处将列出出现频率较高的失败原因（前 5 项）。",
                     min_height_rem=7.2,
                 )
         return
@@ -1860,7 +1860,7 @@ def render_teacher_dashboard(records_by_id, all_records):
     if filtered_df.empty:
         with st.container(border=False):
             render_teacher_section_header(
-                "教学诊断洞察",
+                "教学诊断概览",
                 "当前筛选条件下暂无记录，可调整筛选条件后查看。",
             )
             render_dashboard_empty_state(
@@ -1876,7 +1876,7 @@ def render_teacher_dashboard(records_by_id, all_records):
 
     with st.container(border=False):
         render_teacher_section_header(
-            "教学诊断洞察",
+            "教学诊断概览",
             "对照系统判断和教师复核结果，观察课堂实验中的高频异常来源。",
         )
         insight_left, insight_right = st.columns(2)
@@ -1887,7 +1887,7 @@ def render_teacher_dashboard(records_by_id, all_records):
             st.markdown("</div>", unsafe_allow_html=True)
         with insight_right:
             st.markdown('<div class="pcr-teacher-insight-card">', unsafe_allow_html=True)
-            st.markdown('<div class="pcr-teacher-insight-title">高频失败原因 Top 5</div>', unsafe_allow_html=True)
+            st.markdown('<div class="pcr-teacher-insight-title">高频失败原因（前 5 项）</div>', unsafe_allow_html=True)
             render_top_reason_bars(reason_summary_df, top_n=5)
             st.markdown("</div>", unsafe_allow_html=True)
 

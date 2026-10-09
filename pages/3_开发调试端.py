@@ -205,7 +205,7 @@ def render_api_debug_panel():
             "状态": "已保存候选" if row[3] == "success" else "请求未完成",
             "模型": row[4], "已记录 Token": json.loads(row[5] or "{}").get("total_tokens"),
         } for row in rows]), hide_index=True, width="stretch")
-        st.caption("Token 为接口返回的使用记录，空白不代表没有计费；实际费用以 DeepSeek 账号账单为准。")
+        st.caption("未返回 Token 用量不代表未计费，实际费用请以 DeepSeek 账单为准。")
 
 
 def run_rules_library_check():
