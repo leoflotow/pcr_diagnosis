@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import zipfile
+from windows_icon import replace_executable_icon
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -34,9 +35,9 @@ def app_files():
         yield path,"app/"+path.name
     for folder in ("pages","desktop"):
         for path in (ROOT/folder).iterdir():
-            if path.is_file() and path.suffix in {".py",".ps1",".vbs"}:
+            if path.is_file() and path.suffix in {".py",".ps1",".vbs",".ico"}:
                 yield path,"app/"+folder+"/"+path.name
-    for folder,extensions in (("teaching_platform",{".py"}),("frontend/dist",{".html",".js",".css"}),("knowledge",{".json"})):
+    for folder,extensions in (("teaching_platform",{".py"}),("frontend/dist",{".html",".js",".css",".png",".ico",".svg"}),("knowledge",{".json"})):
         for path in (ROOT/folder).rglob('*'):
             if path.is_file() and path.suffix in extensions and '__pycache__' not in path.parts:
                 yield path,'app/'+path.relative_to(ROOT).as_posix()
@@ -71,7 +72,7 @@ def main():
     # 卸载脚本也在 ZIP 内统一为 UTF-8 BOM，避免安装后中文路径损坏。
     # app_files 中的脚本由下方构建校验检查编码，不打包任何实际 secrets。
     if args.payload_only:return
-    target=output/"BioLabReview-Unified-Setup.exe"
+    target=output/"生物实验智学助手安装程序.exe"
     sed=f'''[Version]
 Class=IEXPRESS
 SEDVersion=3
@@ -88,7 +89,7 @@ InstallPrompt=
 DisplayLicense=
 FinishMessage=
 TargetName={target}
-FriendlyName=BioLabReview Setup
+FriendlyName=生物实验智学助手安装程序
 AppLaunched=powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1
 PostInstallCmd=<None>
 AdminQuietInstCmd=
@@ -106,8 +107,9 @@ SourceFiles0={work}\\
     spec=work/"setup.sed";spec.write_text(sed,encoding="utf-16")
     result=subprocess.run([str(Path(os.environ["SystemRoot"])/"System32/iexpress.exe"),"/N","/Q",str(spec)],timeout=240)
     if result.returncode or not target.exists():raise RuntimeError("Windows 安装包构建未完成。离线 ZIP 已保留，可查看 build/windows。")
+    replace_executable_icon(target, ROOT/'desktop/app.ico')
     digest=hashlib.sha256(target.read_bytes()).hexdigest()
-    (output/(target.name+".sha256")).write_text(digest+"  "+target.name+"\n",encoding="ascii")
+    (output/(target.name+".sha256")).write_text(digest+"  "+target.name+"\n",encoding="utf-8")
     print(f"安装包：{target}（{target.stat().st_size/1024/1024:.1f} MB）",flush=True)
 
 

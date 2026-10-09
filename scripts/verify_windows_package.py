@@ -7,6 +7,7 @@ import subprocess
 import struct
 import sys
 import zipfile
+from windows_icon import verify_executable_icon
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -22,11 +23,14 @@ def main():
                 assert not relative.startswith(('data/','uploads/','.venv/','.git/','.launcher/','frontend/node_modules/'))
                 assert Path(relative).name not in {'.env','secrets.toml'}
             assert hashlib.sha256(archive.read(name)).hexdigest()==digest,name
-        for required in ['app/platform_server.py','app/experiment_business.py','app/frontend/dist/index.html','app/knowledge/network.json','app/teaching_platform/api.py']:
+        for required in ['app/platform_server.py','app/experiment_business.py','app/frontend/dist/index.html','app/knowledge/network.json','app/teaching_platform/api.py','app/desktop/app.ico']:
             assert required in manifest,required
+        assert any(name.startswith('app/frontend/dist/assets/logo-') and name.endswith('.png') for name in manifest), '缺少网页品牌图标'
+        assert archive.read('app/desktop/app.ico') == (ROOT/'desktop/app.ico').read_bytes()
         assert archive.read('app/desktop/uninstall.ps1').startswith(b'\xef\xbb\xbf')
     qa=ROOT/'build/qa/windows';qa.mkdir(parents=True,exist_ok=True)
-    setup=ROOT/'dist/BioLabReview-Unified-Setup.exe'
+    setup=ROOT/'dist/生物实验智学助手安装程序.exe'
+    verify_executable_icon(setup, ROOT/'desktop/app.ico')
     executable=setup.read_bytes();offset=executable.rfind(b'MSCF')
     assert offset>0,'安装包缺少 CAB'
     length=struct.unpack_from('<I',executable,offset+8)[0]

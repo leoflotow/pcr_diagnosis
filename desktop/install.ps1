@@ -22,13 +22,17 @@ try {
     if (-not $NoShortcut) {
         $shell = New-Object -ComObject WScript.Shell
         $desktop = [Environment]::GetFolderPath('Desktop')
-        $shortcutPath = Join-Path $desktop '生物实验智学平台.lnk'
+        $shortcutPath = Join-Path $desktop '生物实验智学助手.lnk'
         if (Test-Path -LiteralPath $shortcutPath) {
             $old = $shell.CreateShortcut($shortcutPath)
-            if ($old.TargetPath -ne $python) { $shortcutPath = Join-Path $desktop '生物实验智学平台（安装版）.lnk' }
+            if ($old.TargetPath -ne $python) { $shortcutPath = Join-Path $desktop '生物实验智学助手（安装版）.lnk' }
         }
         # 清理同一程序的旧版本桌面名称，其他项目的快捷方式保留。
-        $legacyName = -join ([char[]](0x751F,0x7269,0x5B9E,0x9A8C,0x667A,0x6790,0x52A9,0x624B))
+        $legacyNames = @(
+            (-join ([char[]](0x751F,0x7269,0x5B9E,0x9A8C,0x667A,0x6790,0x52A9,0x624B))),
+            (-join ([char[]](0x751F,0x7269,0x5B9E,0x9A8C,0x667A,0x5B66,0x5E73,0x53F0)))
+        )
+        foreach ($legacyName in $legacyNames) {
         foreach ($legacySuffix in @('.lnk','（安装版）.lnk',' (project).lnk')) {
             $legacyLink = Join-Path ([Environment]::GetFolderPath('Desktop')) ($legacyName + $legacySuffix)
             if (Test-Path -LiteralPath $legacyLink) {
@@ -36,29 +40,47 @@ try {
                 if ($legacyShortcut.TargetPath -eq $python) { Remove-Item -LiteralPath $legacyLink }
             }
         }
+        }
         $shortcut = $shell.CreateShortcut($shortcutPath)
         $shortcut.TargetPath = $python
         $shortcut.Arguments = '"' + $launcher + '"'
         $shortcut.WorkingDirectory = $appRoot
-        $shortcut.Description = '生物实验智学平台'
-        $shortcut.IconLocation = $python + ',0'
+        $shortcut.Description = '生物实验智学助手'
+        $shortcut.IconLocation = (Join-Path $appRoot 'desktop\app.ico') + ',0'
         $shortcut.Save()
-        $menu = Join-Path ([Environment]::GetFolderPath('Programs')) '生物实验智学平台'
+        $menu = Join-Path ([Environment]::GetFolderPath('Programs')) '生物实验智学助手'
         New-Item -ItemType Directory -Force -Path $menu | Out-Null
-        Copy-Item -LiteralPath $shortcutPath -Destination (Join-Path $menu '生物实验智学平台.lnk')
+        Copy-Item -LiteralPath $shortcutPath -Destination (Join-Path $menu '生物实验智学助手.lnk')
         $uninstall = Join-Path $installRoot 'app\desktop\uninstall.ps1'
         $link = $shell.CreateShortcut((Join-Path $menu '卸载.lnk'))
         $link.TargetPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
         $link.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $uninstall + '"'
         $link.WindowStyle = 7
         $link.Save()
+        # 升级后仅移除指向本安装目录的旧开始菜单入口。
+        foreach ($legacyName in $legacyNames) {
+            $legacyMenu = Join-Path ([Environment]::GetFolderPath('Programs')) $legacyName
+            foreach ($entry in @(($legacyName + '.lnk'), '卸载.lnk')) {
+                $legacyLink = Join-Path $legacyMenu $entry
+                if (Test-Path -LiteralPath $legacyLink) {
+                    $old = $shell.CreateShortcut($legacyLink)
+                    if (($old.TargetPath -eq $python) -or (($entry -eq '卸载.lnk') -and $old.Arguments.Contains($uninstall))) {
+                        Remove-Item -LiteralPath $legacyLink
+                    }
+                }
+            }
+            if ((Test-Path -LiteralPath $legacyMenu) -and -not (Get-ChildItem -LiteralPath $legacyMenu -Force)) {
+                Remove-Item -LiteralPath $legacyMenu
+            }
+        }
         $reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\BioLabReview'
         New-Item -Path $reg -Force | Out-Null
-        New-ItemProperty -Path $reg -Name DisplayName -Value '生物实验智学平台' -Force | Out-Null
-        New-ItemProperty -Path $reg -Name DisplayVersion -Value '2026.10.08' -Force | Out-Null
+        New-ItemProperty -Path $reg -Name DisplayName -Value '生物实验智学助手' -Force | Out-Null
+        New-ItemProperty -Path $reg -Name DisplayVersion -Value '2026.10.09' -Force | Out-Null
+        New-ItemProperty -Path $reg -Name DisplayIcon -Value ((Join-Path $appRoot 'desktop\app.ico') + ',0') -Force | Out-Null
         New-ItemProperty -Path $reg -Name InstallLocation -Value $installRoot -Force | Out-Null
         New-ItemProperty -Path $reg -Name UninstallString -Value ('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $uninstall + '"') -Force | Out-Null
-        [Windows.Forms.MessageBox]::Show('安装完成。请双击桌面上的“生物实验智学平台”。首次进入可设置教师访问码及 DeepSeek API Key。', '生物实验智学平台') | Out-Null
+        [Windows.Forms.MessageBox]::Show('安装完成。请双击桌面上的“生物实验智学助手”。首次进入可设置教师访问码及 DeepSeek API Key。', '生物实验智学助手') | Out-Null
     }
     if (-not $NoStart) { Start-Process -FilePath $python -ArgumentList ('"' + $launcher + '"') -WorkingDirectory $appRoot -WindowStyle Hidden }
     Write-Output ('Installed: ' + $installRoot)

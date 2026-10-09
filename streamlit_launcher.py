@@ -127,6 +127,9 @@ class DesktopApp:
         self.window=window;self.process=None;self.url=None;self.lan=False;self.port=None
         self.closed=threading.Event();self.events=queue.Queue()
         window.title(PRODUCT_NAME);window.geometry('620x290');window.resizable(False,False)
+        icon = ROOT / 'desktop/app.ico'
+        if os.name == 'nt' and icon.is_file():
+            window.iconbitmap(default=str(icon))
         pane=ttk.Frame(window,padding=22);pane.pack(fill='both',expand=True)
         ttk.Label(pane,text=PRODUCT_NAME,font=('Microsoft YaHei',17,'bold')).pack(anchor='w')
         self.status=tk.StringVar(value='正在启动，请稍候……')
@@ -242,7 +245,7 @@ def main():
     if not lock:
         url=existing_url()
         if url:webbrowser.open(url)
-        else:messagebox.showinfo('生物实验智学平台','系统仍在启动或未正常退出，请检查已打开的启动窗口。',parent=window)
+        else:messagebox.showinfo('生物实验智学助手','系统仍在启动或未正常退出，请检查已打开的启动窗口。',parent=window)
         window.destroy();return
     try:
         DesktopApp(window);window.deiconify();window.mainloop()

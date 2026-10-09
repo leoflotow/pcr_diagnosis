@@ -395,7 +395,7 @@ def render_home_portal():
     with st.container(key="pcr_hero_action_row"):
         col_student, col_teacher, col_dev = st.columns([1.28, 1, 0.9])
         with col_student:
-            if st.button("进入实验探因与复盘", key="home_enter_student", type="primary", use_container_width=True):
+            if st.button("进入电泳异常分析", key="home_enter_student", type="primary", use_container_width=True):
                 enter_student_role()
                 st.rerun()
         with col_teacher:

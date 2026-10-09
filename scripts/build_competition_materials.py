@@ -61,12 +61,14 @@ def make_support_zip():
     files += list((ROOT / "pages").glob("*.py")) + list((ROOT / "tests").glob("*.py"))
     files += [ROOT / "scripts" / "verify_competition_ui.py", ROOT / "scripts" / "verify_teaching_ui.py", ROOT / "scripts" / "build_competition_materials.py", ROOT / "scripts" / "generate_demo_diagrams.py", ROOT / "scripts" / "verify_deepseek_live.py"]
     files += [ROOT / "docs" / "电泳图AI辅助观察使用说明.md", ROOT / "docs" / "电泳图AI辅助识别升级方案_2026-10-04.md", ROOT / "docs" / "教学功能升级使用说明.md"]
-    files += [ROOT / "启动生物实验智学平台.bat", ROOT / "创建桌面快捷方式.bat", ROOT / "scripts" / "build_windows_installer.py", ROOT / "scripts" / "verify_windows_package.py", ROOT / "docs" / "Windows安装与启动说明.md"]
-    files += [path for path in (ROOT / "desktop").iterdir() if path.is_file() and path.suffix in {".ps1", ".vbs"}]
+    files += [ROOT / "启动生物实验智学助手.bat", ROOT / "创建桌面快捷方式.bat", ROOT / "scripts" / "build_windows_installer.py", ROOT / "scripts" / "verify_windows_package.py", ROOT / "docs" / "Windows安装与启动说明.md"]
+    files += [path for path in (ROOT / "desktop").iterdir() if path.is_file() and path.suffix in {".ps1", ".vbs", ".ico"}]
+    files += [ROOT / 'scripts/windows_icon.py']
     files += [ROOT / "demo_assets" / f"case_{index}.png" for index in range(1, 4)]
     files += [path for path in MATERIALS.iterdir() if path.is_file() and path.suffix in {".md", ".pdf", ".csv"}]
     files += [ROOT/'experiment_business.py',ROOT/'platform_server.py',ROOT/'docs/统一教学平台使用说明.md',ROOT/'docs/统一平台迁移对照与验收.md',ROOT/'启动旧版实验复盘.bat']
-    files += list((ROOT/'teaching_platform').glob('*.py')) + list((ROOT/'frontend/src').glob('*'))
+    files += list((ROOT/'teaching_platform').glob('*.py'))
+    files += [path for path in (ROOT/'frontend/src').rglob('*') if path.is_file() and path.suffix in {'.vue','.ts','.css','.png','.svg','.ico'}]
     files += [ROOT/'frontend'/n for n in ['package.json','package-lock.json','index.html','tsconfig.json','vite.config.ts']]
     files += list((ROOT/'knowledge').rglob('*.json'))
     files += [ROOT/'scripts'/n for n in ['build_knowledge.py','build_knowledge_source.py','verify_unified_browser.cjs','verify_platform_load.py']]

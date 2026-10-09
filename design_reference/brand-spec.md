@@ -1,12 +1,12 @@
-# Brand Spec — 生物实验智学平台
+# Brand Spec — 生物实验智学助手
 
 > 历史设计/实施记录，保留原方案供追溯，不作为当前界面或功能要求。现行设计以项目根目录 `DESIGN_SYSTEM.md` 与 `ui_design.css` 为准，当前功能以 `README.md` 为准。
 
-产品名称：生物实验智学平台
+产品名称：生物实验智学助手
 
-副标题：面向本科生物实验教学的知识探索与智能复盘平台
+副标题：面向本科生物实验教学的知识探索与智能复盘工具
 
-当前模块：实验探因与复盘；实验专题：PCR 与电泳
+当前模块：电泳异常分析；实验专题：PCR 与电泳
 
 ## Direction
 IBM Carbon Design System inspired, with a lab-science domain accent.

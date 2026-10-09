@@ -13,7 +13,7 @@ async function size(page,name){const measurements=await page.evaluate(()=>({widt
  const task=await post(teacher,'/teacher/tasks',{title:'梯度退火实验任务',instructions:'先理解知识关联，再记录真实实验观察。',transfer_prompt:'阳性对照正常而样本无带时，还需要什么证据？',knowledge_ids:[entries.items[0].id],knowledge_note:'注意区分自动匹配与已核实关系。'});
  const measures=[];
  for(const width of [360,390,430,1366,1920]){
-  await page.setViewportSize({width,height:900});await page.goto(base);await page.getByRole('heading',{name:'生物功能图谱',exact:true}).waitFor();assert.equal(await page.title(),'生物实验智学平台');await page.getByText('探索基因、蛋白与代谢物的通路关联',{exact:true}).waitFor();await page.getByText('记录实验现象，在证据与反馈中改进判断',{exact:true}).waitFor();measures.push({page:'home',...await size(page,'home-'+width)});
+  await page.setViewportSize({width,height:900});await page.goto(base);await page.getByRole('heading',{name:'生物功能图谱',exact:true}).waitFor();assert.equal(await page.title(),'生物实验智学助手');await page.getByText('探索基因、蛋白与代谢物的通路关联',{exact:true}).waitFor();await page.getByText('结合实验记录与对照结果分析电泳异常，通过教师反馈和复测验证改进判断',{exact:true}).waitFor();measures.push({page:'home',...await size(page,'home-'+width)});
   await page.goto(base+'/knowledge/'+entries.items[0].id);await page.getByRole('heading',{name:entries.items[0].name,exact:true}).waitFor();measures.push({page:'knowledge',...await size(page,'knowledge-'+width)});
  }
  await page.setViewportSize({width:390,height:900});
