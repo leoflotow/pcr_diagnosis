@@ -69,3 +69,7 @@ config/
 CLAUDE.md
 .launcher/
 .python-3.10.11-installer.exe
+/frontend/node_modules/
+/frontend/dist/
+/build/
+/dist/

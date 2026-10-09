@@ -11,6 +11,11 @@ VISION_TIMEOUT = 30
 def setting(name, default=""):
     if name in os.environ:
         return os.environ[name].strip()
+    if os.getenv("BIO_CONFIG_DISABLED") == "1":
+        return default
+    if os.getenv("BIO_WEB_MODE") == "1":
+        from teaching_platform.config import setting as platform_setting
+        return platform_setting(name, default)
     try:
         import streamlit as st
         return str(st.secrets.get(name, default)).strip()

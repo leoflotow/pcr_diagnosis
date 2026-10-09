@@ -2,12 +2,16 @@
 
 ## 项目与边界
 
-生物实验智析助手，Streamlit 教学应用。副标题：面向本科生物实验教学的智能复盘工具。当前模块：PCR 与电泳实验复盘。独立初判→补证→教师复核→学生修订→验证计划。当前参赛方向为 AI+高等教育—AI+教学，无真实课堂效果材料，勿编造成效。小程序和网页部署暂不实施。
+生物实验智析助手，统一 Vue/FastAPI 教学平台；旧版 Streamlit 入口保留。副标题：面向本科生物实验教学的知识探索与智能复盘平台。模块：生物知识网络、实验分析与复盘（PCR 与电泳）。独立初判→补证→教师复核→学生修订→验证计划。当前参赛方向为 AI+高等教育—AI+教学，无真实课堂效果材料，勿编造成效。小程序和网页部署暂不实施。
 
 ## 运行与验证
 
 ```powershell
 python -m pip install -r requirements.txt
+npm ci --prefix frontend
+npm run build --prefix frontend
+python platform_server.py
+# 旧版回退及内部验证
 python -m streamlit run app.py
 python demo_runner.py
 python -m unittest discover -s tests -v
@@ -48,3 +52,11 @@ python -m unittest discover -s tests -v
 ## Windows 桌面启动与分发
 
 `streamlit_launcher.py` 为双击入口，自动等待本机服务并打开浏览器，单实例锁防止同项目重复启动，控制窗口退出停止其自有服务。项目模式保留原库和配置；安装模式使用 `%LOCALAPPDATA%/BioLabReview` 数据与个人配置，程序在 Programs/BioLabReview，禁止把作者真实数据和 secrets 放入安装包。`desktop/` 管理快捷方式、安装和卸载脚本；PowerShell中文脚本须UTF-8 BOM。`scripts/build_windows_installer.py` 仅打包应用白名单和基础Python/项目依赖，产物在忽略的dist，临时文件在build。更新保留旧程序备份，卸载先核对路径，仅移除程序，个人数据保留。不要运行卸载脚本清理课堂数据。新验证 `tests/test_desktop_launcher.py` 与 `scripts/verify_windows_package.py` 使用隔离数据，不读取真实配置。
+
+## 统一教学平台
+
+新版入口 `platform_server.py`，Vue 3/TypeScript 在 frontend/，FastAPI 在 teaching_platform/，接口统一 /api/v1。纯业务抽出 experiment_business.py，core.py 保留旧页面适配，共享规则、存储和报告。旧版 app.py 仍可运行。品牌集中 teaching_platform/config.py，知识只读资源 knowledge/network.json，稳定编号不能用数组位置代替。名称和标识符自动匹配须显示待核实，禁止推断反应方向、未知物种或 PCR 片段。
+
+服务端验证教师会话与私有查询码，图片和报告同样鉴权。任务冻结知识快照及课程方案，修改发布新版本。文本草稿限当前标签页，收藏限当前浏览器且支持导入导出。API 不信任前端已授权标记。图像只观察，主动预览同意，人工核对独立保存。
+
+构建 npm ci --prefix frontend、npm run build --prefix frontend；运行 python platform_server.py。启动器默认本机，主动切换 LAN，不能自动改防火墙。Windows 包含已构建网页，不要求用户安装 Node.js。验证 tests/test_unified_platform.py、scripts/verify_unified_browser.cjs 和 scripts/verify_windows_package.py 只用隔离库、生成图片、BIO_CONFIG_DISABLED=1、PYTHON_DOTENV_DISABLED=1 与空密钥，不得读写课堂资源。实际手机验收与另一台电脑安装需单独如实记录。

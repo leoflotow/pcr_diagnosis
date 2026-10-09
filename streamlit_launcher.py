@@ -23,10 +23,14 @@ def python_path():
     return str(next((p for p in choices if p.is_file()), Path(sys.executable).with_name('python.exe') if os.name == 'nt' else Path(sys.executable)))
 
 
-def server_command(python, port, app=None):
-    command = [python, '-m', 'streamlit', 'run', str(app or ROOT/'app.py'), '--server.address', '127.0.0.1', '--server.port', str(port), '--server.headless', 'true', '--browser.gatherUsageStats', 'false']
+def server_command(python, port, app=None, lan=False):
+    if app is not None:
+        command = [python, '-m', 'streamlit', 'run', str(app), '--server.address', '127.0.0.1', '--server.port', str(port), '--server.headless', 'true', '--browser.gatherUsageStats', 'false']
+        if INSTALLED: command += ['--secrets.files', str(HOME/'.streamlit/secrets.toml')]
+        return command
+    command = [python, str(ROOT/'platform_server.py'), '--host', '0.0.0.0' if lan else '127.0.0.1', '--port', str(port)]
     if INSTALLED:
-        command += ['--secrets.files', str(HOME/'.streamlit/secrets.toml')]
+        command += ['--secrets-path', str(HOME/'.streamlit/secrets.toml')]
     return command
 
 
@@ -44,8 +48,8 @@ def server_environment():
 
 def healthy(url):
     try:
-        with HTTP.open(url+'/_stcore/health', timeout=1) as response:
-            return response.status == 200 and response.read(32).strip() == b'ok'
+        with HTTP.open(url+'/api/v1/health', timeout=1) as response:
+            return response.status == 200 and json.loads(response.read(512)).get('service') == 'biology-teaching-platform'
     except (OSError, ValueError):
         return False
 
@@ -59,6 +63,15 @@ def free_port():
             except OSError:
                 continue
     raise RuntimeError('可用端口已占用，请先退出此前打开的系统后重试。')
+
+
+def local_addresses():
+    """列出本机 IPv4 地址，不请求外部服务、不改防火墙。"""
+    try:
+        return sorted({item[4][0] for item in socket.getaddrinfo(socket.gethostname(),None,socket.AF_INET)
+                       if not item[4][0].startswith(('127.','169.254.'))})
+    except OSError:
+        return []
 
 
 def acquire_lock():
@@ -107,10 +120,13 @@ class DesktopApp:
     def __init__(self,window):
         import tkinter as tk
         from tkinter import ttk
-        from branding import PRODUCT_NAME
-        self.window=window;self.process=None;self.url=None
+        from teaching_platform.config import brand, initialize_environment
+        if INSTALLED:os.environ['BIO_SECRETS_PATH']=str(HOME/'.streamlit/secrets.toml')
+        initialize_environment()
+        PRODUCT_NAME=brand()['name']
+        self.window=window;self.process=None;self.url=None;self.lan=False;self.port=None
         self.closed=threading.Event();self.events=queue.Queue()
-        window.title(PRODUCT_NAME);window.geometry('530x240');window.resizable(False,False)
+        window.title(PRODUCT_NAME);window.geometry('620x290');window.resizable(False,False)
         pane=ttk.Frame(window,padding=22);pane.pack(fill='both',expand=True)
         ttk.Label(pane,text=PRODUCT_NAME,font=('Microsoft YaHei',17,'bold')).pack(anchor='w')
         self.status=tk.StringVar(value='正在启动，请稍候……')
@@ -118,6 +134,7 @@ class DesktopApp:
         ttk.Label(pane,text='自动打开浏览器。使用时保留此窗口，结束后点击“退出系统”。',wraplength=480).pack(anchor='w')
         row=ttk.Frame(pane);row.pack(fill='x',pady=(18,0))
         self.open_button=ttk.Button(row,text='打开系统页面',command=self.open_page,state='disabled');self.open_button.pack(side='left')
+        self.phone_button=ttk.Button(pane,text='开启手机局域网访问',command=self.toggle_lan,state='disabled');self.phone_button.pack(anchor='w',pady=(12,0))
         if INSTALLED:ttk.Button(row,text='首次使用配置',command=self.configure).pack(side='left',padx=10)
         ttk.Button(row,text='退出系统',command=self.close).pack(side='right')
         window.protocol('WM_DELETE_WINDOW',self.close)
@@ -129,11 +146,12 @@ class DesktopApp:
     def start(self):
         try:
             python=python_path()
-            if not Path(python).is_file() or not (ROOT/'app.py').is_file():raise RuntimeError('未找到完整运行环境，请保留项目文件夹或重新安装。')
-            port=free_port();self.publish(port)
+            if not Path(python).is_file() or not (ROOT/'platform_server.py').is_file():raise RuntimeError('未找到完整运行环境，请保留项目文件夹或重新安装。')
+            if not (ROOT/'frontend/dist/index.html').is_file():raise RuntimeError('统一网页尚未构建，请按使用说明完成构建，或安装完整软件包。')
+            port=free_port();self.port=port;self.publish(port)
             if self.closed.is_set():return
             with (RUNTIME/'service.log').open('ab',buffering=0) as log:
-                self.process=subprocess.Popen(server_command(python,port),cwd=ROOT,env=server_environment(),stdin=subprocess.DEVNULL,stdout=log,stderr=log,close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+                self.process=subprocess.Popen(server_command(python,port,lan=self.lan),cwd=ROOT,env=server_environment(),stdin=subprocess.DEVNULL,stdout=log,stderr=log,close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
             url=f'http://127.0.0.1:{port}';deadline=time.monotonic()+60
             while not self.closed.wait(0.3):
                 if self.process.poll() is not None:raise RuntimeError('服务未能启动。详细信息见数据目录中的 .launcher/service.log。')
@@ -148,7 +166,8 @@ class DesktopApp:
         try:
             kind,value=self.events.get_nowait()
             if kind=='ready':
-                self.url=value;self.status.set('系统已启动：'+value);self.open_button.configure(state='normal');self.open_page()
+                self.url=value;self.status.set(('局域网模式已启动：' if self.lan else '本机模式已启动：')+value);self.open_button.configure(state='normal');self.phone_button.configure(state='normal',text='查看手机访问地址／关闭局域网' if self.lan else '开启手机局域网访问');self.open_page()
+                if self.lan:self.show_phone()
             else:self.status.set(value)
         except queue.Empty:pass
         if self.url and self.process and self.process.poll() is not None:
@@ -157,6 +176,41 @@ class DesktopApp:
 
     def open_page(self):
         if self.url:webbrowser.open(self.url)
+
+    def toggle_lan(self):
+        from tkinter import messagebox
+        if self.lan:
+            self.show_phone();return
+        if not messagebox.askyesno('开启局域网访问','请先保存网页中尚未提交的内容。系统将重启为局域网模式，同一网络设备可访问教学页面；教师操作和案例仍需访问码。是否开启？',parent=self.window):return
+        self.restart(True)
+
+    def restart(self,lan):
+        self.open_button.configure(state='disabled');self.phone_button.configure(state='disabled')
+        stop_process(self.process);self.url=None;self.lan=lan;self.status.set('正在切换访问模式……')
+        threading.Thread(target=self.start,daemon=True).start()
+
+    def show_phone(self):
+        import tkinter as tk
+        from tkinter import ttk
+        import qrcode
+        from PIL import ImageTk
+        dialog=tk.Toplevel(self.window);dialog.title('手机局域网访问');dialog.geometry('540x500')
+        pane=ttk.Frame(dialog,padding=20);pane.pack(fill='both',expand=True)
+        ttk.Label(pane,text='手机与电脑需处于可互访的同一网络。电脑保持运行。',wraplength=490).pack(anchor='w')
+        addresses=local_addresses()
+        if not addresses:
+            ttk.Label(pane,text='未找到可用局域网地址，请连接网络后重试。').pack(pady=20)
+        else:
+            choice=tk.StringVar(value=addresses[0]);url=tk.StringVar()
+            combo=ttk.Combobox(pane,textvariable=choice,values=addresses,state='readonly');combo.pack(fill='x',pady=12)
+            label=ttk.Label(pane);label.pack()
+            entry=ttk.Entry(pane,textvariable=url,state='readonly');entry.pack(fill='x',pady=12)
+            def update(event=None):
+                url.set(f'http://{choice.get()}:{self.port}')
+                label.image=ImageTk.PhotoImage(qrcode.make(url.get()).resize((220,220)));label.configure(image=label.image)
+            combo.bind('<<ComboboxSelected>>',update);update()
+        ttk.Label(pane,text='地址打不开时，检查校园网是否隔离设备，或用可控热点测试。系统不会自动修改防火墙。',wraplength=490).pack(anchor='w',pady=10)
+        ttk.Button(pane,text='关闭局域网并切回本机模式',command=lambda:(dialog.destroy(),self.restart(False))).pack(pady=12)
 
     def configure(self):
         import tkinter as tk

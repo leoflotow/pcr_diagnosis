@@ -46,7 +46,7 @@ class GelAssistantTests(ImageFixture, unittest.TestCase):
             self.assertEqual(followup_agent.MODEL_BASE_URL, ai_config.BASE_URL)
 
     def test_config_allows_secrets_and_empty_environment_explicitly_disables_calls(self):
-        with patch.dict(os.environ, {"PCR_DIAGNOSIS_DEMO_MODE": "0"}), patch.object(core.st, "secrets", {"DEEPSEEK_API_KEY": "fake-test"}):
+        with patch.dict(os.environ, {"PCR_DIAGNOSIS_DEMO_MODE": "0", "BIO_CONFIG_DISABLED": "0", "BIO_WEB_MODE": "0"}), patch.object(core.st, "secrets", {"DEEPSEEK_API_KEY": "fake-test"}):
             with patch.dict(os.environ, clear=False):
                 os.environ.pop("DEEPSEEK_API_KEY", None)
                 self.assertEqual(ai_config.api_key(), "fake-test")

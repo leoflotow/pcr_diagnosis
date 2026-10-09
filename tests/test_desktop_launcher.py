@@ -25,7 +25,9 @@ class DesktopLauncherTests(unittest.TestCase):
             self.assertEqual(env["DEEPSEEK_API_KEY"],"key-not-real")
             self.assertEqual(env["PCR_DIAGNOSIS_DB_PATH"],str(Path(directory)/"data/app.db"))
             self.assertFalse((Path(directory)/"data/app.db").exists())
-            self.assertIn(str(Path(directory)/".streamlit/secrets.toml"),launcher.server_command("python.exe",8501))
+            command=launcher.server_command("python.exe",8501)
+            self.assertIn(str(Path(directory)/".streamlit/secrets.toml"),command)
+            self.assertIn('--secrets-path',command)
 
     def test_single_instance_lock_releases(self):
         with tempfile.TemporaryDirectory() as directory,patch.object(launcher,"RUNTIME",Path(directory)):
@@ -36,6 +38,12 @@ class DesktopLauncherTests(unittest.TestCase):
             again=launcher.acquire_lock()
             self.assertIsNotNone(again)
             again.close()
+
+    def test_unified_web_is_local_unless_lan_is_explicit(self):
+        local=launcher.server_command('python.exe',8501)
+        self.assertIn('127.0.0.1',local);self.assertTrue(any('platform_server.py' in p for p in local))
+        self.assertNotIn('streamlit',local)
+        self.assertIn('0.0.0.0',launcher.server_command('python.exe',8501,lan=True))
 
     def test_reopen_only_ready_local_service(self):
         with tempfile.TemporaryDirectory() as directory,patch.object(launcher,"RUNTIME",Path(directory)),patch.object(launcher,"healthy",return_value=True):

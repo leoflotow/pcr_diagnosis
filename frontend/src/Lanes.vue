@@ -1,0 +1,6 @@
+<script setup lang="ts">
+import { ui } from './api'
+defineProps<{lanes:any[],checking?:boolean}>()
+function patternChanged(lane:any){if(lane.pattern==='无法确认')lane.band_count=null;else if(lane.pattern==='单条')lane.band_count=1;else if(lane.pattern==='未见清晰条带')lane.band_count=0}
+</script>
+<template><div class="lane-grid"><fieldset v-for="lane in lanes" :key="lane.lane_id"><legend>泳道 {{lane.lane_id}}</legend><label>可辨条带数（未知留空）<input type="number" min="0" max="100" :value="lane.band_count??''" @input="lane.band_count=($event.target as HTMLInputElement).value===''?null:Number(($event.target as HTMLInputElement).value)"></label><label>形态<select v-model="lane.pattern" @change="patternChanged(lane)"><option v-for="v in ui.config.patterns" :key="v">{{v}}</option></select></label><label>位置<select v-model="lane.position"><option v-for="v in ui.config.positions" :key="v">{{v}}</option></select></label><label>亮度<select v-model="lane.brightness"><option v-for="v in ui.config.brightness" :key="v">{{v}}</option></select></label><template v-if="checking"><label>核对状态<select v-model="lane.state"><option v-for="v in ui.config.check_states" :key="v">{{v}}</option></select></label><label>人工备注<textarea v-model="lane.note" maxlength="500" rows="2"></textarea></label></template></fieldset></div></template>

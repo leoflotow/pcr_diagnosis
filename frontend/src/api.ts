@@ -1,0 +1,14 @@
+import { reactive } from 'vue'
+export const ui=reactive({message:'',error:false,config:{} as any,role:'',caseIds:[] as number[]})
+export function notify(message:string,error=false){ui.message=message;ui.error=error}
+export async function api(path:string,body?:any,method?:string):Promise<any>{
+  const response=await fetch('/api/v1'+path,{method:method??(body===undefined?'GET':'POST'),credentials:'same-origin',headers:body instanceof FormData?{'X-Teaching-Request':'1'}:{'Content-Type':'application/json','X-Teaching-Request':'1'},body:body===undefined?undefined:body instanceof FormData?body:JSON.stringify(body)})
+  if(!response.ok){let data:any={};try{data=await response.json()}catch{};throw new Error(typeof data.detail==='string'?data.detail:'内容未通过检查，请核对必填项、数值及输入长度。')}
+  return response.json()
+}
+export async function run(action:()=>Promise<any>,message='已保存'){try{const result=await action();if(message)notify(message);return result}catch(e){notify((e as Error).message,true);return null}}
+export async function upload(path:string,file:File){const form=new FormData();form.append('file',file);return api(path,form)}
+export function parse(value:any,fallback:any={}){try{return typeof value==='string'?JSON.parse(value):value??fallback}catch{return fallback}}
+export function uid(){const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('')}
+export function download(name:string,data:any){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+export const labels:Record<string,string>={abnormality:'主要实验现象',description:'原始现象与操作记录',student_initial_hypothesis:'独立初判与依据',positive_control_normal:'阳性对照是否正常',negative_control_band:'阴性对照是否有带',positive_control_detail:'阳性对照具体表现',negative_control_detail:'阴性对照具体表现',band_pattern:'条带形态',confirmed_hints:'人工确认的事实',teaching_task_code:'课堂任务码',gel_notes:'人工泳道说明',data_origin:'记录来源',course_name:'课程名称',class_name:'班级',group_code:'匿名组号',experiment_name:'实验名称',template_type:'模板类型',template_amount:'模板加入体积（μL）',template_concentration:'模板浓度（ng/μL）',reaction_volume:'每管反应体积（μL）',target_size:'预期片段大小（bp）',annealing_temp:'实际退火温度（℃）',recommended_temp:'推荐退火温度（℃）',polymerase:'聚合酶与型号',cycles:'循环数',template_input_mass_ng:'模板质量（ng）',controls:'对照设置',protocol_notes:'完整程序与补充说明',hypothesis:'待验证假设',variable:'拟改变的变量',expected_result:'预期结果',interpretation:'不同结果怎样解释',performed_at:'实际复测时间',changed:'实际改变的条件',kept:'保持一致的条件',sample_result:'实际样本结果',expected_comparison:'与预期的比较',conclusion:'本次复测解释',name:'方案名称',source:'方案依据',title:'任务名称',instructions:'任务说明',due_at:'截止时间（可留空）',transfer_prompt:'能力迁移题目（可留空）',knowledge_note:'知识阅读提示',cause:'判断原因',reason:'判断依据',note:'复核依据或备注',verification_feedback:'验证计划反馈',answer:'独立判断',reasoning:'判断依据',minutes:'实际用时（分钟，未知留空）'}

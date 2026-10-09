@@ -36,7 +36,13 @@ def app_files():
         for path in (ROOT/folder).iterdir():
             if path.is_file() and path.suffix in {".py",".ps1",".vbs"}:
                 yield path,"app/"+folder+"/"+path.name
-    for name in ("branding.py","rules.csv","rule_combos.csv","rules_v2.csv","course_presets.json","ui_design.css","requirements.txt","README.md","RULE_AUDIT.md",".streamlit/config.toml","docs/教学功能升级使用说明.md","docs/Windows安装与启动说明.md"):
+    for folder,extensions in (("teaching_platform",{".py"}),("frontend/dist",{".html",".js",".css"}),("knowledge",{".json"})):
+        for path in (ROOT/folder).rglob('*'):
+            if path.is_file() and path.suffix in extensions and '__pycache__' not in path.parts:
+                yield path,'app/'+path.relative_to(ROOT).as_posix()
+    if not (ROOT/'frontend/dist/index.html').is_file():
+        raise RuntimeError('请先构建统一网页：npm ci --prefix frontend，然后 npm run build --prefix frontend。')
+    for name in ("branding.py","rules.csv","rule_combos.csv","rules_v2.csv","course_presets.json","ui_design.css","requirements.txt","README.md","RULE_AUDIT.md",".streamlit/config.toml","docs/教学功能升级使用说明.md","docs/Windows安装与启动说明.md","docs/统一教学平台使用说明.md"):
         path=ROOT/name
         yield path,"app/"+name
 
@@ -65,7 +71,7 @@ def main():
     # 卸载脚本也在 ZIP 内统一为 UTF-8 BOM，避免安装后中文路径损坏。
     # app_files 中的脚本由下方构建校验检查编码，不打包任何实际 secrets。
     if args.payload_only:return
-    target=output/"BioLabReview-Setup-2026.10.08.exe"
+    target=output/"BioLabReview-Unified-Setup.exe"
     sed=f'''[Version]
 Class=IEXPRESS
 SEDVersion=3

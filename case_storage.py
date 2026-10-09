@@ -313,7 +313,7 @@ def save_reassessment(path, record_id, result_text, positive, negative, followup
         return True
 
 
-def save_revision(path, record_id, code, cause, reason):
+def save_revision(path, record_id, code, cause, reason, expected_version=None):
     if not all(str(v or "").strip() for v in (record_id,code,cause,reason)):
         return False
     digest = hashlib.sha256(code.strip().encode()).hexdigest()
@@ -324,6 +324,8 @@ def save_revision(path, record_id, code, cause, reason):
         if not row or not row["teacher_final_cause"]:
             return False
         version = int(row["teacher_review_version"] or 0)
+        if expected_version is not None and version != expected_version:
+            return False
         if row["student_revision_time"] and int(row["student_revision_review_version"] or 0) == version:
             return False
         if row["student_revision_time"]:
@@ -348,3 +350,59 @@ def save_verification_plan(path, record_id, code, plan):
         cursor = conn.execute("UPDATE diagnosis_records SET verification_plan_json=? WHERE id=? AND student_access_hash=?",
                               (json.dumps(data,ensure_ascii=False),record_id,digest))
         return cursor.rowcount == 1
+
+
+def init_database(path):
+    """初始化SQLite数据库，创建诊断记录表"""
+    prepare_database(path)
+    conn = sqlite3.connect(path)
+    cursor = conn.cursor()
+    # 创建诊断记录表
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS diagnosis_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            abnormality TEXT,
+            template_amount REAL,
+            annealing_temp REAL,
+            cycles INTEGER,
+            positive_control_normal TEXT,
+            negative_control_band TEXT,
+            description TEXT,
+            diagnosis_result TEXT,
+            diagnosis_time TEXT,
+            gel_image_path TEXT,
+            teacher_final_cause TEXT,
+            teacher_note TEXT,
+            teacher_confirm_time TEXT,
+            followup_json TEXT,
+            student_initial_hypothesis TEXT,
+            student_access_hash TEXT,
+            student_revised_cause TEXT,
+            student_revision_reason TEXT,
+            student_revision_time TEXT
+        )
+    """)
+
+    # 兼容旧数据库：如果缺少教师确认字段，则自动补字段（最小改动，不重建库）
+    cursor.execute("PRAGMA table_info(diagnosis_records)")
+    existing_cols = [row[1] for row in cursor.fetchall()]
+    if "teacher_final_cause" not in existing_cols:
+        cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN teacher_final_cause TEXT")
+    if "teacher_note" not in existing_cols:
+        cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN teacher_note TEXT")
+    if "teacher_confirm_time" not in existing_cols:
+        cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN teacher_confirm_time TEXT")
+    if "gel_image_path" not in existing_cols:
+        cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN gel_image_path TEXT")
+    if "followup_json" not in existing_cols:
+        cursor.execute("ALTER TABLE diagnosis_records ADD COLUMN followup_json TEXT")
+    for column in (
+        "student_initial_hypothesis", "student_access_hash", "student_revised_cause",
+        "student_revision_reason", "student_revision_time",
+    ):
+        if column not in existing_cols:
+            cursor.execute(f"ALTER TABLE diagnosis_records ADD COLUMN {column} TEXT")
+
+    migrate(conn)
+    conn.commit()
+    conn.close()

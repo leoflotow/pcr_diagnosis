@@ -143,7 +143,7 @@ def task_status(task):
     return "开放"
 
 
-def create_task(path, title, instructions, transfer_prompt, due_at="", scheme_id=None, teacher_authorized=False):
+def create_task(path, title, instructions, transfer_prompt, due_at="", scheme_id=None, teacher_authorized=False, after_insert=None):
     require_teacher(teacher_authorized)
     title = text(title, "任务名称", 120)
     instructions = text(instructions, "任务说明")
@@ -161,8 +161,10 @@ def create_task(path, title, instructions, transfer_prompt, due_at="", scheme_id
         if scheme_id and not scheme:
             raise ValueError("课程方案不存在。")
         code = secrets.token_hex(4).upper()
-        conn.execute("INSERT INTO teaching_tasks(code,title,instructions,due_at,transfer_prompt,scheme_json,created_at) VALUES (?,?,?,?,?,?,?)",
+        cursor = conn.execute("INSERT INTO teaching_tasks(code,title,instructions,due_at,transfer_prompt,scheme_json,created_at) VALUES (?,?,?,?,?,?,?)",
                      (code, title, instructions, due_at, transfer_prompt, dump(dict(scheme)) if scheme else "{}", now()))
+        if after_insert:
+            after_insert(conn, cursor.lastrowid)
     return code
 
 
